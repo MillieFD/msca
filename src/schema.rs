@@ -93,10 +93,10 @@ use std::convert::Infallible;
 use std::fmt::{Display, Formatter};
 use std::num;
 
-/// Shorthand occupied entry for a [`Column`] that already exists in the [`Schema`].
+/// Shorthand [`OccupiedEntry`] for a [`Column`] that already exists in the [`Schema`].
 type Occupied<'a> = OccupiedEntry<'a, &'static str, Column>;
 
-/// Shorthand vacant entry for a [`Column`] that does not yet exist in the [`Schema`].
+/// Shorthand [`VacantEntry`] for a [`Column`] that does not yet exist in the [`Schema`].
 type Vacant<'a> = VacantEntry<'a, &'static str, Column>;
 
 /* ------------------------------------------------------------------------------ Public Exports */
