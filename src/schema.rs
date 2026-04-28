@@ -368,6 +368,13 @@ impl Type {
             subtype => Self::Option { subtype: Box::new(subtype) },
         }
     }
+
+    /// Constructor for [`Type::Sequence`] wrapping the provided subtype.
+    pub fn sequence(subtype: Self) -> Self {
+        Self::Sequence {
+            subtype: Box::new(subtype),
+        }
+    }
 }
 
 mod number {
@@ -798,9 +805,7 @@ where
     type Ok = Type;
     type Error = Infallible;
     fn unfold(&mut self) -> Result<Self::Ok, Self::Error> {
-        Ok(Type::Sequence {
-            subtype: T::with_unfolder(self)?.into(),
-        })
+        Type::sequence(T::with_unfolder(self)?).into()
     }
 }
 
