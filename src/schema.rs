@@ -360,8 +360,12 @@ impl Type {
 
     /// Constructor for [`Type::Option`] wrapping the provided subtype.
     pub fn option(subtype: Self) -> Self {
-        Self::Option {
-            subtype: Box::new(subtype),
+        match subtype {
+            // Flatten nested options. Single null bitmap improves on-disk efficiency.
+            Self::Option { subtype } => Self::Option { subtype },
+            // Box non-option subtypes to prevent unbounded enum size from infinite recursion.
+            #[rustfmt::skip] // Single line match arm improves readability.
+            subtype => Self::Option { subtype: Box::new(subtype) },
         }
     }
 }
@@ -783,9 +787,7 @@ where
     type Ok = Type;
     type Error = Infallible;
     fn unfold(&mut self) -> Result<Self::Ok, Self::Error> {
-        Ok(Type::Option {
-            subtype: T::with_unfolder(self)?.into(),
-        })
+        Type::option(T::with_unfolder(self)?).into()
     }
 }
 
