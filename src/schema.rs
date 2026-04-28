@@ -114,7 +114,7 @@ pub struct Schema {
     ///
     /// The [`BTreeMap`] guarantees a stable deterministic column order for consistent binary
     /// encoding and schema comparison.
-    #[cbor(n(1), skip_if = "BTreeMap::is_empty")]
+    #[cbor(n(0), skip_if = "BTreeMap::is_empty")]
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub columns: BTreeMap<&'static str, Column>,
 }
