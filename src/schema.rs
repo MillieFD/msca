@@ -569,7 +569,7 @@ where
 /// integration with on-disk storage.
 // TODO [1] link to procedural macro documentation
 // TODO [2] link to procedural macro user guide
-pub trait Unfold: Serialize {
+pub trait Unfold {
     /// Delegates to [`Unfolder::unfold`] on the provided [`Unfolder`].
     fn with_unfolder<U: Unfolder<Self>>(unfolder: &mut U) -> Result<U::Ok, U::Error> {
         unfolder.unfold()
