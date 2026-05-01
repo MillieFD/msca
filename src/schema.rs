@@ -193,7 +193,7 @@ pub enum Type {
     /// Fixed size tuple wrapping an arbitrary number of subtypes.
     #[n(4)]
     Tuple {
-        /// [`Type`] of each subtype root node. [`Vec::len`] returns the number of elements.
+        /// [`Type`] of each subtype root node. [`Vec::len`] returns the arity.
         #[n(0)]
         subtypes: Vec<Type>,
     },
