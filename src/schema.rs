@@ -130,8 +130,8 @@ impl Schema {
 
     /// Resolve a [`Column`] name collision by comparing the associated metadata.
     ///
-    /// - Returns `Ok(Self)` unaltered if the column definitions are identical.
-    /// - Returns `Err(Error::Collision)` if the column definitions differ.
+    /// - Returns [`Self`](Schema) unaltered if the column definitions are identical.
+    /// - Returns [`Error::Collision`] if the column definitions differ.
     fn occupied(mut self, occupied: Occupied, ty: Type) -> Result<Self, Error> {
         match occupied.get().ty == ty {
             // Idempotent column definition
