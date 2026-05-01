@@ -70,7 +70,6 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //! are achieved by appending additional schema segments.
 
 use minicbor::{Decode, Encode};
-use serde::{Deserialize, Serialize};
 use std::collections::btree_map::{BTreeMap, Entry, OccupiedEntry, VacantEntry};
 use std::convert::Infallible;
 use std::fmt::{Display, Formatter};
@@ -90,7 +89,8 @@ type Vacant<'a> = VacantEntry<'a, &'static str, Column>;
 /// lightweight descriptor for segment initialisation without holding buffer contents in memory. An
 /// on-disk schema segment encodes the schema definition (column names and types) while on-disk
 /// data segments contain the columnar buffers.
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize, Encode, Decode)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode)]
 // NOTE: schema::Schema (public builder) ≠ manifest::Schema (private descriptor).
 pub struct Schema {
     /// [`Column`] descriptors keyed by name.
@@ -98,7 +98,10 @@ pub struct Schema {
     /// The [`BTreeMap`] guarantees a stable deterministic column order for consistent binary
     /// encoding and schema comparison.
     #[cbor(n(0), skip_if = "BTreeMap::is_empty")]
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    #[cfg_attr(
+        feature = "serde",
+        serde(default, skip_serializing_if = "BTreeMap::is_empty")
+    )]
     pub columns: BTreeMap<&'static str, Column>,
 }
 
@@ -154,9 +157,8 @@ impl Schema {
 /// `Column` does **not** contain the actual buffer data; it is a lightweight descriptor for
 /// discovery and random access without holding buffer contents in memory. Data is stored via one
 /// or more on-disk data segments, each of which contains a buffer for this column.
-#[derive(
-    Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, Encode, Decode,
-)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode)]
 struct Column {
     /// The [`Type`] of values contained within this column.
     #[n(0)]
@@ -165,9 +167,8 @@ struct Column {
 
 /// A minimal type **descriptor** that provides a stable and extensible representation for
 /// platform-agnostic Rust primitives; used when walking the type graph for schema encoding.
-#[derive(
-    Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, Encode, Decode,
-)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode)]
 #[non_exhaustive] // To accommodate the potential future stabilisation of additional types.
 pub enum Type {
     /* ----------------------------------------------------------- Fixed-Size Machine Primitives */
@@ -376,24 +377,11 @@ mod number {
     //! [1]: https://rust-lang.github.io/rfcs/3453-f16-and-f128.html
 
     use minicbor::{Decode, Encode};
-    use serde::{Deserialize, Serialize};
     use std::fmt::{Display, Formatter};
 
     /// Semantic classification of the numeric primitive type.
-    #[derive(
-        Debug,
-        Copy,
-        Clone,
-        Eq,
-        PartialEq,
-        Ord,
-        PartialOrd,
-        Hash,
-        Serialize,
-        Deserialize,
-        Encode,
-        Decode,
-    )]
+    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+    #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode)]
     #[non_exhaustive] // To accommodate the potential stabilisation of additional numeric kinds.
     pub enum Kind {
         /* ---------------------------------------------------------------------------- Unsigned */
@@ -436,20 +424,8 @@ mod number {
     /// This type does **not** contain the actual numeric value; it is a lightweight descriptor for
     /// numeric type information without holding values in memory. Each unique combination of `Kind`
     /// and `bytes` corresponds to a specific Rust numeric primitive type.
-    #[derive(
-        Debug,
-        Copy,
-        Clone,
-        Eq,
-        PartialEq,
-        Ord,
-        PartialOrd,
-        Hash,
-        Serialize,
-        Deserialize,
-        Encode,
-        Decode,
-    )]
+    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+    #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode)]
     pub struct Number {
         /// Semantic classification of the numeric primitive type.
         #[n(0)]
@@ -480,6 +456,11 @@ mod acc {
     //! Each accumulator type implements the [`Builder`] trait, which defines a shared interface for
     //! handling in-memory value accumulation.
 
+    use super::{Build, Builder};
+    use bitvec::vec::BitVec;
+    use core::num::NonZeroU64;
+    use minicbor::{Decode, Encode};
+
     /// Data accumulator for [optional](Option) values with niche optimisation; a compiler
     /// optimisation technique that leverages unused bit patterns (niches) to represent additional
     /// states without increasing the [size](size_of) of the type.
@@ -495,9 +476,49 @@ mod acc {
     ///
     /// Implementors are advised to use niche-optimised types when possible to improve storage
     /// efficiency and random read performance.
+    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+    #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode)]
     pub(super) struct OptInSitu<T> {
         /// Contiguous payload encoding [`Some`] and [`None`] values directly.
+        #[cbor(n(0), skip_if = "Vec::is_empty")]
         pub data: Vec<Option<T>>,
+    }
+
+    /// Data accumulator for [optional](Option) values without niche optimisation.
+    ///
+    /// ### Data Layout
+    ///
+    /// [`OptBitVec`] encodes [validity](Option) and [value](T) separately for non-niche types:
+    ///
+    /// 1. A packed [`BitVec`] encodes [`Some`] as `true`.
+    /// 2. A contiguous data buffer encodes values.
+    ///
+    /// [`T::default`] generates placeholder values for [`None`] entries in the data buffer. This
+    /// design maintains the alignment necessary for **O(1) random access** by index.
+    ///
+    /// ### Guidance
+    ///
+    /// The sibling [`OptInSitu`] type encodes [`Some`] and [`None`] values directly in a single
+    /// data buffer for supported niche types; no validity mask required. Implementors are advised
+    /// to use niche-optimised types when possible to improve storage efficiency and random read
+    /// performance.
+    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+    #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode)]
+    pub(super) struct OptBitVec<T: Build + Default> {
+        /// Validity mask where `true → `[`Some`] and `false → `[`None`].
+        #[cbor(n(0), skip_if = "BitVec::is_empty")]
+        #[cfg_attr(
+            feature = "serde",
+            serde(default, skip_serializing_if = "BitVec::is_empty")
+        )]
+        pub mask: BitVec,
+        /// Contiguous payload padded with [`Default::default`] for [`None`] entries.
+        #[cbor(n(1), skip_if = "Builder::is_empty")]
+        #[cfg_attr(
+            feature = "serde",
+            serde(default, skip_serializing_if = "Builder::is_empty")
+        )]
+        pub data: T::Builder,
     }
 }
 
@@ -513,7 +534,8 @@ mod acc {
 ///
 /// This enum is `#[non_exhaustive]` meaning additional variants may be added in future versions.
 /// Implementers are advised to include a wildcard arm `_` to account for potential additions.
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode)]
 #[non_exhaustive] // To accommodate potential future error cases.
 pub enum Error {
     /// A [`Column`] with the same [name](String) but a different [type](Type) already exists in
