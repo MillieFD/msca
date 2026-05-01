@@ -110,16 +110,21 @@ impl Schema {
         }
     }
 
-    /// Add a [`Column`] to [`self`](Schema) with the specified `name` and [`Type`].
-    pub fn column<T: Unfold>(mut self, name: &'static str) -> Result<Self, Error>
+    /// Add a [`Column`] to [`self`](Schema) with the specified `name` and [`type`](R).
+    ///
+    /// Returns an empty [`Builder<R>`] for in-memory data accumulation, where [`R`] matches the
+    /// column type. This design ensures schema verification is performed exactly once.
+    pub fn column<R>(&mut self, name: &'static str) -> Result<Box<dyn Builder<R>>, Error>
     where
-        Schema: Unfolder<T, Ok = Type>,
+        R: Unfold + Build,
+        Schema: Unfolder<R, Ok = Type>,
     {
-        let ty = T::with_unfolder(&mut self)?;
+        let ty = R::with_unfolder(self)?;
         match self.columns.entry(name) {
-            Entry::Vacant(vacant) => Ok(self.vacant(vacant, ty)),
-            Entry::Occupied(occupied) => self.occupied(occupied, ty),
-        }
+            Entry::Vacant(vacant) => self.vacant(vacant, ty),
+            Entry::Occupied(occupied) => self.occupied(occupied, ty)?,
+        };
+        R::Builder::new()
     }
 
     /// Insert a new [`Column`] into the [`Schema`] at the provided vacant entry.
