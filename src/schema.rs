@@ -520,6 +520,114 @@ mod acc {
         )]
         pub data: T::Builder,
     }
+
+    /// Data accumulator for [unsized][1] values.
+    ///
+    /// ### Data Layout
+    ///
+    /// It is not possible to predetermine the disk space required by each instance of an unsized
+    /// type; there is no guarantee that two [`Vec<T>`] contain the same number of elements.
+    /// [`Clem`](crate) therefore unfolds unsized types into:
+    ///
+    /// 1. Columnar `offsets` bufffer describing boundaries.
+    /// 2. Contiguous `data` buffer encoding values.
+    ///
+    /// This design ensures **O(1) random access** and avoids per-element pointer chasing.
+    /// Sequential scans across the contained [elements](T) remain linear; leveraging columnar
+    /// optimisations for SIMD and prefetch.
+    ///
+    /// ```text
+    /// offsets: [3, 6, 6]
+    /// values:  [a, b, c, d, e, f, g, h]
+    /// ```
+    ///
+    /// The serialized on-disk example above is deserialized into the memory representation below.
+    /// Implementers can specify which type to use for offset storage based on the number of
+    /// expected elements.
+    ///
+    /// ```text
+    /// Row 0 → values[..3] → "abc"
+    /// Row 1 → values[3..6] → "def"
+    /// Row 2 → values[6..6] → "" (empty)
+    /// Row 3 → values[6..] → "gh"
+    /// ```
+    ///
+    /// Nested unsized types use **multiple offset layers** alongside a **single data buffer**.
+    /// This composable design preserves the performance advantages associated with contiguous value
+    /// storage; namely predictable vectorised traversal. Scanning performance across the contiguous
+    /// inner `values` buffer is unaffected by deep nesting. The inner offsets buffer is aligned in
+    /// memory order of traversal to improve cache locality during nested iteration and reduce TLB
+    /// misses.
+    ///
+    /// ```text
+    /// inner offsets
+    /// outer offsets
+    /// values
+    /// ```
+    ///
+    /// [1]: https://doc.rust-lang.org/reference/dynamically-sized-types.html
+    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+    #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode)]
+    pub(super) struct Seq<T: Build> {
+        /// Cumulative end offsets. `offsets[i]` marks the inclusive end of element `i` and the
+        /// exclusive start of element `i + 1`.
+        #[cbor(n(0), skip_if = "Vec::is_empty")]
+        #[cfg_attr(
+            feature = "serde",
+            serde(default, skip_serializing_if = "Vec::is_empty")
+        )]
+        // TODO Allow users to specify the offset type based on the number of expected elements.
+        pub offsets: Vec<NonZeroU64>,
+        /// Flattened element buffer.
+        #[cbor(n(1), skip_if = "Builder::is_empty")]
+        #[cfg_attr(
+            feature = "serde",
+            serde(default, skip_serializing_if = "Builder::is_empty")
+        )]
+        pub data: T::Builder,
+    }
+
+    /// Data accumulator for [optional](Option) [unsized][1] values.
+    ///
+    /// ### Data Layout
+    ///
+    /// It is not possible to predetermine the disk space required by each instance of an unsized
+    /// type; there is no guarantee that two [`Vec<T>`] contain the same number of elements.
+    /// [`Clem`](crate) therefore unfolds unsized types into:
+    ///
+    /// 1. Columnar `offsets` bufffer describing boundaries.
+    /// 2. Contiguous `data` buffer encoding values.
+    ///
+    /// [`OptSeq`] leverages niche-optimisation on the `offsets` buffer to simultaneously encode
+    /// validity without requiring an auxiliary bitmap. `None` rows append no data.
+    ///
+    /// See the [documentation](Seq) on non-optional unsized type accumulation for more details.
+    ///
+    /// [1]: https://doc.rust-lang.org/reference/dynamically-sized-types.html
+    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+    #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode)]
+    pub(super) struct OptSeq<T: Build> {
+        /// Cumulative end offsets per row; [`None`] marks a null row (no data appended).
+        #[cbor(n(0), skip_if = "Vec::is_empty")]
+        #[cfg_attr(
+            feature = "serde",
+            serde(default, skip_serializing_if = "Vec::is_empty")
+        )]
+        pub offsets: Vec<Option<NonZeroU64>>,
+        /// Flattened element buffer; only [`Some`] rows contribute entries.
+        #[cbor(n(1), skip_if = "Builder::is_empty")]
+        #[cfg_attr(
+            feature = "serde",
+            serde(default, skip_serializing_if = "Builder::is_empty")
+        )]
+        pub data: T::Builder,
+    }
+
+    /// Stateless type-level wrapper that flattens nested types on push. All storage lives in the
+    /// inner accumulator.
+    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+    #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode)]
+    pub(super) struct Flatten<T>(#[n(0)] pub T);
 }
 
 /* ------------------------------------------------------------------------------ Specific Error */
