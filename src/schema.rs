@@ -379,7 +379,7 @@ mod number {
     use serde::{Deserialize, Serialize};
     use std::fmt::{Display, Formatter};
 
-    /// Classification of the numeric primitive type.
+    /// Semantic classification of the numeric primitive type.
     #[derive(
         Debug,
         Copy,
@@ -394,8 +394,8 @@ mod number {
         Encode,
         Decode,
     )]
-    #[non_exhaustive] // To accommodate the potential stabilisation of additional numeric classes.
-    pub(super) enum Kind {
+    #[non_exhaustive] // To accommodate the potential stabilisation of additional numeric kinds.
+    pub enum Kind {
         /* ---------------------------------------------------------------------------- Unsigned */
         /// Unsigned integer type.
         #[n(0)]
@@ -428,10 +428,10 @@ mod number {
         }
     }
 
-    /// A minimal and extensible numeric type **descriptor** that specifies:
+    /// A minimal and extensible runtime numeric type **descriptor** that specifies:
     ///
-    /// 1. The numeric [classification](Kind).
-    /// 2. Number of bytes used to encode the value.
+    /// 1. The [kind](Kind) of number.
+    /// 2. The [size](size_of) of each value in bytes.
     ///
     /// This type does **not** contain the actual numeric value; it is a lightweight descriptor for
     /// numeric type information without holding values in memory. Each unique combination of `Kind`
