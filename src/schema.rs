@@ -651,12 +651,16 @@ pub enum Error {
     ///
     /// Each schema stores columns in a [`BTreeMap`] keyed by column name. Reusing an existing
     /// name therefore overwrites the existing column definition, resulting in possible data loss.
+    #[n(0)]
     Collision {
         /// Name shared by the new and existing columns.
+        #[n(0)]
         name: &'static str,
         /// [`Type`] of the existing [`Column`] in the [`Schema`].
+        #[n(1)]
         ty1: Type,
         /// [`Type`] of the new [`Column`] being added to the [`Schema`].
+        #[n(2)]
         ty2: Type,
     },
     /// The requested type is not supported by this version of [`clem`](crate).
@@ -664,7 +668,8 @@ pub enum Error {
     /// Some types are deliberately omitted. Please read the [type documentation](Type) for more
     /// details. If you think a type should be supported, please open a new GitHub feature request
     /// with your use case and justification for inclusion.
-    Unsupported(&'static str),
+    #[n(1)]
+    Unsupported(#[n(0)] &'static str),
 }
 
 impl Error {
