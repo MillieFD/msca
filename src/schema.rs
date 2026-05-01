@@ -450,11 +450,11 @@ mod number {
         Encode,
         Decode,
     )]
-    pub(super) struct Number {
-        /// Classification of the numeric primitive type.
+    pub struct Number {
+        /// Semantic classification of the numeric primitive type.
         #[n(0)]
         pub kind: Kind,
-        /// Number of bytes used to encode the value.
+        /// Number of bytes used to encode each value.
         #[n(1)]
         pub size: u8,
     }
