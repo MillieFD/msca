@@ -88,8 +88,8 @@ type Vacant<'a> = VacantEntry<'a, &'static str, Column>;
 ///
 /// This type does **not** contain the actual schema definition or columnar data buffers; it is a
 /// lightweight descriptor for segment initialisation without holding buffer contents in memory. An
-/// on-disk schema segment encodes the schema definition (column names and types) while
-/// on-disk data segments contain the columnar buffers.
+/// on-disk schema segment encodes the schema definition (column names and types) while on-disk
+/// data segments contain the columnar buffers.
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize, Encode, Decode)]
 // NOTE: schema::Schema (public builder) ≠ manifest::Schema (private descriptor).
 pub struct Schema {
