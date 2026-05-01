@@ -567,9 +567,6 @@ pub trait Unfold {
 
 /// A **schema builder** that can unfold the supported type `T`.
 ///
-/// - Rust primitive types are unfolded directly into their corresponding [`Type`] descriptors.
-/// - Algebraic data types (structs and enums) are unfolded recursively into their component types.
-///
 /// `Unfolder` is implemented independently for each supported type; enabling type-driven encoding.
 /// For example, the default [`Schema`] builder folds `u8` into a [`Type::Number`] descriptor with
 /// `kind: number::Kind::UInt` and `size: 1`.
