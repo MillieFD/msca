@@ -400,14 +400,14 @@ mod number {
         /// Unsigned integer type.
         #[n(0)]
         UInt,
-        /// [Non-zero](std::num::NonZero) unsigned integer type.
+        /// [Non-zero](num::NonZero) unsigned integer type.
         #[n(1)]
         NonZeroUInt,
         /* ------------------------------------------------------------------------------ Signed */
         /// Signed integer type.
         #[n(2)]
         Int,
-        /// [Non-zero](std::num::NonZero) signed integer type.
+        /// [Non-zero](num::NonZero) signed integer type.
         #[n(3)]
         NonZeroInt,
         /* ---------------------------------------------------------------------- Floating Point */
