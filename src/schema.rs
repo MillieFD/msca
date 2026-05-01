@@ -578,7 +578,7 @@ pub trait Unfolder<T: ?Sized> {
     fn unfold(&mut self) -> Result<Self::Ok, Self::Error>;
 }
 
-/* ----------------------------------------------------------------------- Trait Implementations */
+/* --------------------------------------------------------------- Unfolder Trait Implementation */
 
 impl Unfolder<bool> for Schema {
     type Ok = Type;
