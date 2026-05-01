@@ -19,7 +19,7 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //! Arbitrary user-defined algebraic data types (structs and enums) are [unfolded](Unfold) into
 //! their primitive [components](Type).
 //!
-//! - **Leaf nodes** map to contiguous columnar data buffers via index.
+//! - **Leaf nodes** map to contiguous columnar data buffers by name.
 //! - **Internal nodes** exist purely for navigation and reconstruction.
 //!
 //! ### Unsized Types
