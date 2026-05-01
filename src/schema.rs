@@ -149,14 +149,11 @@ impl Schema {
 
 /* ---------------------------------------------------------------------------- Schema Internals */
 
-/// A minimal column **descriptor** that wraps interpretation metadata necessary for random access
-/// and value [deserialization](Deserialize).
+/// A minimal column **descriptor** that provides type metadata for reading and writing values.
 ///
-/// This type does **not** contain the actual buffer data; it is a lightweight descriptor for column
-/// discovery and access without holding buffer contents in memory. Data is stored via one or more
-/// on-disk data segments, each of which contains a buffer for this column.
-///
-/// [`Vec`] order in-memory is **not** guaranteed to reflect [`Sector`] order on-disk.
+/// `Column` does **not** contain the actual buffer data; it is a lightweight descriptor for
+/// discovery and random access without holding buffer contents in memory. Data is stored via one
+/// or more on-disk data segments, each of which contains a buffer for this column.
 #[derive(
     Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, Encode, Decode,
 )]
