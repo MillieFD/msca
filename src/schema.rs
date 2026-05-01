@@ -568,8 +568,7 @@ pub trait Unfold {
 /// A **schema builder** that can unfold the supported type `T`.
 ///
 /// `Unfolder` is implemented independently for each supported type; enabling type-driven encoding.
-/// For example, the default [`Schema`] builder folds `u8` into a [`Type::Number`] descriptor with
-/// `kind: number::Kind::UInt` and `size: 1`.
+/// For example, the default [`Schema`] builder unfolds `u8` into a [`Type::Number`] descriptor.
 pub trait Unfolder<T: ?Sized> {
     /// The output type returned by [`unfold`] on success.
     type Ok;
