@@ -52,7 +52,7 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //! Row 3 → values[6..] → "gh"
 //! ```
 //!
-//! Nested unsized types serialize into a flattened graph with **multiple offset layers**. This
+//! Nested unsized types use **multiple offset layers** alongside a **single data buffer**. This
 //! composable design preserves the performance advantages associated with contiguous value storage;
 //! namely predictable vectorised traversal. Scanning performance across the contiguous inner
 //! `values` buffer is unaffected by deep nesting. The inner offsets buffer is aligned in memory
