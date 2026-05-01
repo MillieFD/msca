@@ -539,7 +539,7 @@ where
     }
 }
 
-/* --------------------------------------------------------------------------- Composition Trait */
+/* --------------------------------------------------------------------- Unfold Trait Definition */
 
 /// A platform-agnostic **type** that can be unfolded into its primitive [components](Type) using
 /// an [`Unfolder`].
