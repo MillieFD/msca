@@ -25,15 +25,15 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //! ### Unsized Types
 //!
 //! It is not possible to predetermine the disk space required by each instance of an unsized type;
-//! there is no guarantee that one `Vec<T>` contains the same number of elements as another
-//! `Vec<T>`. The `clem` serializer therefore parses unsized types into:
+//! there is no guarantee that two [`Vec<T>`] contain the same number of elements. [`Clem`](crate)
+//! therefore unfolds unsized types into:
 //!
-//! 1. Columnar metadata describing boundaries
-//! 2. A contiguous region of elements
+//! 1. Columnar `offsets` bufffer describing boundaries.
+//! 2. Contiguous `data` buffer encoding values.
 //!
 //! This design ensures **O(1) random access** and avoids per-element pointer chasing. Sequential
-//! scans across the contained elements `[T]` remain linear; leveraging columnar optimisations for
-//! SIMD and prefetch.
+//! scans across the contained elements remain linear; leveraging columnar optimisations for SIMD
+//! and prefetch.
 //!
 //! ```text
 //! offsets: [3, 6, 6]
@@ -42,8 +42,7 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //!
 //! The serialized on-disk example above is deserialized into the memory representation below.
 //! Implementers must specify which type to use for offset storage based on the number of expected
-//! elements. A `NonZeroUInt` marker trait is implemented for approved types. The `offsets` buffer
-//! can simultaneously encode nullability by leveraging niche-optimisation on non-zero types.
+//! elements.
 //!
 //! ```text
 //! Row 0 → values[..3] → "abc"
@@ -65,7 +64,7 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //! ```
 //!
 //! Readers can directly query data from a named field – without reconstructing the full type – by
-//! reading only the required columnar data buffer. Each schema segment encodes **one** schema and
+//! reading only the required columnar data buffer. Each schema segment encodes **one** schema, and
 //! each `clem` file requires at least **one** schema segment. Multimodality and schema evolution
 //! are achieved by appending additional schema segments.
 
