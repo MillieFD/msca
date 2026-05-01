@@ -26,7 +26,7 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //!
 //! It is not possible to predetermine the disk space required by each instance of an unsized type;
 //! there is no guarantee that one `Vec<T>` contains the same number of elements as another
-//! `Vec<T>`. The `clem` type serializer therefore parses unsized types into:
+//! `Vec<T>`. The `clem` serializer therefore parses unsized types into:
 //!
 //! 1. Columnar metadata describing boundaries
 //! 2. A contiguous region of elements
