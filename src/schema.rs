@@ -565,6 +565,37 @@ pub trait Unfold {
     }
 }
 
+/* ----------------------------------------------------------------- Unfold Trait Implementation */
+
+impl Unfold for bool {}
+impl Unfold for char {}
+impl Unfold for u8 {}
+impl Unfold for u16 {}
+impl Unfold for u32 {}
+impl Unfold for u64 {}
+impl Unfold for u128 {}
+impl Unfold for num::NonZeroU8 {}
+impl Unfold for num::NonZeroU16 {}
+impl Unfold for num::NonZeroU32 {}
+impl Unfold for num::NonZeroU64 {}
+impl Unfold for num::NonZeroU128 {}
+impl Unfold for i8 {}
+impl Unfold for i16 {}
+impl Unfold for i32 {}
+impl Unfold for i64 {}
+impl Unfold for i128 {}
+impl Unfold for num::NonZeroI8 {}
+impl Unfold for num::NonZeroI16 {}
+impl Unfold for num::NonZeroI32 {}
+impl Unfold for num::NonZeroI64 {}
+impl Unfold for num::NonZeroI128 {}
+impl Unfold for f32 {}
+impl Unfold for f64 {}
+impl<T: Unfold> Unfold for Option<T> {}
+impl<T: Unfold> Unfold for Vec<T> {}
+
+/* ------------------------------------------------------------------- Unfolder Trait Definition */
+
 /// A **schema builder** that can unfold the supported type `T`.
 ///
 /// `Unfolder` is implemented independently for each supported type; enabling type-driven encoding.
