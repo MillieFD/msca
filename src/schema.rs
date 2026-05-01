@@ -446,9 +446,8 @@ mod acc {
     //! Composable in-memory data accumulation primitives, each mapped to a separate on-disk space
     //! optimisation strategy:
     //!
-    //! - [`Bool`] → Bit packed
-    //! - [`Niche`] → In-situ [`None`] values; no null bitmap required.
-    //! - [`Opt`] → Contiguous data buffer with bit-packed [`Option`] mask.
+    //! - [`OptInSitu`] → In-situ [`None`] values; no null bitmap required.
+    //! - [`OptBitVec`] → Contiguous data buffer with bit-packed [`Option`] mask.
     //! - [`Seq`] → Contiguous data buffer with offset metadata.
     //! - [`OptSeq`] → Contiguous data buffer with combined offsets and mask.
     //! - [`Flatten`] → Collapses nested [`Option`] layers.
