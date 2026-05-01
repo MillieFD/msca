@@ -480,6 +480,25 @@ mod acc {
     //! Each accumulator type implements the [`Builder`] trait, which defines a shared interface for
     //! handling in-memory value accumulation.
 
+    /// Data accumulator for [optional](Option) values with niche optimisation; a compiler
+    /// optimisation technique that leverages unused bit patterns (niches) to represent additional
+    /// states without increasing the [size](size_of) of the type.
+    ///
+    /// ### Data Layout
+    ///
+    /// [`OptInSitu`] encodes [`Some`] and [`None`] values directly in a single data buffer for
+    /// supported niche types; no validity mask is required.
+    ///
+    /// [`OptBitVec`] provides a fallback implementation for non-niche types.
+    ///
+    /// ### Guidance
+    ///
+    /// Implementors are advised to use niche-optimised types when possible to improve storage
+    /// efficiency and random read performance.
+    pub(super) struct OptInSitu<T> {
+        /// Contiguous payload encoding [`Some`] and [`None`] values directly.
+        pub data: Vec<Option<T>>,
+    }
 }
 
 /* ------------------------------------------------------------------------------ Specific Error */
