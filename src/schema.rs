@@ -363,10 +363,11 @@ impl Type {
 }
 
 mod number {
-    //! This module provides a minimal stable type **descriptor** for Rust numeric primitives.
+    //! This module provides a minimal and extensible [`Number`] **descriptor** for Rust numeric
+    //! primitives.
     //!
     //! Defining a distinct enum variant for each fixed-width machine primitive type is fragile; as
-    //! Rust stabilises new types – such as [`f16`][1] – new enum variants will need to be added,
+    //! Rust stabilises new types – such as [`f16`][1] – new enum variants would need to be added,
     //! which may break backwards compatibility and binary encoding.
     //!
     //! Instead, this module defines an extensible [`Number`] descriptor to encode arbitrary numeric
