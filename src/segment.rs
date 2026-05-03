@@ -37,25 +37,10 @@ use std::num::NonZeroU64;
 
 /* ------------------------------------------------------------------------------ Public Exports */
 
-/// On-disk **variant** identifier carried in the first byte of every segment header.
-///
-/// Format extensibility may be achieved via the introduction of new segment variants in future
-/// releases. Existing variants are guaranteed to retain their discriminant values for binary
-/// compatibility with existing files.
-///
-/// See the [module level documentation](self) for more details.
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode)]
-#[non_exhaustive] // To accommodate future segment variants.
-#[repr(u8)] // To map discriminant values directly ⇄ variant byte in the segment header.
-pub enum Variant {
-    /// A [`Schema`] segment describing the [structure](crate::schema::Schema) of encoded data.
-    #[n(0)]
-    Schema = 0x01, // DO NOT alter discriminant value (breaking change)
-    /// A [`Data`] segment encoding columnar buffers for a specified schema instance.
-    #[n(1)]
-    Data = 0x02, // DO NOT alter discriminant value (breaking change)
-}
+use crate::Sector;
+pub use data::{Buffer, Data, buffer};
+pub use schema::Schema;
+
 mod variant {
     //! todo module doc comment
 
@@ -166,6 +151,8 @@ pub(crate) const fn align(n: usize) -> usize {
     (n + 7) & !7
 }
 
+/* ------------------------------------------------------------------------------ Specific Error */
+
 /// Errors returned by [`Segment`] encoding and decoding.
 ///
 /// Enum variants cover various granular error cases that may arise when working with segments.
@@ -180,4 +167,42 @@ pub(crate) const fn align(n: usize) -> usize {
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode)]
 #[non_exhaustive] // To accommodate potential future error cases.
 pub enum Error {
+    /// A read operation attempted to access bytes beyond the end of the input slice.
+    #[n(0)]
+    Truncated(#[n(0)] Sector),
+    /// Underlying [`variant::Error`] from a failed [`Variant`] parsing operation.
+    #[n(1)]
+    Variant(#[n(0)] variant::Error),
+    /// Attempted to decode a zero value into a [`NonZero`](num::NonZero) field.
+    #[n(2)]
+    Zero,
+}
+
+impl Display for Error {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Truncated(sector) => write!(f, "Read from {sector:?} was truncated"),
+            Self::Variant(error) => write!(f, "Segment variant ID error → {error}"),
+            Self::Zero => write!(f, "Expected non-zero value was zero"),
+            other => write!(f, "Unexpected segment error → {other:?}"),
+        }
+    }
+}
+
+impl std::error::Error for Error {}
+
+impl From<variant::Error> for Error {
+    fn from(error: variant::Error) -> Self {
+        Self::Variant(error)
+    }
+}
+
+//noinspection DuplicatedCode
+impl<T, E> From<Error> for Result<T, E>
+where
+    E: From<Error>,
+{
+    fn from(error: Error) -> Self {
+        Err(E::from(error))
+    }
 }
