@@ -72,3 +72,11 @@ impl TryFrom<u8> for Variant {
         }
     }
 }
+
+/* --------------------------------------------------------------------------- Alignment Helpers */
+
+/// Round `n` up to the next multiple of eight; the unit of [critical-field alignment](self).
+pub(crate) const fn align(n: usize) -> usize {
+    (n + 7) & !7
+}
+
