@@ -80,3 +80,18 @@ pub(crate) const fn align(n: usize) -> usize {
     (n + 7) & !7
 }
 
+/// Errors returned by [`Segment`] encoding and decoding.
+///
+/// Enum variants cover various granular error cases that may arise when working with segments.
+/// Users should consider handling errors explicitly wherever possible to provide meaningful error
+/// messages and recovery actions.
+///
+/// ### Implementation
+///
+/// This enum is `#[non_exhaustive]` meaning additional variants may be added in future versions.
+/// Implementers are advised to include a wildcard arm `_` to account for potential additions.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode)]
+#[non_exhaustive] // To accommodate potential future error cases.
+pub enum Error {
+}
