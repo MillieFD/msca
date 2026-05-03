@@ -39,7 +39,11 @@ use std::num::NonZeroU64;
 
 /// On-disk **variant** identifier carried in the first byte of every segment header.
 ///
-/// See the [module level documentation](crate::segment) for more details.
+/// Format extensibility may be achieved via the introduction of new segment variants in future
+/// releases. Existing variants are guaranteed to retain their discriminant values for binary
+/// compatibility with existing files.
+///
+/// See the [module level documentation](self) for more details.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode)]
 #[non_exhaustive] // To accommodate future segment variants.
