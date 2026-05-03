@@ -22,9 +22,9 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //! - [`Schema`] segments describe the structure of encoded data.
 //! - [`Data`] segments carry columnar buffers for a specified schema instance.
 //!
-//! Multimodality and schema evolution are achieved by appending additional schema segments. Data
-//! storage and file extensibility are achieved by appending additional data segments. Format
-//! extensibility may be realised by the introduction of new segment variants in future releases.
+//! Multimodality and schema evolution are realised by appending additional schema segments. Data
+//! storage and file extensibility are realised by appending additional data segments. Format
+//! extensibility may be achieved via the introduction of new segment variants in future releases.
 //!
 //! ### Module Boundary
 //!
