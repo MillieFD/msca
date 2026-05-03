@@ -56,19 +56,105 @@ pub enum Variant {
     #[n(1)]
     Data = 0x02, // DO NOT alter discriminant value (breaking change)
 }
+mod variant {
+    //! todo module doc comment
 
-impl TryFrom<u8> for Variant {
-    type Error = Error;
+    use minicbor::{Decode, Encode};
+    use std::fmt::{Display, Formatter};
 
-    fn try_from(byte: u8) -> Result<Self, Error> {
-        match byte {
-            x if x == Self::Schema as u8 => Ok(Self::Schema),
-            x if x == Self::Data as u8 => Ok(Self::Data),
-            other => Error::Variant {
-                expected: None,
-                found: other,
+    /* -------------------------------------------------------------------------- Public Exports */
+
+    /// On-disk **variant** identifier carried in the first byte of every segment header.
+    ///
+    /// Format extensibility may be achieved via the introduction of new segment variants in future
+    /// releases. Existing variants are guaranteed to retain their discriminant values for binary
+    /// compatibility with existing files.
+    ///
+    /// See the [module level documentation](self) for more details.
+    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+    #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode)]
+    #[non_exhaustive] // To accommodate future segment variants.
+    #[repr(u8)] // To map discriminant values directly ⇄ variant byte in the segment header.
+    pub enum Variant {
+        /// A [`Schema`] segment describing the [structure](crate::schema::Schema) of encoded data.
+        #[n(0)]
+        Schema = 0x01, // DO NOT alter discriminant value (breaking change)
+        /// A [`Data`] segment encoding columnar buffers for a specified schema instance.
+        #[n(1)]
+        Data = 0x02, // DO NOT alter discriminant value (breaking change)
+    }
+
+    /* ------------------------------------------------------------------- Trait Implementations */
+
+    impl Display for Variant {
+        fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+            match self {
+                Self::Schema => write!(f, "Schema"),
+                Self::Data => write!(f, "Data"),
             }
-            .into(),
+        }
+    }
+
+    impl TryFrom<u8> for Variant {
+        type Error = Error;
+
+        fn try_from(byte: u8) -> Result<Self, Error> {
+            match byte {
+                x if x == Self::Schema as u8 => Ok(Self::Schema),
+                x if x == Self::Data as u8 => Ok(Self::Data),
+                other => Error::Unknown { found: other }.into(),
+            }
+        }
+    }
+
+    /* -------------------------------------------------------------------------- Specific Error */
+
+    /// Errors returned by [`Variant`] parsing.
+    ///
+    /// Enum variants cover various granular error cases that may arise when working with segments.
+    /// Users should consider handling errors explicitly wherever possible to provide meaningful
+    /// error messages and recovery actions.
+    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+    #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode)]
+    pub enum Error {
+        /// The actual variant byte did not match the [`Variant`] expected by the caller.
+        #[n(0)]
+        Unexpected {
+            /// The [`Variant`] expected by the caller.
+            #[n(0)]
+            expected: Variant,
+            /// The actual variant byte encountered by the caller.
+            #[n(1)]
+            found: Variant,
+        },
+        /// The actual variant byte did not map to any known [`Variant`].
+        #[n(1)]
+        Unknown {
+            /// The actual variant byte encountered by the caller.
+            #[n(0)]
+            found: u8,
+        },
+    }
+
+    impl Display for Error {
+        fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+            match self {
+                Error::Unexpected { expected, found } => write!(
+                    f,
+                    "Unexpected segment variant:\n\t\
+                    Expected {expected:?}\n\t\
+                    Found {found:?}"
+                ),
+                Error::Unknown { found } => write!(f, "Unknown segment variant → 0x{found:02X}"),
+            }
+        }
+    }
+
+    impl std::error::Error for Error {}
+
+    impl From<u8> for Error {
+        fn from(value: u8) -> Self {
+            Self::Unknown { found: value }
         }
     }
 }
