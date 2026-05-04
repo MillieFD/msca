@@ -100,7 +100,7 @@ mod variant {
     /// Users should consider handling errors explicitly wherever possible to provide meaningful
     /// error messages and recovery actions.
     #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-    #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode)]
+    #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode, CborLen)]
     pub enum Error {
         /// The actual variant byte did not match the [`Variant`] expected by the caller.
         #[n(0)]
