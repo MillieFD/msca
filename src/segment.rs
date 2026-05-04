@@ -495,3 +495,17 @@ where
         self.iter().for_each(|v| v.serialize_into(buf))
     }
 }
+
+impl Serialize for Schema {
+    fn size(&self) -> usize {
+        size_of::<Header>() + minicbor::len(self)
+    }
+
+    fn serialize_into(&self, buf: &mut Vec<u8>) {
+        let size = self.size() as u64;
+        buf.push(Self::VARIANT as u8);
+        buf.extend_from_slice(&size.to_le_bytes());
+        // SAFETY: minicbor::encode is infallible when writing to a Vec<u8>
+        minicbor::encode(self, buf).expect("Failed to encode schema.");
+    }
+}
