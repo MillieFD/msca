@@ -699,6 +699,7 @@ impl Display for Error {
 
 impl std::error::Error for Error {}
 
+//noinspection DuplicatedCode → Conversion is implemented for error types across different modules.
 impl<T, E> From<Error> for Result<T, E>
 where
     E: From<Error>,
