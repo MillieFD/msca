@@ -69,7 +69,7 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //! are achieved by appending additional schema segments.
 
 use bitvec::vec::BitVec;
-use minicbor::{Decode, Encode};
+use minicbor::{CborLen, Decode, Encode};
 use std::collections::btree_map::{BTreeMap, Entry, OccupiedEntry, VacantEntry};
 use std::convert::Infallible;
 use std::fmt::{Display, Formatter};
@@ -90,7 +90,7 @@ type Vacant<'a> = VacantEntry<'a, &'static str, Column>;
 /// on-disk schema segment encodes the schema definition (column names and types) while on-disk
 /// data segments contain the columnar buffers.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode)]
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, CborLen)]
 // NOTE: schema::Schema (public builder) ≠ manifest::Schema (private descriptor).
 pub struct Schema {
     /// [`Column`] descriptors keyed by name.
@@ -158,7 +158,7 @@ impl Schema {
 /// discovery and random access without holding buffer contents in memory. Data is stored via one
 /// or more on-disk data segments, each of which contains a buffer for this column.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode)]
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode, CborLen)]
 struct Column {
     /// The [`Type`] of values contained within this column.
     #[n(0)]
@@ -168,7 +168,7 @@ struct Column {
 /// A minimal type **descriptor** that provides a stable and extensible representation for
 /// platform-agnostic Rust primitives; used when walking the type graph for schema encoding.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode)]
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode, CborLen)]
 #[non_exhaustive] // To accommodate the potential future stabilisation of additional types.
 pub enum Type {
     /* ----------------------------------------------------------- Fixed-Size Machine Primitives */
@@ -376,12 +376,12 @@ mod number {
     //!
     //! [1]: https://rust-lang.github.io/rfcs/3453-f16-and-f128.html
 
-    use minicbor::{Decode, Encode};
+    use minicbor::{CborLen, Decode, Encode};
     use std::fmt::{Display, Formatter};
 
     /// Semantic classification of the numeric primitive type.
     #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-    #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode)]
+    #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode, CborLen)]
     #[non_exhaustive] // To accommodate the potential stabilisation of additional numeric kinds.
     pub enum Kind {
         /* ---------------------------------------------------------------------------- Unsigned */
@@ -425,7 +425,7 @@ mod number {
     /// numeric type information without holding values in memory. Each unique combination of `Kind`
     /// and `bytes` corresponds to a specific Rust numeric primitive type.
     #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-    #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode)]
+    #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode, CborLen)]
     pub struct Number {
         /// Semantic classification of the numeric primitive type.
         #[n(0)]
@@ -458,7 +458,7 @@ mod acc {
     use super::{Build, Builder};
     use bitvec::vec::BitVec;
     use core::num::NonZeroU64;
-    use minicbor::{Decode, Encode};
+    use minicbor::{CborLen, Decode, Encode};
 
     /// Data accumulator for [optional](Option) values with niche optimisation; a compiler
     /// optimisation technique that leverages unused bit patterns (niches) to represent additional
@@ -476,7 +476,7 @@ mod acc {
     /// Implementors are advised to use niche-optimised types when possible to improve storage
     /// efficiency and random read performance.
     #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-    #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode)]
+    #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode, CborLen)]
     pub(super) struct OptInSitu<T> {
         /// Contiguous payload encoding [`Some`] and [`None`] values directly.
         #[cbor(n(0), skip_if = "Vec::is_empty")]
@@ -502,7 +502,7 @@ mod acc {
     /// to use niche-optimised types when possible to improve storage efficiency and random read
     /// performance.
     #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-    #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode)]
+    #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode, CborLen)]
     pub(super) struct OptBitVec<T: Build + Default> {
         /// Validity mask where `true → `[`Some`] and `false → `[`None`].
         #[cbor(n(0), skip_if = "BitVec::is_empty")]
@@ -566,7 +566,7 @@ mod acc {
     ///
     /// [1]: https://doc.rust-lang.org/reference/dynamically-sized-types.html
     #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-    #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode)]
+    #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode, CborLen)]
     pub(super) struct Seq<T: Build> {
         /// Cumulative end offsets. `offsets[i]` marks the inclusive end of element `i` and the
         /// exclusive start of element `i + 1`.
@@ -604,7 +604,7 @@ mod acc {
     ///
     /// [1]: https://doc.rust-lang.org/reference/dynamically-sized-types.html
     #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-    #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode)]
+    #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode, CborLen)]
     pub(super) struct OptSeq<T: Build> {
         /// Cumulative end offsets per row; [`None`] marks a null row (no data appended).
         #[cbor(n(0), skip_if = "Vec::is_empty")]
@@ -625,7 +625,7 @@ mod acc {
     /// Stateless type-level wrapper that flattens nested types on push. All storage lives in the
     /// inner accumulator.
     #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-    #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode)]
+    #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode, CborLen)]
     pub(super) struct Flatten<T>(#[n(0)] pub T);
 }
 
@@ -642,7 +642,7 @@ mod acc {
 /// This enum is `#[non_exhaustive]` meaning additional variants may be added in future versions.
 /// Implementers are advised to include a wildcard arm `_` to account for potential additions.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode)]
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode, CborLen)]
 #[non_exhaustive] // To accommodate potential future error cases.
 pub enum Error {
     /// A [`Column`] with the same [name](String) but a different [type](Type) already exists in
