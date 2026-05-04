@@ -44,7 +44,7 @@ pub use schema::Schema;
 mod variant {
     //! todo module doc comment
 
-    use minicbor::{Decode, Encode};
+    use minicbor::{CborLen, Decode, Encode};
     use std::fmt::{Display, Formatter};
 
     /* -------------------------------------------------------------------------- Public Exports */
