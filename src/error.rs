@@ -39,6 +39,11 @@ pub enum Error {
     Magic,
     /// File version is not recognised by this build of [`clem`](crate).
     Version(u8),
+    /// Underlying [`segment::Error`][1] while encoding a [`Segment`][2]
+    ///
+    /// [1]: crate::segment::Error
+    /// [2]: crate::segment::Segment
+    Segment(crate::segment::Error),
 }
 
 /* ----------------------------------------------------------------------- Trait Implementations */
@@ -51,8 +56,9 @@ impl fmt::Display for Error {
             Self::Convert(e) => write!(f, "Integer type conversion error → {e}"),
             Self::Encode(msg) => write!(f, "CBOR encode error → {msg}"),
             Self::Decode(e) => write!(f, "CBOR decode error → {e}"),
-            Self::Magic => f.write_str("File is not a valid `clem` dataset"),
-            Self::Version(v) => write!(f, "Unrecognised version → {v}"),
+            Self::Magic => f.write_str("File is not a valid clem dataset"),
+            Self::Version(v) => write!(f, "Unrecognised clem version → {v}"),
+            Self::Segment(e) => write!(f, "Segment error → {e}"),
         }
     }
 }
@@ -64,6 +70,7 @@ impl std::error::Error for Error {
             Self::Utf8(e) => Some(e),
             Self::Convert(e) => Some(e),
             Self::Decode(e) => Some(e),
+            Self::Segment(e) => Some(e),
             _ => None, // Some variants do not wrap an inner error source
         }
     }
@@ -107,8 +114,14 @@ impl From<minicbor::decode::Error> for Error {
 }
 
 impl From<std::convert::Infallible> for Error {
-    fn from(_: std::convert::Infallible) -> Self {
-        unreachable!()
+    fn from(value: std::convert::Infallible) -> Self {
+        match value {}
+    }
+}
+
+impl From<crate::segment::Error> for Error {
+    fn from(error: crate::segment::Error) -> Self {
+        Self::Segment(error)
     }
 }
 
@@ -132,5 +145,13 @@ mod tests {
         let source = str::from_utf8(b"\xFF").unwrap_err();
         let error: Error = source.into();
         assert!(error.to_string().starts_with("UTF8 from u8 error →"));
+    }
+
+    #[test]
+    fn from_segment_error() {
+        use crate::segment;
+        let source = segment::Error::Zero;
+        let error: Error = source.into();
+        assert!(error.to_string().starts_with("Segment error →"));
     }
 }
