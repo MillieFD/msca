@@ -90,7 +90,7 @@ type Vacant<'a> = VacantEntry<'a, &'static str, Column>;
 /// on-disk schema segment encodes the schema definition (column names and types) while on-disk
 /// data segments contain the columnar buffers.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, CborLen)]
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode, CborLen)]
 // NOTE: schema::Schema (public builder) ≠ manifest::Schema (private descriptor).
 pub struct Schema {
     /// [`Column`] descriptors keyed by name.
