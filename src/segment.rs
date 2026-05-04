@@ -197,7 +197,13 @@ impl From<variant::Error> for Error {
     }
 }
 
-//noinspection DuplicatedCode
+impl From<Infallible> for Error {
+    fn from(value: Infallible) -> Self {
+        match value {}
+    }
+}
+
+//noinspection DuplicatedCode → Conversion is implemented for error types across different modules.
 impl<T, E> From<Error> for Result<T, E>
 where
     E: From<Error>,
