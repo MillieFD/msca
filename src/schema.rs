@@ -995,29 +995,80 @@ where
     }
 }
 
-impl Unfold for bool {}
-impl Unfold for char {}
-impl Unfold for u8 {}
-impl Unfold for u16 {}
-impl Unfold for u32 {}
-impl Unfold for u64 {}
-impl Unfold for u128 {}
-impl Unfold for num::NonZeroU8 {}
-impl Unfold for num::NonZeroU16 {}
-impl Unfold for num::NonZeroU32 {}
-impl Unfold for num::NonZeroU64 {}
-impl Unfold for num::NonZeroU128 {}
-impl Unfold for i8 {}
-impl Unfold for i16 {}
-impl Unfold for i32 {}
-impl Unfold for i64 {}
-impl Unfold for i128 {}
-impl Unfold for num::NonZeroI8 {}
-impl Unfold for num::NonZeroI16 {}
-impl Unfold for num::NonZeroI32 {}
-impl Unfold for num::NonZeroI64 {}
-impl Unfold for num::NonZeroI128 {}
-impl Unfold for f32 {}
-impl Unfold for f64 {}
-impl<T: Unfold> Unfold for Option<T> {}
-impl<T: Unfold> Unfold for Vec<T> {}
+/* -------------------------------------------------------------- Serialize Trait Implementation */
+
+impl Serialize for BitVec {
+    #[rustfmt::skip] // Single line fn body improves readability.
+    fn size(&self) -> usize { (self.len() + 7) / 8 }
+    fn serialize_into(&self, buf: &mut Vec<u8>) {
+        // TODO → Ensure correctness. Is this conversion possible without intermediate allocation?
+        let bytes = self.chunks(8).collect::<Vec<u8>>();
+        buf.extend_from_slice(&bytes);
+    }
+}
+
+impl<T> Serialize for acc::OptInSitu<T>
+where
+    Vec<Option<T>>: Serialize,
+{
+    fn size(&self) -> usize {
+        self.data.size()
+    }
+    fn serialize_into(&self, buf: &mut Vec<u8>) {
+        self.data.serialize_into(buf)
+    }
+}
+
+impl<T> Serialize for acc::OptBitVec<T>
+where
+    T: Build + Default,
+    T::Builder: Serialize,
+{
+    fn size(&self) -> usize {
+        self.mask.size() + self.data.size()
+    }
+    fn serialize_into(&self, buf: &mut Vec<u8>) {
+        self.mask.serialize_into(buf);
+        self.data.serialize_into(buf);
+    }
+}
+
+impl<T> Serialize for acc::Seq<T>
+where
+    T: Build,
+    T::Builder: Serialize,
+{
+    fn size(&self) -> usize {
+        self.offsets.size() + self.data.size()
+    }
+    fn serialize_into(&self, buf: &mut Vec<u8>) {
+        self.offsets.serialize_into(buf);
+        self.data.serialize_into(buf);
+    }
+}
+
+impl<T> Serialize for acc::OptSeq<T>
+where
+    T: Build,
+    T::Builder: Serialize,
+{
+    fn size(&self) -> usize {
+        self.offsets.size() + self.data.size()
+    }
+    fn serialize_into(&self, buf: &mut Vec<u8>) {
+        self.offsets.serialize_into(buf);
+        self.data.serialize_into(buf);
+    }
+}
+
+impl<S> Serialize for acc::Flatten<S>
+where
+    S: Serialize,
+{
+    fn size(&self) -> usize {
+        self.0.size() // Transparent wrapper over S
+    }
+    fn serialize_into(&self, buf: &mut Vec<u8>) {
+        self.0.serialize_into(buf); // Transparent wrapper over S
+    }
+}
