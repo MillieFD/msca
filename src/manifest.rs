@@ -59,29 +59,38 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //! predicate pruning.
 
 use crate::{Error, Sector};
-use minicbor::{Decode, Encode};
-use serde::{Deserialize, Serialize};
+use minicbor::{CborLen, Decode, Encode};
 use std::collections::BTreeMap;
-use std::num::NonZeroUsize;
+use std::num::NonZeroU64;
 
 /* ------------------------------------------------------------------------------ Public Exports */
 
 /// Manifest of file segments and accompanying metadata for random access and predicate pruning.
 /// See the [module-level documentation](self) for details.
-#[derive(Debug, Clone, Default, Serialize, Deserialize, Encode, Decode)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode, CborLen)]
 #[cbor(tag(100))]
 pub(crate) struct Manifest {
     /// Schema segments keyed by name.
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    #[n(0)]
+    #[cbor(n(0), skip_if = "BTreeMap::is_empty")]
+    #[cfg_attr(
+        feature = "serde",
+        serde(default, skip_serializing_if = "BTreeMap::is_empty")
+    )]
     pub schemas: BTreeMap<String, Schema>,
     /// Dictionaries keyed by name. Entries are **not** duplicated in the generic `schemas` map.
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     #[cbor(n(1), skip_if = "BTreeMap::is_empty")]
+    #[cfg_attr(
+        feature = "serde",
+        serde(default, skip_serializing_if = "BTreeMap::is_empty")
+    )]
     pub dictionaries: BTreeMap<String, Dictionary>,
     /// Indexes keyed by name. Entries are **not** duplicated in the generic `dictionaries` map.
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     #[cbor(n(2), skip_if = "BTreeMap::is_empty")]
+    #[cfg_attr(
+        feature = "serde",
+        serde(default, skip_serializing_if = "BTreeMap::is_empty")
+    )]
     pub indexes: BTreeMap<String, Index>,
     /// Implementers can use the optional free-form `metadata.toml` to attach file-level
     /// domain-specific information such as:
@@ -94,8 +103,11 @@ pub(crate) struct Manifest {
     /// described in the `manifest`. The core library includes a read and write surface, but
     /// implementers must include their own metadata parsing and validation logic.
     #[cfg(feature = "metadata")]
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[n(2)]
+    #[cbor(n(3), skip_if = "Option::is_none")]
+    #[cfg_attr(
+        feature = "serde",
+        serde(default, skip_serializing_if = "Option::is_none")
+    )]
     pub metadata: Option<Sector>,
 }
 
@@ -123,15 +135,22 @@ impl Manifest {
 /// lightweight descriptor for segment discovery and access without holding buffer contents in
 /// memory. An on-disk schema segment encodes the schema definition (column names and types) while
 /// on-disk data segments contain the columnar buffers.
-#[derive(Debug, Clone, Serialize, Deserialize, Encode, Decode)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode, CborLen)]
 pub(crate) struct Schema {
+    /// [`Column`] descriptors keyed by name.
+    ///
+    /// The [`BTreeMap`] guarantees a stable deterministic column order for consistent binary
+    /// encoding and schema comparison.
+    #[cbor(n(0), skip_if = "BTreeMap::is_empty")]
+    #[cfg_attr(
+        feature = "serde",
+        serde(default, skip_serializing_if = "BTreeMap::is_empty")
+    )]
+    pub columns: BTreeMap<&'static str, Column>,
     /// Location of the schema segment including header.
-    #[n(0)]
+    #[n(1)]
     pub sector: Sector,
-    /// [`Column`] descriptors keyed by [`name`](String).
-    #[cbor(n(1), skip_if = "BTreeMap::is_empty")]
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub columns: BTreeMap<String, Column>,
 }
 
 /// A minimal column **descriptor** that wraps a list of [`Buffer`] descriptors.
@@ -141,11 +160,15 @@ pub(crate) struct Schema {
 /// on-disk data segments, each of which contains a buffer for this column.
 ///
 /// [`Vec`] order in-memory is **not** guaranteed to reflect [`Sector`] order on-disk.
-#[derive(Debug, Clone, Serialize, Deserialize, Encode, Decode)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode, CborLen)]
 pub(crate) struct Column {
     /// List of [`Buffer`] descriptors for this column across all data segments.
     #[cbor(n(0), skip_if = "Vec::is_empty")]
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[cfg_attr(
+        feature = "serde",
+        serde(default, skip_serializing_if = "Vec::is_empty")
+    )]
     pub buffers: Vec<Buffer>,
 }
 
@@ -158,16 +181,17 @@ pub(crate) struct Column {
 /// This type does **not** contain the actual buffer data; it is a lightweight descriptor for buffer
 /// discovery and access without holding buffer contents in memory. Data is stored via contiguous
 /// buffers distributed across one or more on-disk data segments.
-#[derive(Debug, Clone, Serialize, Deserialize, Encode, Decode)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode, CborLen)]
 pub(crate) struct Buffer {
     /// Location of the schema segment including header.
     #[n(0)]
     pub sector: Sector,
     /// Number of data entries.
     ///
-    /// Empty buffers are never written to disk. [`NonZeroUsize`] is used to enforce this invariant.
+    /// Empty buffers are never written to disk. [`NonZeroU64`] is used to enforce this invariant.
     #[n(1)]
-    pub count: NonZeroUsize,
+    pub count: NonZeroU64,
     /// Minimum value recorded in this buffer. Used for segment-level predicate pruning.
     ///
     /// Data is stored via an arbitrary-length [`Vec`] containing raw bytes encoded in
@@ -259,14 +283,18 @@ mod number {
 /// lightweight descriptor for segment discovery and access without holding buffer contents in
 /// memory. An on-disk schema segment encodes the schema definition (column names and types) while
 /// on-disk data segments contain the columnar buffers.
-#[derive(Debug, Clone, Serialize, Deserialize, Encode, Decode)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode, CborLen)]
 pub(crate) struct Dictionary {
     /// Location of the schema segment including header.
     #[n(0)]
     pub schema: Sector,
     /// Column descriptors keyed by name.
     #[cbor(n(1), skip_if = "BTreeMap::is_empty")]
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    #[cfg_attr(
+        feature = "serde",
+        serde(default, skip_serializing_if = "BTreeMap::is_empty")
+    )]
     pub columns: BTreeMap<String, Column>,
 }
 
@@ -292,7 +320,8 @@ impl Dictionary {
 /// index discovery and access without holding buffer contents in memory. An on-disk schema segment
 /// encodes the schema definition (column names and types) while on-disk data segments contain the
 /// columnar buffers.
-#[derive(Debug, Clone, Serialize, Deserialize, Encode, Decode)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode, CborLen)]
 pub(crate) struct Index {
     /// Underlying [`Dictionary`] descriptor.
     #[n(0)]
