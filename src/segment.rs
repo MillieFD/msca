@@ -172,6 +172,8 @@ pub(crate) const fn align(n: usize) -> usize {
 pub enum Error {
     /// A read operation attempted to access bytes beyond the end of the input slice.
     #[n(0)]
+    #[deprecated(note = "Truncated variant will move into IO module Error")]
+    // TODO → Move to IO module Error enum
     Truncated(#[n(0)] Sector),
     /// Underlying [`variant::Error`] from a failed [`Variant`] parsing operation.
     #[n(1)]
