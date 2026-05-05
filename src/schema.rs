@@ -68,6 +68,7 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //! each `clem` file requires at least **one** schema segment. Multimodality and schema evolution
 //! are achieved by appending additional schema segments.
 
+use crate::accumulate::{Accumulate, Flatten, OptBitVec, OptInSitu, OptSeq, Seq};
 use bitvec::vec::BitVec;
 use minicbor::{CborLen, Decode, Encode};
 use std::collections::btree_map::{BTreeMap, Entry, OccupiedEntry, VacantEntry};
@@ -115,11 +116,11 @@ impl Schema {
 
     /// Add a [`Column`] to [`self`](Schema) with the specified `name` and [`type`](R).
     ///
-    /// Returns an empty [`Builder<R>`] for in-memory data accumulation, where [`R`] matches the
-    /// column type. This design ensures schema verification is performed exactly once.
-    pub fn column<R>(&mut self, name: &'static str) -> Result<Box<dyn Builder<R>>, Error>
+    /// Returns an empty [`Accumulator`](acc) for in-memory data accumulation. This design ensures
+    /// schema verification is performed exactly once.
+    pub fn column<R>(&mut self, name: &'static str) -> Result<Box<dyn Accumulate<Item = R>>, Error>
     where
-        R: Unfold + Build,
+        R: Unfold,
         Schema: Unfolder<R, Ok = Type>,
     {
         let ty = R::with_unfolder(self)?;
@@ -127,7 +128,7 @@ impl Schema {
             Entry::Vacant(vacant) => self.vacant(vacant, ty),
             Entry::Occupied(occupied) => self.occupied(occupied, ty)?,
         };
-        R::Builder::new()
+        R::RawAcc::default().into()
     }
 
     /// Insert a new [`Column`] into the [`Schema`] at the provided vacant entry.
@@ -442,219 +443,6 @@ mod number {
     }
 }
 
-mod acc {
-    //! Composable in-memory data accumulation primitives, each mapped to a separate on-disk space
-    //! optimisation strategy:
-    //!
-    //! - [`OptInSitu`] → In-situ [`None`] values; no null bitmap required.
-    //! - [`OptBitVec`] → Contiguous data buffer with bit-packed [`Option`] mask.
-    //! - [`Seq`] → Contiguous data buffer with offset metadata.
-    //! - [`OptSeq`] → Contiguous data buffer with combined offsets and mask.
-    //! - [`Flatten`] → Collapses nested [`Option`] layers.
-    //!
-    //! Each accumulator type implements the [`Builder`] trait, which defines a shared interface for
-    //! handling in-memory value accumulation.
-
-    use super::{Build, Builder};
-    use bitvec::vec::BitVec;
-    use core::num::NonZeroU64;
-    use minicbor::{CborLen, Decode, Encode};
-
-    /* ------------------------------------------------------------- Accumulate Trait Definition */
-
-    /// An in-memory **data accumulator** that can ingest values of the specified
-    /// [`type`](Self::Item) and encode into an optimised on-disk format.
-    pub trait Accumulate {
-        /// The input type accepted by [`Self::push`].
-        type Item;
-
-        /// Initialise an empty accumulator for the specified [`type`](Self::Item).
-        #[rustfmt::skip] // Single line where clause improves readability.
-        fn new() -> Self where Self: Sized;
-
-        /// Append a single value of `T` to [`Self`].
-        fn push(&mut self, value: Self::Item);
-
-        /// Reinitialise [`Self`] without writing to disk. All accumulated data is permanently lost.
-        ///
-        /// Note that this method may not affect the allocated capacity of the underlying storage.
-        fn discard(&mut self);
-
-        /// Returns `true` if the accumulator contains no values.
-        fn is_empty(&self) -> bool;
-    }
-
-    /* ----------------------------------------------------------------------- Data Accumulators */
-
-    /// Data accumulator for [optional](Option) values with niche optimisation; a compiler
-    /// optimisation technique that leverages unused bit patterns (niches) to represent additional
-    /// states without increasing the [size](size_of) of the type.
-    ///
-    /// ### Data Layout
-    ///
-    /// [`OptInSitu`] encodes [`Some`] and [`None`] values directly in a single data buffer for
-    /// supported niche types; no validity mask is required.
-    ///
-    /// [`OptBitVec`] provides a fallback implementation for non-niche types.
-    ///
-    /// ### Guidance
-    ///
-    /// Implementors are advised to use niche-optimised types when possible to improve storage
-    /// efficiency and random read performance.
-    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-    #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode, CborLen)]
-    pub(super) struct OptInSitu<T> {
-        /// Contiguous payload encoding [`Some`] and [`None`] values directly.
-        #[cbor(n(0), skip_if = "Vec::is_empty")]
-        pub data: Vec<Option<T>>,
-    }
-
-    /// Data accumulator for [optional](Option) values without niche optimisation.
-    ///
-    /// ### Data Layout
-    ///
-    /// [`OptBitVec`] encodes [validity](Option) and [value](T) separately for non-niche types:
-    ///
-    /// 1. A packed [`BitVec`] encodes [`Some`] as `true`.
-    /// 2. A contiguous data buffer encodes values.
-    ///
-    /// [`T::default`] generates placeholder values for [`None`] entries in the data buffer. This
-    /// design maintains the alignment necessary for **O(1) random access** by index.
-    ///
-    /// ### Guidance
-    ///
-    /// The sibling [`OptInSitu`] type encodes [`Some`] and [`None`] values directly in a single
-    /// data buffer for supported niche types; no validity mask required. Implementors are advised
-    /// to use niche-optimised types when possible to improve storage efficiency and random read
-    /// performance.
-    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-    #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode, CborLen)]
-    pub(super) struct OptBitVec<T: Build + Default> {
-        /// Validity mask where `true → `[`Some`] and `false → `[`None`].
-        #[cbor(n(0), skip_if = "BitVec::is_empty")]
-        #[cfg_attr(
-            feature = "serde",
-            serde(default, skip_serializing_if = "BitVec::is_empty")
-        )]
-        pub mask: BitVec,
-        /// Contiguous payload padded with [`Default::default`] for [`None`] entries.
-        #[cbor(n(1), skip_if = "Builder::is_empty")]
-        #[cfg_attr(
-            feature = "serde",
-            serde(default, skip_serializing_if = "Builder::is_empty")
-        )]
-        pub data: T::Builder,
-    }
-
-    /// Data accumulator for [unsized][1] values.
-    ///
-    /// ### Data Layout
-    ///
-    /// It is not possible to predetermine the disk space required by each instance of an unsized
-    /// type; there is no guarantee that two [`Vec<T>`] contain the same number of elements.
-    /// [`Clem`](crate) therefore unfolds unsized types into:
-    ///
-    /// 1. Columnar `offsets` bufffer describing boundaries.
-    /// 2. Contiguous `data` buffer encoding values.
-    ///
-    /// This design ensures **O(1) random access** and avoids per-element pointer chasing.
-    /// Sequential scans across the contained [elements](T) remain linear; leveraging columnar
-    /// optimisations for SIMD and prefetch.
-    ///
-    /// ```text
-    /// offsets: [3, 6, 6]
-    /// values:  [a, b, c, d, e, f, g, h]
-    /// ```
-    ///
-    /// The serialized on-disk example above is deserialized into the memory representation below.
-    /// Implementers can specify which type to use for offset storage based on the number of
-    /// expected elements.
-    ///
-    /// ```text
-    /// Row 0 → values[..3] → "abc"
-    /// Row 1 → values[3..6] → "def"
-    /// Row 2 → values[6..6] → "" (empty)
-    /// Row 3 → values[6..] → "gh"
-    /// ```
-    ///
-    /// Nested unsized types use **multiple offset layers** alongside a **single data buffer**.
-    /// This composable design preserves the performance advantages associated with contiguous value
-    /// storage; namely predictable vectorised traversal. Scanning performance across the contiguous
-    /// inner `values` buffer is unaffected by deep nesting. The inner offsets buffer is aligned in
-    /// memory order of traversal to improve cache locality during nested iteration and reduce TLB
-    /// misses.
-    ///
-    /// ```text
-    /// inner offsets
-    /// outer offsets
-    /// values
-    /// ```
-    ///
-    /// [1]: https://doc.rust-lang.org/reference/dynamically-sized-types.html
-    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-    #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode, CborLen)]
-    pub(super) struct Seq<T: Build> {
-        /// Cumulative end offsets. `offsets[i]` marks the inclusive end of element `i` and the
-        /// exclusive start of element `i + 1`.
-        #[cbor(n(0), skip_if = "Vec::is_empty")]
-        #[cfg_attr(
-            feature = "serde",
-            serde(default, skip_serializing_if = "Vec::is_empty")
-        )]
-        // TODO Allow users to specify the offset type based on the number of expected elements.
-        pub offsets: Vec<NonZeroU64>,
-        /// Flattened element buffer.
-        #[cbor(n(1), skip_if = "Builder::is_empty")]
-        #[cfg_attr(
-            feature = "serde",
-            serde(default, skip_serializing_if = "Builder::is_empty")
-        )]
-        pub data: T::Builder,
-    }
-
-    /// Data accumulator for [optional](Option) [unsized][1] values.
-    ///
-    /// ### Data Layout
-    ///
-    /// It is not possible to predetermine the disk space required by each instance of an unsized
-    /// type; there is no guarantee that two [`Vec<T>`] contain the same number of elements.
-    /// [`Clem`](crate) therefore unfolds unsized types into:
-    ///
-    /// 1. Columnar `offsets` bufffer describing boundaries.
-    /// 2. Contiguous `data` buffer encoding values.
-    ///
-    /// [`OptSeq`] leverages niche-optimisation on the `offsets` buffer to simultaneously encode
-    /// validity without requiring an auxiliary bitmap. `None` rows append no data.
-    ///
-    /// See the [documentation](Seq) on non-optional unsized type accumulation for more details.
-    ///
-    /// [1]: https://doc.rust-lang.org/reference/dynamically-sized-types.html
-    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-    #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode, CborLen)]
-    pub(super) struct OptSeq<T: Build> {
-        /// Cumulative end offsets per row; [`None`] marks a null row (no data appended).
-        #[cbor(n(0), skip_if = "Vec::is_empty")]
-        #[cfg_attr(
-            feature = "serde",
-            serde(default, skip_serializing_if = "Vec::is_empty")
-        )]
-        pub offsets: Vec<Option<NonZeroU64>>,
-        /// Flattened element buffer; only [`Some`] rows contribute entries.
-        #[cbor(n(1), skip_if = "Builder::is_empty")]
-        #[cfg_attr(
-            feature = "serde",
-            serde(default, skip_serializing_if = "Builder::is_empty")
-        )]
-        pub data: T::Builder,
-    }
-
-    /// Stateless type-level wrapper that flattens nested types on push. All storage lives in the
-    /// inner accumulator.
-    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-    #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode, CborLen)]
-    pub(super) struct Flatten<T>(#[n(0)] pub T);
-}
-
 /* ------------------------------------------------------------------------------ Specific Error */
 
 /// Errors returned by [`Schema`] composition.
@@ -752,6 +540,12 @@ where
 // TODO [1] link to procedural macro documentation
 // TODO [2] link to procedural macro user guide
 pub trait Unfold {
+    /// The [accumulator](Accumulate) type used to ingest unwrapped values of [`Self`].
+    type RawAcc: Accumulate<Item = Self>;
+
+    /// The [accumulator](Accumulate) type used to ingest [optional](Option) values of [`Self`].
+    type OptAcc: Accumulate<Item = Option<Self>>;
+
     /// Delegates to [`unfold`](Unfolder::unfold) on the provided [`Unfolder`].
     fn with_unfolder<U>(unfolder: &mut U) -> Result<U::Ok, U::Error>
     where
@@ -763,44 +557,158 @@ pub trait Unfold {
 
 /* ----------------------------------------------------------------- Unfold Trait Implementation */
 
-impl Unfold for bool {}
-impl Unfold for char {}
-impl Unfold for u8 {}
-impl Unfold for u16 {}
-impl Unfold for u32 {}
-impl Unfold for u64 {}
-impl Unfold for u128 {}
-impl Unfold for num::NonZeroU8 {}
-impl Unfold for num::NonZeroU16 {}
-impl Unfold for num::NonZeroU32 {}
-impl Unfold for num::NonZeroU64 {}
-impl Unfold for num::NonZeroU128 {}
-impl Unfold for i8 {}
-impl Unfold for i16 {}
-impl Unfold for i32 {}
-impl Unfold for i64 {}
-impl Unfold for i128 {}
-impl Unfold for num::NonZeroI8 {}
-impl Unfold for num::NonZeroI16 {}
-impl Unfold for num::NonZeroI32 {}
-impl Unfold for num::NonZeroI64 {}
-impl Unfold for num::NonZeroI128 {}
-impl Unfold for f32 {}
-impl Unfold for f64 {}
-impl<T: Unfold> Unfold for Option<T> {}
-impl<T: Unfold> Unfold for Vec<T> {}
+impl Unfold for bool {
+    type RawAcc = BitVec;
+    type OptAcc = OptBitVec<Self>;
+}
+
+impl Unfold for char {
+    type RawAcc = Vec<Self>;
+    type OptAcc = OptInSitu<Self>;
+}
+
+impl Unfold for u8 {
+    type RawAcc = Vec<Self>;
+    type OptAcc = OptBitVec<Self>;
+}
+
+impl Unfold for u16 {
+    type RawAcc = Vec<Self>;
+    type OptAcc = OptBitVec<Self>;
+}
+
+impl Unfold for u32 {
+    type RawAcc = Vec<Self>;
+    type OptAcc = OptBitVec<Self>;
+}
+
+impl Unfold for u64 {
+    type RawAcc = Vec<Self>;
+    type OptAcc = OptBitVec<Self>;
+}
+
+impl Unfold for u128 {
+    type RawAcc = Vec<Self>;
+    type OptAcc = OptBitVec<Self>;
+}
+
+impl Unfold for num::NonZeroU8 {
+    type RawAcc = Vec<Self>;
+    type OptAcc = OptInSitu<Self>;
+}
+
+impl Unfold for num::NonZeroU16 {
+    type RawAcc = Vec<Self>;
+    type OptAcc = OptInSitu<Self>;
+}
+
+impl Unfold for num::NonZeroU32 {
+    type RawAcc = Vec<Self>;
+    type OptAcc = OptInSitu<Self>;
+}
+
+impl Unfold for num::NonZeroU64 {
+    type RawAcc = Vec<Self>;
+    type OptAcc = OptInSitu<Self>;
+}
+
+impl Unfold for num::NonZeroU128 {
+    type RawAcc = Vec<Self>;
+    type OptAcc = OptInSitu<Self>;
+}
+
+impl Unfold for i8 {
+    type RawAcc = Vec<Self>;
+    type OptAcc = OptBitVec<Self>;
+}
+
+impl Unfold for i16 {
+    type RawAcc = Vec<Self>;
+    type OptAcc = OptBitVec<Self>;
+}
+
+impl Unfold for i32 {
+    type RawAcc = Vec<Self>;
+    type OptAcc = OptBitVec<Self>;
+}
+
+impl Unfold for i64 {
+    type RawAcc = Vec<Self>;
+    type OptAcc = OptBitVec<Self>;
+}
+
+impl Unfold for i128 {
+    type RawAcc = Vec<Self>;
+    type OptAcc = OptBitVec<Self>;
+}
+
+impl Unfold for num::NonZeroI8 {
+    type RawAcc = Vec<Self>;
+    type OptAcc = OptInSitu<Self>;
+}
+
+impl Unfold for num::NonZeroI16 {
+    type RawAcc = Vec<Self>;
+    type OptAcc = OptInSitu<Self>;
+}
+
+impl Unfold for num::NonZeroI32 {
+    type RawAcc = Vec<Self>;
+    type OptAcc = OptInSitu<Self>;
+}
+
+impl Unfold for num::NonZeroI64 {
+    type RawAcc = Vec<Self>;
+    type OptAcc = OptInSitu<Self>;
+}
+
+impl Unfold for num::NonZeroI128 {
+    type RawAcc = Vec<Self>;
+    type OptAcc = OptInSitu<Self>;
+}
+
+impl Unfold for f32 {
+    type RawAcc = Vec<Self>;
+    type OptAcc = OptBitVec<Self>;
+}
+
+impl Unfold for f64 {
+    type RawAcc = Vec<Self>;
+    type OptAcc = OptBitVec<Self>;
+}
+
+impl<T> Unfold for Option<T>
+where
+    T: Unfold,
+{
+    type RawAcc = T::OptAcc;
+    type OptAcc = Flatten<T::OptAcc>;
+}
+
+impl<T> Unfold for Vec<T>
+where
+    T: Unfold,
+{
+    type RawAcc = Seq<T>;
+    type OptAcc = OptSeq<T>;
+}
 
 /* ------------------------------------------------------------------- Unfolder Trait Definition */
 
-/// A **schema builder** that can unfold the supported type `T`.
+/// A **schema builder** that can unfold the supported type [`T`].
 ///
 /// `Unfolder` is implemented independently for each supported type; enabling type-driven encoding.
 /// For example, the default [`Schema`] builder unfolds `u8` into a [`Type::Number`] descriptor.
-pub trait Unfolder<T: ?Sized> {
-    /// The output type returned by [`unfold`] on success.
+pub trait Unfolder<T>
+where
+    T: ?Sized,
+{
+    /// The output type returned by [`unfold`](Self::unfold) on success.
     type Ok;
-    /// The error type returned by [`unfold`] on failure.
+
+    /// The error type returned by [`unfold`](Self::unfold) on failure.
     type Error;
+
     /// Specific unfolding logic for the supported type `T`.
     fn unfold(&mut self) -> Result<Self::Ok, Self::Error>;
 }
@@ -810,6 +718,7 @@ pub trait Unfolder<T: ?Sized> {
 impl Unfolder<bool> for Schema {
     type Ok = Type;
     type Error = Infallible;
+
     fn unfold(&mut self) -> Result<Self::Ok, Self::Error> {
         Ok(Type::Bool)
     }
@@ -818,6 +727,7 @@ impl Unfolder<bool> for Schema {
 impl Unfolder<char> for Schema {
     type Ok = Type;
     type Error = Infallible;
+
     fn unfold(&mut self) -> Result<Self::Ok, Self::Error> {
         Ok(Type::Char)
     }
@@ -826,6 +736,7 @@ impl Unfolder<char> for Schema {
 impl Unfolder<u8> for Schema {
     type Ok = Type;
     type Error = Infallible;
+
     fn unfold(&mut self) -> Result<Self::Ok, Self::Error> {
         Ok(Type::U8)
     }
@@ -834,6 +745,7 @@ impl Unfolder<u8> for Schema {
 impl Unfolder<u16> for Schema {
     type Ok = Type;
     type Error = Infallible;
+
     fn unfold(&mut self) -> Result<Self::Ok, Self::Error> {
         Ok(Type::U16)
     }
@@ -842,6 +754,7 @@ impl Unfolder<u16> for Schema {
 impl Unfolder<u32> for Schema {
     type Ok = Type;
     type Error = Infallible;
+
     fn unfold(&mut self) -> Result<Self::Ok, Self::Error> {
         Ok(Type::U32)
     }
@@ -850,6 +763,7 @@ impl Unfolder<u32> for Schema {
 impl Unfolder<u64> for Schema {
     type Ok = Type;
     type Error = Infallible;
+
     fn unfold(&mut self) -> Result<Self::Ok, Self::Error> {
         Ok(Type::U64)
     }
@@ -858,6 +772,7 @@ impl Unfolder<u64> for Schema {
 impl Unfolder<u128> for Schema {
     type Ok = Type;
     type Error = Infallible;
+
     fn unfold(&mut self) -> Result<Self::Ok, Self::Error> {
         Ok(Type::U128)
     }
@@ -866,6 +781,7 @@ impl Unfolder<u128> for Schema {
 impl Unfolder<num::NonZeroU8> for Schema {
     type Ok = Type;
     type Error = Infallible;
+
     fn unfold(&mut self) -> Result<Self::Ok, Self::Error> {
         Ok(Type::NZU8)
     }
@@ -874,6 +790,7 @@ impl Unfolder<num::NonZeroU8> for Schema {
 impl Unfolder<num::NonZeroU16> for Schema {
     type Ok = Type;
     type Error = Infallible;
+
     fn unfold(&mut self) -> Result<Self::Ok, Self::Error> {
         Ok(Type::NZU16)
     }
@@ -882,6 +799,7 @@ impl Unfolder<num::NonZeroU16> for Schema {
 impl Unfolder<num::NonZeroU32> for Schema {
     type Ok = Type;
     type Error = Infallible;
+
     fn unfold(&mut self) -> Result<Self::Ok, Self::Error> {
         Ok(Type::NZU32)
     }
@@ -890,6 +808,7 @@ impl Unfolder<num::NonZeroU32> for Schema {
 impl Unfolder<num::NonZeroU64> for Schema {
     type Ok = Type;
     type Error = Infallible;
+
     fn unfold(&mut self) -> Result<Self::Ok, Self::Error> {
         Ok(Type::NZU64)
     }
@@ -898,6 +817,7 @@ impl Unfolder<num::NonZeroU64> for Schema {
 impl Unfolder<num::NonZeroU128> for Schema {
     type Ok = Type;
     type Error = Infallible;
+
     fn unfold(&mut self) -> Result<Self::Ok, Self::Error> {
         Ok(Type::NZU128)
     }
@@ -906,6 +826,7 @@ impl Unfolder<num::NonZeroU128> for Schema {
 impl Unfolder<i8> for Schema {
     type Ok = Type;
     type Error = Infallible;
+
     fn unfold(&mut self) -> Result<Self::Ok, Self::Error> {
         Ok(Type::I8)
     }
@@ -914,6 +835,7 @@ impl Unfolder<i8> for Schema {
 impl Unfolder<i16> for Schema {
     type Ok = Type;
     type Error = Infallible;
+
     fn unfold(&mut self) -> Result<Self::Ok, Self::Error> {
         Ok(Type::I16)
     }
@@ -922,6 +844,7 @@ impl Unfolder<i16> for Schema {
 impl Unfolder<i32> for Schema {
     type Ok = Type;
     type Error = Infallible;
+
     fn unfold(&mut self) -> Result<Self::Ok, Self::Error> {
         Ok(Type::I32)
     }
@@ -930,6 +853,7 @@ impl Unfolder<i32> for Schema {
 impl Unfolder<i64> for Schema {
     type Ok = Type;
     type Error = Infallible;
+
     fn unfold(&mut self) -> Result<Self::Ok, Self::Error> {
         Ok(Type::I64)
     }
@@ -938,6 +862,7 @@ impl Unfolder<i64> for Schema {
 impl Unfolder<i128> for Schema {
     type Ok = Type;
     type Error = Infallible;
+
     fn unfold(&mut self) -> Result<Self::Ok, Self::Error> {
         Ok(Type::I128)
     }
@@ -946,6 +871,7 @@ impl Unfolder<i128> for Schema {
 impl Unfolder<num::NonZeroI8> for Schema {
     type Ok = Type;
     type Error = Infallible;
+
     fn unfold(&mut self) -> Result<Self::Ok, Self::Error> {
         Ok(Type::NZI8)
     }
@@ -954,6 +880,7 @@ impl Unfolder<num::NonZeroI8> for Schema {
 impl Unfolder<num::NonZeroI16> for Schema {
     type Ok = Type;
     type Error = Infallible;
+
     fn unfold(&mut self) -> Result<Self::Ok, Self::Error> {
         Ok(Type::NZI16)
     }
@@ -962,6 +889,7 @@ impl Unfolder<num::NonZeroI16> for Schema {
 impl Unfolder<num::NonZeroI32> for Schema {
     type Ok = Type;
     type Error = Infallible;
+
     fn unfold(&mut self) -> Result<Self::Ok, Self::Error> {
         Ok(Type::NZI32)
     }
@@ -970,6 +898,7 @@ impl Unfolder<num::NonZeroI32> for Schema {
 impl Unfolder<num::NonZeroI64> for Schema {
     type Ok = Type;
     type Error = Infallible;
+
     fn unfold(&mut self) -> Result<Self::Ok, Self::Error> {
         Ok(Type::NZI64)
     }
@@ -978,6 +907,7 @@ impl Unfolder<num::NonZeroI64> for Schema {
 impl Unfolder<num::NonZeroI128> for Schema {
     type Ok = Type;
     type Error = Infallible;
+
     fn unfold(&mut self) -> Result<Self::Ok, Self::Error> {
         Ok(Type::NZI128)
     }
@@ -986,6 +916,7 @@ impl Unfolder<num::NonZeroI128> for Schema {
 impl Unfolder<f32> for Schema {
     type Ok = Type;
     type Error = Infallible;
+
     fn unfold(&mut self) -> Result<Self::Ok, Self::Error> {
         Ok(Type::F32)
     }
@@ -994,6 +925,7 @@ impl Unfolder<f32> for Schema {
 impl Unfolder<f64> for Schema {
     type Ok = Type;
     type Error = Infallible;
+
     fn unfold(&mut self) -> Result<Self::Ok, Self::Error> {
         Ok(Type::F64)
     }
@@ -1005,6 +937,7 @@ where
 {
     type Ok = Type;
     type Error = Infallible;
+
     fn unfold(&mut self) -> Result<Self::Ok, Self::Error> {
         Type::option(T::with_unfolder(self)?).into()
     }
@@ -1016,85 +949,8 @@ where
 {
     type Ok = Type;
     type Error = Infallible;
+
     fn unfold(&mut self) -> Result<Self::Ok, Self::Error> {
         Type::sequence(T::with_unfolder(self)?).into()
-    }
-}
-
-/* -------------------------------------------------------------- Serialize Trait Implementation */
-
-impl Serialize for BitVec {
-    #[rustfmt::skip] // Single line fn body improves readability.
-    fn size(&self) -> usize { (self.len() + 7) / 8 }
-    fn serialize_into(&self, buf: &mut Vec<u8>) {
-        // TODO → Ensure correctness. Is this conversion possible without intermediate allocation?
-        let bytes = self.chunks(8).collect::<Vec<u8>>();
-        buf.extend_from_slice(&bytes);
-    }
-}
-
-impl<T> Serialize for acc::OptInSitu<T>
-where
-    Vec<Option<T>>: Serialize,
-{
-    fn size(&self) -> usize {
-        self.data.size()
-    }
-    fn serialize_into(&self, buf: &mut Vec<u8>) {
-        self.data.serialize_into(buf)
-    }
-}
-
-impl<T> Serialize for acc::OptBitVec<T>
-where
-    T: Build + Default,
-    T::Builder: Serialize,
-{
-    fn size(&self) -> usize {
-        self.mask.size() + self.data.size()
-    }
-    fn serialize_into(&self, buf: &mut Vec<u8>) {
-        self.mask.serialize_into(buf);
-        self.data.serialize_into(buf);
-    }
-}
-
-impl<T> Serialize for acc::Seq<T>
-where
-    T: Build,
-    T::Builder: Serialize,
-{
-    fn size(&self) -> usize {
-        self.offsets.size() + self.data.size()
-    }
-    fn serialize_into(&self, buf: &mut Vec<u8>) {
-        self.offsets.serialize_into(buf);
-        self.data.serialize_into(buf);
-    }
-}
-
-impl<T> Serialize for acc::OptSeq<T>
-where
-    T: Build,
-    T::Builder: Serialize,
-{
-    fn size(&self) -> usize {
-        self.offsets.size() + self.data.size()
-    }
-    fn serialize_into(&self, buf: &mut Vec<u8>) {
-        self.offsets.serialize_into(buf);
-        self.data.serialize_into(buf);
-    }
-}
-
-impl<S> Serialize for acc::Flatten<S>
-where
-    S: Serialize,
-{
-    fn size(&self) -> usize {
-        self.0.size() // Transparent wrapper over S
-    }
-    fn serialize_into(&self, buf: &mut Vec<u8>) {
-        self.0.serialize_into(buf); // Transparent wrapper over S
     }
 }
