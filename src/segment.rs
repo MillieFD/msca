@@ -25,6 +25,13 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //! storage and file extensibility are realised by appending additional data segments. Format
 //! extensibility may be achieved via the introduction of new segment variants in future releases.
 //!
+//! ### Alignment
+//!
+//! [`clem`](crate) uses **targeted 64-bit alignment** on critical data to ensure SIMD vectorisation
+//! and cache-line efficiency. Alignment is not enforced for small or non-performance-critical
+//! fields to improve on-disk space efficiency.
+// TODO → Link to separate .md document for more details regarding aligned and unaligned fields.
+//!
 //! ### Module Boundary
 //!
 //! This module performs **only** in-memory ⇄ byte-buffer transformations. File I/O is the
