@@ -45,7 +45,11 @@ pub use data::{Buffer, Data, buffer};
 pub use schema::Schema;
 
 mod variant {
-    //! todo module doc comment
+    //! This module defines the segment [`Variant`] identifier and associated parsing [`Error`].
+    //!
+    //! A [`clem`](crate) file is partitioned into self-describing **segments** which are immutable
+    //! once written. Each segment begins with a single [`Variant`] byte to identify the segment
+    //! type and payload structure. Readers dispatch on the variant byte to specific decoders.
 
     use minicbor::{CborLen, Decode, Encode};
     use std::fmt::{Display, Formatter};
