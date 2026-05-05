@@ -36,13 +36,28 @@ use crate::schema::Schema;
 use minicbor::{CborLen, Decode, Encode};
 use std::convert::Infallible;
 use std::fmt::{Display, Formatter};
-use std::num;
+use std::num::NonZeroU64;
 
 /* ------------------------------------------------------------------------------ Public Exports */
 
-use crate::Sector;
-pub use data::{Buffer, Data, buffer};
-pub use schema::Schema;
+pub use self::variant::Variant;
+
+/// A minimal segment header containing:
+///
+/// 1. A [`Variant`] byte to identify the segment type and payload structure.
+/// 2. LE [`NonZeroU64`] encoding the size of the segment payload in bytes.
+///
+/// See the [module level documentation](self) for more details.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode, CborLen)]
+struct Header {
+    /// Segment [`Variant`] identifier carried in the first byte of every segment header.
+    #[n(0)]
+    variant: Variant,
+    /// LE [`NonZeroU64`] encoding the size of the segment payload in bytes. Excludes the header.
+    #[n(1)]
+    length: NonZeroU64,
+}
 
 mod variant {
     //! This module defines the segment [`Variant`] identifier and associated parsing [`Error`].
