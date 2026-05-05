@@ -460,6 +460,32 @@ mod acc {
     use core::num::NonZeroU64;
     use minicbor::{CborLen, Decode, Encode};
 
+    /* ------------------------------------------------------------- Accumulate Trait Definition */
+
+    /// An in-memory **data accumulator** that can ingest values of the specified
+    /// [`type`](Self::Item) and encode into an optimised on-disk format.
+    pub trait Accumulate {
+        /// The input type accepted by [`Self::push`].
+        type Item;
+
+        /// Initialise an empty accumulator for the specified [`type`](Self::Item).
+        #[rustfmt::skip] // Single line where clause improves readability.
+        fn new() -> Self where Self: Sized;
+
+        /// Append a single value of `T` to [`Self`].
+        fn push(&mut self, value: Self::Item);
+
+        /// Reinitialise [`Self`] without writing to disk. All accumulated data is permanently lost.
+        ///
+        /// Note that this method may not affect the allocated capacity of the underlying storage.
+        fn discard(&mut self);
+
+        /// Returns `true` if the accumulator contains no values.
+        fn is_empty(&self) -> bool;
+    }
+
+    /* ----------------------------------------------------------------------- Data Accumulators */
+
     /// Data accumulator for [optional](Option) values with niche optimisation; a compiler
     /// optimisation technique that leverages unused bit patterns (niches) to represent additional
     /// states without increasing the [size](size_of) of the type.
