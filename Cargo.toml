@@ -18,6 +18,7 @@ unwrap_used = "deny"
 [dependencies]
 smol = "2.0"
 memmap2 = "0.9"
+bitvec = "1.0"
 
 [dependencies.minicbor]
 version = "2.2"
