@@ -1,4 +1,4 @@
-# Read Cycle
+### Read Cycle
 
 The read cycle is built upon two complementary principles:
 

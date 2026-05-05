@@ -1,4 +1,4 @@
-# Write Cycle
+### Write Cycle
 
 Let `m` denote the combined byte length of the existing manifest and metadata (if present). Let `s` denote the byte
 length of the incoming segment. The write-cycle exploits the relationship between `s` and `m` to guarantee that the
