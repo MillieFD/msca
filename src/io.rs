@@ -116,3 +116,11 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 #![doc = include_str!("../docs/write-cycle.md")]
 #![doc = include_str!("../docs/read-cycle.md")]
 
+/// Magic byte sequence used to identify a valid [`clem`](crate) file.
+pub(crate) const MAGIC: [u8; 4] = *b"clem";
+
+/// Current [`clem`](crate) major version number which is embedded in the file header to indicate
+/// breaking changes in the format specification. Forwards and backwards compatibility across
+/// version numbers is not guaranteed. Implementers must reject any unrecognised version number.
+pub(crate) const VERSION: u8 = 1;
+
