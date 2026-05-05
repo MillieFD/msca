@@ -147,6 +147,35 @@ mod variant {
     }
 }
 
+/* -------------------------------------------------------------------- Segment Trait Definition */
+
+/// A self-describing on-disk **segment** prefixed by a [`Variant`] discriminant and an LE [`u64`]
+/// size field, followed by a variant-specific payload. See the [module level documentation](self).
+pub trait Segment: Serialize {
+    /// On-disk variant identifier for [`Self`]. Stored in the first byte of the segment header.
+    const VARIANT: Variant;
+}
+
+/* ---------------------------------------------------------------- Segment Trait Implementation */
+
+impl Serialize for Schema {
+    fn size(&self) -> usize {
+        size_of::<Header>() + minicbor::len(self)
+    }
+
+    fn serialize_into(&self, buf: &mut Vec<u8>) {
+        let size = self.size() as u64;
+        buf.push(Self::VARIANT as u8);
+        buf.extend_from_slice(&size.to_le_bytes());
+        // SAFETY: minicbor::encode is infallible when writing to Vec<u8>
+        minicbor::encode(self, buf).expect("Failed to encode schema.");
+    }
+}
+
+impl Segment for Schema {
+    const VARIANT: Variant = Variant::Schema;
+}
+
 /* --------------------------------------------------------------------------- Alignment Helpers */
 
 /// Round `n` up to the next multiple of eight; the unit of [critical-field alignment](self).
