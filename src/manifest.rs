@@ -58,6 +58,7 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //! Each `Buffer` contains a `sector: Sector` alongside data statistics such as `min` and `max` for
 //! predicate pruning.
 
+use crate::accumulate::Serialize;
 use crate::{Error, Sector};
 use minicbor::{CborLen, Decode, Encode};
 use std::collections::BTreeMap;
@@ -112,17 +113,20 @@ pub(crate) struct Manifest {
 }
 
 impl Manifest {
-    /// Encode the [`Manifest`] into CBOR bytes.
-    pub fn encode(&self) -> Vec<u8> {
-        let mut buf = Vec::new();
-        // SAFETY: minicbor::encode returns Infallible.
-        minicbor::encode(self, &mut buf).expect("Failed to encode manifest as CBOR");
-        buf
-    }
-
     /// Decode a [`Manifest`] from CBOR bytes.
     pub fn decode(bytes: &[u8]) -> Result<Self, Error> {
         minicbor::decode(bytes).map_err(Error::Decode)
+    }
+}
+
+impl Serialize for Manifest {
+    fn size(&self) -> usize {
+        minicbor::len(self)
+    }
+
+    fn serialize_into(&self, buf: &mut Vec<u8>) {
+        // SAFETY: minicbor::encode is infallible when writing to Vec<u8>
+        minicbor::encode(self, buf).expect("Failed to encode manifest as CBOR");
     }
 }
 
