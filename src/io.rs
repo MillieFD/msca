@@ -125,4 +125,29 @@ const VERSION: u8 = 1;
 /// [2]: VERSION
 const HEADER: usize = size_of_val(&MAGIC) + size_of_val(&VERSION) + size_of::<Header>();
 
+/// Mutable region of the file header.
+///
+/// Excludes immutable header elements such as the [magic bytes][1] and [version number][2]. See the
+/// [module documentation](self) for a detailed description of the file header layout.
+///
+/// [1]: MAGIC
+/// [2]: VERSION
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, PartialOrd, Hash, Encode, Decode, CborLen)]
+pub(crate) struct Header {
+    /// Byte offset immediately following the last committed [`Segment`].
+    #[n(0)]
+    pub tail: NonZeroU64,
+    /// On-disk location of the encoded [`Manifest`].
+    #[n(1)]
+    pub manifest: Sector,
+}
+
+impl Serialize for Header {
+    fn serialize_into(&self, buf: &mut Vec<u8>) {
+        buf.extend_from_slice(&self.tail.get().to_le_bytes());
+        self.manifest.serialize_into(buf);
+    }
+}
+
 
