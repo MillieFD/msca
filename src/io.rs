@@ -112,10 +112,17 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 #![doc = include_str!("../docs/read-cycle.md")]
 
 /// Magic byte sequence used to identify a valid [`clem`](crate) file.
-pub(crate) const MAGIC: [u8; 4] = *b"clem";
+const MAGIC: [u8; 4] = *b"clem";
 
 /// Current [`clem`](crate) major version number which is embedded in the file header to indicate
 /// breaking changes in the format specification. Forwards and backwards compatibility across
 /// version numbers is not guaranteed. Implementers must reject any unrecognised version number.
-pub(crate) const VERSION: u8 = 1;
+const VERSION: u8 = 1;
+
+/// Total length of the file header in bytes. Includes the [magic bytes][1] and [version number][2].
+///
+/// [1]: MAGIC
+/// [2]: VERSION
+const HEADER: usize = size_of_val(&MAGIC) + size_of_val(&VERSION) + size_of::<Header>();
+
 
