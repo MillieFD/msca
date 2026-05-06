@@ -175,6 +175,17 @@ pub enum Error {
     Version(#[n(0)] u8),
 }
 
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Magic => f.write_str("File is not a valid clem dataset"),
+            Self::Version(v) => write!(f, "Unrecognised clem version → {v}"),
+        }
+    }
+}
+
+impl std::error::Error for Error {}
+
 /* --------------------------------------------------------------------------------------- Tests */
 
 #[cfg(test)]
