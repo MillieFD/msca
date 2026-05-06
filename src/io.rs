@@ -151,3 +151,31 @@ impl Serialize for Header {
 }
 
 
+/* ------------------------------------------------------------------------------ Specific Error */
+
+/// Errors returned by [`File`] IO.
+///
+/// Enum variants cover various granular error cases that may arise when working with the underlying
+/// file. Users should consider handling errors explicitly wherever possible to provide meaningful
+/// error messages and recovery actions.
+///
+/// ### Implementation
+///
+/// This enum is `#[non_exhaustive]` meaning additional variants may be added in future versions.
+/// Implementers are advised to include a wildcard arm `_` to account for potential additions.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode, CborLen)]
+#[non_exhaustive] // To accommodate potential future error cases.
+pub enum Error {
+    /// File magic bytes did not match the expected `clem` signature.
+    #[n(0)]
+    Magic,
+    /// File version number is not recognised by this build of [`clem`](crate).
+    #[n(1)]
+    Version(#[n(0)] u8),
+}
+
+/* --------------------------------------------------------------------------------------- Tests */
+
+#[cfg(test)]
+mod tests {}
