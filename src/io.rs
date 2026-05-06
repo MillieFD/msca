@@ -164,7 +164,7 @@ impl Serialize for Header {
 /// This enum is `#[non_exhaustive]` meaning additional variants may be added in future versions.
 /// Implementers are advised to include a wildcard arm `_` to account for potential additions.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode, CborLen)]
+#[derive(Debug, Encode, Decode, CborLen)]
 #[non_exhaustive] // To accommodate potential future error cases.
 pub enum Error {
     /// File magic bytes did not match the expected `clem` signature.
@@ -173,6 +173,9 @@ pub enum Error {
     /// File version number is not recognised by this build of [`clem`](crate).
     #[n(1)]
     Version(#[n(0)] u8),
+    /// Underlying [`std::io::Error`] from the file backing the [`Dataset`](todo link).
+    #[n(2)]
+    Io(#[n(0)] std::io::Error),
 }
 
 impl fmt::Display for Error {
@@ -180,6 +183,7 @@ impl fmt::Display for Error {
         match self {
             Self::Magic => f.write_str("File is not a valid clem dataset"),
             Self::Version(v) => write!(f, "Unrecognised clem version → {v}"),
+            Self::Io(e) => write!(f, "File IO error → {e}"),
         }
     }
 }
