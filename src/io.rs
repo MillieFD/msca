@@ -23,12 +23,12 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //!
 //! ### Segment Composition
 //!
-//! Each file is partitioned into self-describing [segments](crate::segment::Segment) which are
-//! immutable once written. Each segment begins with a minimal header consisting of a
-//! [`variant: u8`](Variant) identifier and [`length: NonZeroU64`](NonZeroU64).
+//! Each file is partitioned into self-describing [segments](Segment) which are immutable once
+//! written. Each segment begins with a minimal header consisting of a [`variant`][1] identifier
+//! and [`length`](NonZeroU64).
 //!
 //! - [`Schema`] segments describe the structure of encoded data.
-//! - [`Data`] segments carry columnar buffers for a specified schema instance.
+//! - `Data` segments carry columnar buffers for a specified schema instance.
 //!
 //! Multimodality and schema evolution are realised by appending additional schema segments. Data
 //! storage and file extensibility are realised by appending additional data segments. Format
@@ -36,42 +36,39 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //!
 //! ### Lazy Partial Reads
 //!
-//! On-disk data is represented via a minimal [`Sector`](crate::Sector) struct prior to file IO.
-//! This design ensures:
+//! On-disk data is represented via a minimal [`Sector`] struct prior to file IO. This design
+//! ensures:
 //!
 //! - **O(1) Random Access:** Readers `seek` directly to the relevant file region.
 //! - **Efficient:** Readers `take` the required number of bytes instead of loading the entire file.
 //!
 //! Passing a small `Sector` instance can reduce overhead compared to passing an owned data buffer.
-//! Sectors enforce the immutability of underlying on-disk data; implementers must `copy` into an
+//! Sectors enforce the immutability of underlying on-disk data; implementers must [`Copy`] into an
 //! owned type when mutability is required e.g. for downstream data processing.
 //!
 //! ### Manifest
 //!
-//! A [`Manifest`][1] footer lists file segments by type. Data segments are grouped by [Schema]
+//! A [`Manifest`] footer lists file segments by type. Data segments are grouped by [`Schema`]
 //! alongside segment-level statistics e.g. min and max values. The manifest acts like the index of
-//! a book to enhance:
-//!
-//! - Segment discovery
-//! - Random access
-//! - Predicate pruning
+//! a book to enhance segment discovery and random access.
 //!
 //! The manifest is encoded as **CBOR** and written after the final data segment. A [`BTreeMap`][2]
 //! sorted in lexicographic order ensures the layout is deterministic regardless of insertion order.
 //!
 //! ### Metadata
 //!
-//! An optinal free-form `metadata` [`Sector`][3] may be written after the
-//! [`Manifest`][1] where implementers can attach file-level domain-specific information such as:
+//! An optional free-form `metadata` [`Sector`] may be written after the [`Manifest`] where
+//! implementers can attach file-level domain-specific information such as:
+//!
 //! - Date and time
 //! - Experimental parameters
 //! - Provenance
 //!
-//! The [`Manifest`][1] may include an optional `metadata` field which points to this [`Sector`][3].
-//! The file IO mechanisms defined in this module will always preserve metadata and update the
-//! [`Manifest`][1] metadata field during the write-cycle if present, but will only provide a read
-//! and write surface if the corresponding metadata feature is enabled. Implementers must include
-//! their own metadata parsing and validation logic.
+//! The [`Manifest`] may include an optional `metadata` field which points to this [`Sector`]. The
+//! file IO mechanisms defined in this module will always preserve metadata and update the
+//! [`Manifest`] metadata field during the write-cycle if present, but will only provide a read and
+//! write surface if the corresponding metadata feature is enabled. Implementers must include their
+//! own metadata parsing and validation logic.
 //!
 //! ### File Header
 //!
@@ -109,9 +106,8 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //! between `tail` and the start of the manifest when appending segments that are shorter than the
 //! combined manifest and metadata. This empty region is filled during the next write-cycle.
 //!
-//! [1]: crate::manifest::Manifest
+//! [1]: crate::segment::Variant
 //! [2]: std::collections::BTreeMap
-//! [3]: crate::Sector
 
 #![doc = include_str!("../docs/write-cycle.md")]
 #![doc = include_str!("../docs/read-cycle.md")]
