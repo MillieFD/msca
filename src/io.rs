@@ -201,14 +201,6 @@ impl Deserialize for Header {
     }
 }
 
-impl TryFrom<&[u8]> for Header {
-    type Error = Error;
-
-    fn try_from(src: &[u8]) -> Result<Self, Self::Error> {
-        Self::deserialize(src)
-    }
-}
-
 impl Deserialize for NonZeroU64 {
     type Error = Error;
 
