@@ -193,13 +193,14 @@ impl Deserialize for NonZeroU64 {
     type Error = Error;
 
     fn deserialize(src: &[u8]) -> Result<Self, Self::Error> {
-        match src.get(0..size_of::<Self>()).ok_or_else(Error::Truncated {
-            expected: size_of::<Self>(),
-            actual: src.len(),
-        })? {
-            s if let Some(v) = u64::from_le_bytes(src.try_into()?).into() => Ok(v),
-            _ => Err(Error::Zero),
-        }
+        let buf = src
+            .get(0..size_of::<Self>())
+            .ok_or_else(Error::Truncated {
+                expected: size_of::<Self>(),
+                actual: src.len(),
+            })?
+            .try_into()?;
+        u64::from_le_bytes(buf).try_into()
     }
 }
 
