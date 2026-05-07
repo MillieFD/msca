@@ -59,8 +59,9 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //! predicate pruning.
 
 use crate::accumulate::Serialize;
-use crate::{Error, Sector};
+use crate::{Deserialize, Error, Sector, io};
 use minicbor::{CborLen, Decode, Encode};
+use smol::io::{AsyncRead, AsyncReadExt};
 use std::collections::BTreeMap;
 use std::num::NonZeroU64;
 
@@ -126,9 +127,6 @@ impl Manifest {
         Manifest::deserialize(&buf)
     }
 
-    /// Decode a [`Manifest`] from CBOR bytes.
-    pub fn decode(bytes: &[u8]) -> Result<Self, Error> {
-        minicbor::decode(bytes).map_err(Error::Decode)
     }
 }
 
