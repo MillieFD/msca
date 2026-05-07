@@ -266,8 +266,9 @@ impl File {
         file.flush().await?;
         // SAFETY: Undefined behaviour if the underlying file is modified while mmap is held.
         // 1. Segments are immutable once written. The mmap is tightly scoped to prevent UB:
-        //   a. Excludes the mutable file header and manifest.
-        //   b. Includes only the immutable segments.
+        //   a. Offset excludes the mutable file header
+        //   b. Length excludes the mutable manifest and metadata (if present)
+        //   c. Only immutable segment region included in mmap
         // 2. Appending a new segment updates the manifest and mmap simultaneously (one lock)
         //   a. In-flight reader mmaps remain valid (existing segments unaltered)
         //   b. New mmaps must await a read lock on the file state
