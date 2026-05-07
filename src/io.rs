@@ -274,7 +274,7 @@ impl File {
         //   b. New mmaps must await a read lock on the file state
         let mmap = unsafe { MMAP.map(&file)? }.into();
         let state = State { manifest, mmap }.into();
-        let writer = Writer { file, header }.into();
+        let writer = Writer { file: file.into(), header }.into();
         Self { writer, state, path }.into()
     }
 
