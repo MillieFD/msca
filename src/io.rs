@@ -246,7 +246,7 @@ impl File {
     /// This function will return an [`Error::Io`] if:
     ///
     /// - A file already exists at the specified path.
-    /// - An issue occurs while creating, opening, or writing to the file.
+    /// - An OS error occurs while creating, opening, or writing to the file.
     /// - Memory mapping the file (`Mmap`) fails.
     ///
     /// [1]: PathBuf
@@ -273,6 +273,46 @@ impl File {
         //   a. In-flight reader mmaps remain valid (existing segments unaltered)
         //   b. New mmaps must await a read lock on the file state
         let mmap = unsafe { MMAP.map(&file)? }.into();
+        let state = State { manifest, mmap }.into();
+        let writer = Writer { file, header }.into();
+        Self { writer, state, path }.into()
+    }
+
+    /// Open an existing [clem](crate) file with read and write permissions at the specified
+    /// [path](PathBuf).
+    ///
+    /// The [magic bytes](MAGIC) and [version number](VERSION) are validated immediately on open. A
+    /// [`Mmap`] is scoped to the immutable [`Segment`] file region. Implementors must ensure that
+    /// the provided `path` remains valid and accessible for the entire duration of the operation.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an [`Error::Io`] if:
+    ///
+    /// - A file does not exist at the specified path.
+    /// - An OS error occurs while opening the file.
+    /// - Memory mapping the file (`Mmap`) fails.
+    async fn open(path: impl Into<PathBuf>) -> Result<Self, Error> {
+        let mut file = smol::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create_new(false) // Explicitly disallow file creation. Use File::create instead.
+            .open(&path)
+            .await?;
+        let header = Header::from_file(&mut file).await?;
+        let mmap = MmapOptions::new()
+            .offset(HEADER.get() as u64)
+            .len(header.tail.get() as usize - HEADER.get());
+        // SAFETY: Undefined behaviour if the underlying file is modified while mmap is held.
+        // 1. Segments are immutable once written. The mmap is tightly scoped to prevent UB:
+        //   a. Offset excludes the mutable file header
+        //   b. Length excludes the mutable manifest and metadata (if present)
+        //   c. Only immutable segment region included in mmap
+        // 2. Appending a new segment updates the manifest and mmap simultaneously (one lock)
+        //   a. In-flight reader mmaps remain valid (existing segments unaltered)
+        //   b. New mmaps must await a read lock on the file state
+        let mmap = unsafe { MMAP.map(&file)? }.into();
+        let manifest = Manifest::from_file(&mut file, header.manifest)?;
         let state = State { manifest, mmap }.into();
         let writer = Writer { file, header }.into();
         Self { writer, state, path }.into()
