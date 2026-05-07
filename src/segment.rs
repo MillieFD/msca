@@ -235,25 +235,15 @@ pub(crate) const fn align(n: usize) -> usize {
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode, CborLen)]
 #[non_exhaustive] // To accommodate potential future error cases.
 pub enum Error {
-    /// A read operation attempted to access bytes beyond the end of the input slice.
-    #[n(0)]
-    #[deprecated(note = "Truncated variant will move into IO module Error")]
-    // TODO → Move to IO module Error enum
-    Truncated(#[n(0)] Sector),
     /// Underlying [`variant::Error`] from a failed [`Variant`] parsing operation.
-    #[n(1)]
+    #[n(0)]
     Variant(#[n(0)] variant::Error),
-    /// Attempted to decode a zero value into a [`NonZero`](num::NonZero) field.
-    #[n(2)]
-    Zero,
 }
 
 impl Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Truncated(sector) => write!(f, "Read from {sector:?} was truncated"),
             Self::Variant(error) => write!(f, "Segment variant ID error → {error}"),
-            Self::Zero => write!(f, "Expected non-zero value was zero"),
             other => write!(f, "Unexpected segment error → {other:?}"),
         }
     }
