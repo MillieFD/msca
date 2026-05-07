@@ -225,6 +225,17 @@ impl From<std::array::TryFromSliceError> for Error {
     }
 }
 
+/* ---------------------------------------------------------------- Deserialize Trait Definition */
+
+/// A **type** that can be deserialized from a canonical [`clem`](crate) binary representation.
+pub trait Deserialize {
+    /// The error type returned by [`deserialize`](Self::deserialize) on failure.
+    type Error;
+
+    /// Deserialize `self` from the provided source byte slice.
+    fn deserialize(buf: &[u8]) -> Result<Self, Self::Error>;
+}
+
 /* --------------------------------------------------------------------------------------- Tests */
 
 #[cfg(test)]
