@@ -23,7 +23,7 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 use crate::schema::Unfold;
 use bitvec::vec::BitVec;
 use minicbor::{CborLen, Decode, Encode};
-use std::num::{self, NonZeroU64};
+use std::num::*;
 
 /* --------------------------------------------------------------------------- Data Accumulators */
 
@@ -402,273 +402,468 @@ where
 
 /* ------------------------------------------------------------------ Serialize Trait Definition */
 
+/// A **buffer** that can hold the serialized byte representation of a value.
+pub trait Buffer: AsRef<[u8]> + AsMut<[u8]> {}
+
+/// Blanket implementation that covers stack-allocated byte arrays and heap-allocated byte vectors.
+///
+/// This design defines a fixed-size buffer for types with a known size at compile time, while
+/// facilitating dynamic buffer sizing for types that require heap allocation.
+impl<T> Buffer for T where T: AsRef<[u8]> + AsMut<[u8]> {}
+
 /// A **type** that can be serialized into a canonical [`clem`](crate) byte representation for
 /// on-disk storage.
 pub trait Serialize {
+    /// The [`Buffer`] type returned by [`Self::serialize`].
+    ///
+    /// Fixed-size types can specify an appropriate array to leverage stack allocation. Unsized
+    /// types should specify a heap-allocated buffer to accommodate dynamic sizing at runtime.
+    type Buffer: Buffer;
+
     /// Returns the number of bytes required to encode `self`.
+    ///
+    /// Defaults to the [`size_of`](size_of)`::<Self>` if not otherwise specified.
     fn size(&self) -> usize {
         size_of::<Self>()
     }
 
-    /// [`Serialize`](Self::serialize) `self` and append the encoded bytes to the provided buffer.
-    fn serialize_into(&self, buf: &mut Vec<u8>);
+    /// Serialize `self` and append the encoded bytes to the provided existent [`Buffer`].
+    fn serialize_into(&self, buf: &mut [u8]);
 
-    /// Serialize `self` and return the encoded bytes as a tight [`Box<[u8]>`].
-    fn serialize(&self) -> Box<[u8]> {
-        let size = self.size();
-        let mut buf = Vec::with_capacity(size);
-        self.serialize_into(&mut buf);
-        debug_assert_eq!(buf.len(), size, "Actual size ≠ predicted size");
-        buf.into_boxed_slice()
-    }
+    /// Serialize `self` and return the encoded bytes in a new [`Buffer`].
+    fn serialize(&self) -> Self::Buffer;
 }
 
 /* -------------------------------------------------------------- Serialize Trait Implementation */
 
 impl Serialize for char {
-    fn serialize_into(&self, buf: &mut Vec<u8>) {
+    type Buffer = [u8; size_of::<Self>()];
+
+    fn serialize_into(&self, buf: &mut [u8]) {
         debug_assert_eq!(size_of::<Self>(), size_of::<u32>(), "char is not 4 bytes");
         u32::from(*self).serialize_into(buf);
+    }
+
+    fn serialize(&self) -> Self::Buffer {
+        u32::from(*self).serialize()
     }
 }
 
 impl Serialize for u8 {
-    fn serialize_into(&self, buf: &mut Vec<u8>) {
-        buf.push(*self);
+    type Buffer = [u8; size_of::<Self>()];
+
+    fn serialize_into(&self, buf: &mut [u8]) {
+        buf[0] = *self;
+    }
+
+    fn serialize(&self) -> Self::Buffer {
+        [*self]
     }
 }
 
 impl Serialize for u16 {
-    fn serialize_into(&self, buf: &mut Vec<u8>) {
+    type Buffer = [u8; size_of::<Self>()];
+
+    fn serialize_into(&self, buf: &mut [u8]) {
         let bytes = self.to_le_bytes();
         buf.extend_from_slice(&bytes);
+    }
+
+    fn serialize(&self) -> Self::Buffer {
+        self.to_le_bytes()
     }
 }
 
 impl Serialize for u32 {
-    fn serialize_into(&self, buf: &mut Vec<u8>) {
+    type Buffer = [u8; size_of::<Self>()];
+
+    fn serialize_into(&self, buf: &mut [u8]) {
         let bytes = self.to_le_bytes();
         buf.extend_from_slice(&bytes);
+    }
+
+    fn serialize(&self) -> Self::Buffer {
+        self.to_le_bytes()
     }
 }
 
 impl Serialize for u64 {
-    fn serialize_into(&self, buf: &mut Vec<u8>) {
+    type Buffer = [u8; size_of::<Self>()];
+
+    fn serialize_into(&self, buf: &mut [u8]) {
         let bytes = self.to_le_bytes();
         buf.extend_from_slice(&bytes);
+    }
+
+    fn serialize(&self) -> Self::Buffer {
+        self.to_le_bytes()
     }
 }
 
 impl Serialize for u128 {
-    fn serialize_into(&self, buf: &mut Vec<u8>) {
+    type Buffer = [u8; size_of::<Self>()];
+
+    fn serialize_into(&self, buf: &mut [u8]) {
         let bytes = self.to_le_bytes();
         buf.extend_from_slice(&bytes);
     }
-}
 
-impl Serialize for num::NonZeroU8 {
-    fn serialize_into(&self, buf: &mut Vec<u8>) {
-        self.get().serialize_into(buf);
+    fn serialize(&self) -> Self::Buffer {
+        self.to_le_bytes()
     }
 }
 
-impl Serialize for num::NonZeroU16 {
-    fn serialize_into(&self, buf: &mut Vec<u8>) {
+impl Serialize for NonZeroU8 {
+    type Buffer = [u8; size_of::<Self>()];
+
+    fn serialize_into(&self, buf: &mut [u8]) {
         self.get().serialize_into(buf);
+    }
+
+    fn serialize(&self) -> Self::Buffer {
+        self.get().serialize()
     }
 }
 
-impl Serialize for num::NonZeroU32 {
-    fn serialize_into(&self, buf: &mut Vec<u8>) {
+impl Serialize for NonZeroU16 {
+    type Buffer = [u8; size_of::<Self>()];
+
+    fn serialize_into(&self, buf: &mut [u8]) {
         self.get().serialize_into(buf);
+    }
+
+    fn serialize(&self) -> Self::Buffer {
+        self.get().serialize()
     }
 }
 
-impl Serialize for num::NonZeroU64 {
-    fn serialize_into(&self, buf: &mut Vec<u8>) {
+impl Serialize for NonZeroU32 {
+    type Buffer = [u8; size_of::<Self>()];
+
+    fn serialize_into(&self, buf: &mut [u8]) {
         self.get().serialize_into(buf);
+    }
+
+    fn serialize(&self) -> Self::Buffer {
+        self.get().serialize()
     }
 }
 
-impl Serialize for num::NonZeroU128 {
-    fn serialize_into(&self, buf: &mut Vec<u8>) {
+impl Serialize for NonZeroU64 {
+    type Buffer = [u8; size_of::<Self>()];
+
+    fn serialize_into(&self, buf: &mut [u8]) {
         self.get().serialize_into(buf);
+    }
+
+    fn serialize(&self) -> Self::Buffer {
+        self.get().serialize()
+    }
+}
+
+impl Serialize for NonZeroU128 {
+    type Buffer = [u8; size_of::<Self>()];
+
+    fn serialize_into(&self, buf: &mut [u8]) {
+        self.get().serialize_into(buf);
+    }
+
+    fn serialize(&self) -> Self::Buffer {
+        self.get().serialize()
     }
 }
 
 impl Serialize for i8 {
-    fn serialize_into(&self, buf: &mut Vec<u8>) {
+    type Buffer = [u8; size_of::<Self>()];
+
+    fn serialize_into(&self, buf: &mut [u8]) {
         let bytes = self.to_le_bytes();
         buf.extend_from_slice(&bytes);
+    }
+
+    fn serialize(&self) -> Self::Buffer {
+        self.to_le_bytes()
     }
 }
 
 impl Serialize for i16 {
-    fn serialize_into(&self, buf: &mut Vec<u8>) {
+    type Buffer = [u8; size_of::<Self>()];
+
+    fn serialize_into(&self, buf: &mut [u8]) {
         let bytes = self.to_le_bytes();
         buf.extend_from_slice(&bytes);
+    }
+
+    fn serialize(&self) -> Self::Buffer {
+        self.to_le_bytes()
     }
 }
 
 impl Serialize for i32 {
-    fn serialize_into(&self, buf: &mut Vec<u8>) {
+    type Buffer = [u8; size_of::<Self>()];
+
+    fn serialize_into(&self, buf: &mut [u8]) {
         let bytes = self.to_le_bytes();
         buf.extend_from_slice(&bytes);
+    }
+
+    fn serialize(&self) -> Self::Buffer {
+        self.to_le_bytes()
     }
 }
 
 impl Serialize for i64 {
-    fn serialize_into(&self, buf: &mut Vec<u8>) {
+    type Buffer = [u8; size_of::<Self>()];
+
+    fn serialize_into(&self, buf: &mut [u8]) {
         let bytes = self.to_le_bytes();
         buf.extend_from_slice(&bytes);
+    }
+
+    fn serialize(&self) -> Self::Buffer {
+        self.to_le_bytes()
     }
 }
 
 impl Serialize for i128 {
-    fn serialize_into(&self, buf: &mut Vec<u8>) {
+    type Buffer = [u8; size_of::<Self>()];
+
+    fn serialize_into(&self, buf: &mut [u8]) {
         let bytes = self.to_le_bytes();
         buf.extend_from_slice(&bytes);
     }
-}
 
-impl Serialize for num::NonZeroI8 {
-    fn serialize_into(&self, buf: &mut Vec<u8>) {
-        self.get().serialize_into(buf);
+    fn serialize(&self) -> Self::Buffer {
+        self.to_le_bytes()
     }
 }
 
-impl Serialize for num::NonZeroI16 {
-    fn serialize_into(&self, buf: &mut Vec<u8>) {
+impl Serialize for NonZeroI8 {
+    type Buffer = [u8; size_of::<Self>()];
+
+    fn serialize_into(&self, buf: &mut [u8]) {
         self.get().serialize_into(buf);
+    }
+
+    fn serialize(&self) -> Self::Buffer {
+        self.get().serialize()
     }
 }
 
-impl Serialize for num::NonZeroI32 {
-    fn serialize_into(&self, buf: &mut Vec<u8>) {
+impl Serialize for NonZeroI16 {
+    type Buffer = [u8; size_of::<Self>()];
+
+    fn serialize_into(&self, buf: &mut [u8]) {
         self.get().serialize_into(buf);
+    }
+
+    fn serialize(&self) -> Self::Buffer {
+        self.get().serialize()
     }
 }
 
-impl Serialize for num::NonZeroI64 {
-    fn serialize_into(&self, buf: &mut Vec<u8>) {
+impl Serialize for NonZeroI32 {
+    type Buffer = [u8; size_of::<Self>()];
+
+    fn serialize_into(&self, buf: &mut [u8]) {
         self.get().serialize_into(buf);
+    }
+
+    fn serialize(&self) -> Self::Buffer {
+        self.get().serialize()
     }
 }
 
-impl Serialize for num::NonZeroI128 {
-    fn serialize_into(&self, buf: &mut Vec<u8>) {
+impl Serialize for NonZeroI64 {
+    type Buffer = [u8; size_of::<Self>()];
+
+    fn serialize_into(&self, buf: &mut [u8]) {
         self.get().serialize_into(buf);
+    }
+
+    fn serialize(&self) -> Self::Buffer {
+        self.get().serialize()
+    }
+}
+
+impl Serialize for NonZeroI128 {
+    type Buffer = [u8; size_of::<Self>()];
+
+    fn serialize_into(&self, buf: &mut [u8]) {
+        self.get().serialize_into(buf);
+    }
+
+    fn serialize(&self) -> Self::Buffer {
+        self.get().serialize()
     }
 }
 
 impl Serialize for f32 {
-    fn serialize_into(&self, buf: &mut Vec<u8>) {
+    type Buffer = [u8; size_of::<Self>()];
+
+    fn serialize_into(&self, buf: &mut [u8]) {
         let bytes = self.to_le_bytes();
         buf.extend_from_slice(&bytes);
+    }
+
+    fn serialize(&self) -> Self::Buffer {
+        self.to_le_bytes()
     }
 }
 
 impl Serialize for f64 {
-    fn serialize_into(&self, buf: &mut Vec<u8>) {
+    type Buffer = [u8; size_of::<Self>()];
+
+    fn serialize_into(&self, buf: &mut [u8]) {
         let bytes = self.to_le_bytes();
         buf.extend_from_slice(&bytes);
+    }
+
+    fn serialize(&self) -> Self::Buffer {
+        self.to_le_bytes()
     }
 }
 
 impl Serialize for Option<char> {
-    fn serialize_into(&self, buf: &mut Vec<u8>) {
+    type Buffer = [u8; size_of::<Self>()];
+
+    fn serialize_into(&self, buf: &mut [u8]) {
         // None writes u32::MAX (outside the valid scalar range).
         self.map_or(u32::MAX, u32::from).serialize_into(buf);
     }
-}
 
-impl Serialize for Option<num::NonZeroU8> {
-    fn serialize_into(&self, buf: &mut Vec<u8>) {
-        match self {
-            Some(n) => n.serialize_into(buf),
-            None => 0u8.serialize_into(buf),
-        }
+    fn serialize(&self) -> Self::Buffer {
+        self.map_or(u32::MAX, u32::from).serialize()
     }
 }
 
-impl Serialize for Option<num::NonZeroU16> {
-    fn serialize_into(&self, buf: &mut Vec<u8>) {
-        match self {
-            Some(n) => n.serialize_into(buf),
-            None => 0u16.serialize_into(buf),
-        }
+impl Serialize for Option<NonZeroU8> {
+    type Buffer = [u8; size_of::<Self>()];
+
+    fn serialize_into(&self, buf: &mut [u8]) {
+        // None writes u8::MIN (outside the valid non-zero range).
+        self.map_or(u8::MIN, NonZeroU8::get).serialize_into(buf)
+    }
+
+    fn serialize(&self) -> Self::Buffer {
+        self.map_or(u8::MIN, NonZeroU8::get).serialize()
     }
 }
 
-impl Serialize for Option<num::NonZeroU32> {
-    fn serialize_into(&self, buf: &mut Vec<u8>) {
-        match self {
-            Some(n) => n.serialize_into(buf),
-            None => 0u32.serialize_into(buf),
-        }
+impl Serialize for Option<NonZeroU16> {
+    type Buffer = [u8; size_of::<Self>()];
+
+    fn serialize_into(&self, buf: &mut [u8]) {
+        // None writes u16::MIN (outside the valid non-zero range).
+        self.map_or(u16::MIN, NonZeroU16::get).serialize_into(buf)
+    }
+
+    fn serialize(&self) -> Self::Buffer {
+        self.map_or(u16::MIN, NonZeroU16::get).serialize()
     }
 }
 
-impl Serialize for Option<num::NonZeroU64> {
-    fn serialize_into(&self, buf: &mut Vec<u8>) {
-        match self {
-            Some(n) => n.serialize_into(buf),
-            None => 0u64.serialize_into(buf),
-        }
+impl Serialize for Option<NonZeroU32> {
+    type Buffer = [u8; size_of::<Self>()];
+
+    fn serialize_into(&self, buf: &mut [u8]) {
+        // None writes u32::MIN (outside the valid non-zero range).
+        self.map_or(u32::MIN, NonZeroU32::get).serialize_into(buf)
+    }
+
+    fn serialize(&self) -> Self::Buffer {
+        self.map_or(u32::MIN, NonZeroU32::get).serialize()
     }
 }
 
-impl Serialize for Option<num::NonZeroU128> {
-    fn serialize_into(&self, buf: &mut Vec<u8>) {
-        match self {
-            Some(n) => n.serialize_into(buf),
-            None => 0u128.serialize_into(buf),
-        }
+impl Serialize for Option<NonZeroU64> {
+    type Buffer = [u8; size_of::<Self>()];
+
+    fn serialize_into(&self, buf: &mut [u8]) {
+        // None writes u64::MIN (outside the valid non-zero range).
+        self.map_or(u64::MIN, NonZeroU64::get).serialize_into(buf)
+    }
+
+    fn serialize(&self) -> Self::Buffer {
+        self.map_or(u64::MIN, NonZeroU64::get).serialize()
     }
 }
 
-impl Serialize for Option<num::NonZeroI8> {
-    fn serialize_into(&self, buf: &mut Vec<u8>) {
-        match self {
-            Some(n) => n.serialize_into(buf),
-            None => 0i8.serialize_into(buf),
-        }
+impl Serialize for Option<NonZeroU128> {
+    type Buffer = [u8; size_of::<Self>()];
+
+    fn serialize_into(&self, buf: &mut [u8]) {
+        // None writes u128::MIN (outside the valid non-zero range).
+        self.map_or(u128::MIN, NonZeroU128::get).serialize_into(buf)
+    }
+
+    fn serialize(&self) -> Self::Buffer {
+        self.map_or(u128::MIN, NonZeroU128::get).serialize()
     }
 }
 
-impl Serialize for Option<num::NonZeroI16> {
-    fn serialize_into(&self, buf: &mut Vec<u8>) {
-        match self {
-            Some(n) => n.serialize_into(buf),
-            None => 0i16.serialize_into(buf),
-        }
+impl Serialize for Option<NonZeroI8> {
+    type Buffer = [u8; size_of::<Self>()];
+
+    fn serialize_into(&self, buf: &mut [u8]) {
+        // None writes 0i8 (outside the valid non-zero range).
+        self.map_or(0i8, NonZeroI8::get).serialize_into(buf)
+    }
+
+    fn serialize(&self) -> Self::Buffer {
+        self.map_or(0i8, NonZeroI8::get).serialize()
     }
 }
 
-impl Serialize for Option<num::NonZeroI32> {
-    fn serialize_into(&self, buf: &mut Vec<u8>) {
-        match self {
-            Some(n) => n.serialize_into(buf),
-            None => 0i32.serialize_into(buf),
-        }
+impl Serialize for Option<NonZeroI16> {
+    type Buffer = [u8; size_of::<Self>()];
+
+    fn serialize_into(&self, buf: &mut [u8]) {
+        // None writes 0i16 (outside the valid non-zero range).
+        self.map_or(0i16, NonZeroI16::get).serialize_into(buf)
+    }
+
+    fn serialize(&self) -> Self::Buffer {
+        self.map_or(0i16, NonZeroI16::get).serialize()
     }
 }
 
-impl Serialize for Option<num::NonZeroI64> {
-    fn serialize_into(&self, buf: &mut Vec<u8>) {
-        match self {
-            Some(n) => n.serialize_into(buf),
-            None => 0i64.serialize_into(buf),
-        }
+impl Serialize for Option<NonZeroI32> {
+    type Buffer = [u8; size_of::<Self>()];
+
+    fn serialize_into(&self, buf: &mut [u8]) {
+        // None writes 0i32 (outside the valid non-zero range).
+        self.map_or(0i32, NonZeroI32::get).serialize_into(buf)
+    }
+
+    fn serialize(&self) -> Self::Buffer {
+        self.map_or(0i32, NonZeroI32::get).serialize()
     }
 }
 
-impl Serialize for Option<num::NonZeroI128> {
-    fn serialize_into(&self, buf: &mut Vec<u8>) {
-        match self {
-            Some(n) => n.serialize_into(buf),
-            None => 0i128.serialize_into(buf),
-        }
+impl Serialize for Option<NonZeroI64> {
+    type Buffer = [u8; size_of::<Self>()];
+
+    fn serialize_into(&self, buf: &mut [u8]) {
+        // None writes 0i64 (outside the valid non-zero range).
+        self.map_or(0i64, NonZeroI64::get).serialize_into(buf)
+    }
+
+    fn serialize(&self) -> Self::Buffer {
+        self.map_or(0i64, NonZeroI64::get).serialize()
+    }
+}
+
+impl Serialize for Option<NonZeroI128> {
+    type Buffer = [u8; size_of::<Self>()];
+
+    fn serialize_into(&self, buf: &mut [u8]) {
+        // None writes 0i128 (outside the valid non-zero range).
+        self.map_or(0i128, NonZeroI128::get).serialize_into(buf)
+    }
+
+    fn serialize(&self) -> Self::Buffer {
+        self.map_or(0i128, NonZeroI128::get).serialize()
     }
 }
 
@@ -676,23 +871,42 @@ impl<T> Serialize for Vec<T>
 where
     T: Serialize,
 {
+    type Buffer = Vec<u8>;
+
     fn size(&self) -> usize {
+        // Recursively sum the sizes of all elements.
         self.iter().map(T::size).sum()
     }
-    fn serialize_into(&self, buf: &mut Vec<u8>) {
+
+    fn serialize_into(&self, buf: &mut [u8]) {
         self.iter().for_each(|v| v.serialize_into(buf))
+    }
+
+    fn serialize(&self) -> Self::Buffer {
+        let size = self.size();
+        let mut buf = Vec::with_capacity(size);
+        self.serialize_into(&mut buf);
+        debug_assert_eq!(buf.len(), size, "actual size ≠ predicted size");
+        buf
     }
 }
 
 impl Serialize for BitVec {
+    type Buffer = Vec<u8>;
+
     fn size(&self) -> usize {
+        // Each byte encodes 8 bits; round up (↑) BitVec::len to the nearest whole byte.
         (self.len() + 7) / 8
     }
 
-    fn serialize_into(&self, buf: &mut Vec<u8>) {
-        // TODO → Ensure correctness. Is this conversion possible without intermediate allocation?
-        let bytes = self.chunks(8).collect::<Vec<u8>>();
-        buf.extend_from_slice(&bytes);
+    fn serialize_into(&self, buf: &mut [u8]) {
+        // TODO → Check correctness & write unit test.
+        buf.extend_from_slice(&self.chunks(8));
+    }
+
+    fn serialize(&self) -> Self::Buffer {
+        // TODO → Check correctness & write unit test.
+        self.chunks(8).collect()
     }
 }
 
@@ -700,12 +914,18 @@ impl<T> Serialize for OptInSitu<T>
 where
     Vec<Option<T>>: Serialize,
 {
+    type Buffer = Vec<u8>;
+
     fn size(&self) -> usize {
         self.data.size()
     }
 
-    fn serialize_into(&self, buf: &mut Vec<u8>) {
+    fn serialize_into(&self, buf: &mut [u8]) {
         self.data.serialize_into(buf)
+    }
+
+    fn serialize(&self) -> Self::Buffer {
+        self.data.serialize()
     }
 }
 
@@ -714,13 +934,23 @@ where
     T: Unfold + Default,
     T::RawAcc: Serialize,
 {
+    type Buffer = Vec<u8>;
+
     fn size(&self) -> usize {
         self.mask.size() + self.data.size()
     }
 
-    fn serialize_into(&self, buf: &mut Vec<u8>) {
+    fn serialize_into(&self, buf: &mut [u8]) {
         self.mask.serialize_into(buf);
         self.data.serialize_into(buf);
+    }
+
+    fn serialize(&self) -> Self::Buffer {
+        let size = self.size();
+        let mut buf = Vec::with_capacity(size);
+        self.serialize_into(&mut buf);
+        debug_assert_eq!(buf.len(), size, "actual size ≠ predicted size");
+        buf
     }
 }
 
@@ -729,13 +959,23 @@ where
     T: Unfold,
     T::RawAcc: Serialize,
 {
+    type Buffer = Vec<u8>;
+
     fn size(&self) -> usize {
         self.offsets.size() + self.data.size()
     }
 
-    fn serialize_into(&self, buf: &mut Vec<u8>) {
+    fn serialize_into(&self, buf: &mut [u8]) {
         self.offsets.serialize_into(buf);
         self.data.serialize_into(buf);
+    }
+
+    fn serialize(&self) -> Self::Buffer {
+        let size = self.size();
+        let mut buf = Vec::with_capacity(size);
+        self.serialize_into(&mut buf);
+        debug_assert_eq!(buf.len(), size, "actual size ≠ predicted size");
+        buf
     }
 }
 
@@ -744,13 +984,23 @@ where
     T: Unfold,
     T::RawAcc: Serialize,
 {
+    type Buffer = Vec<u8>;
+
     fn size(&self) -> usize {
         self.offsets.size() + self.data.size()
     }
 
-    fn serialize_into(&self, buf: &mut Vec<u8>) {
+    fn serialize_into(&self, buf: &mut [u8]) {
         self.offsets.serialize_into(buf);
         self.data.serialize_into(buf);
+    }
+
+    fn serialize(&self) -> Self::Buffer {
+        let size = self.size();
+        let mut buf = Vec::with_capacity(size);
+        self.serialize_into(&mut buf);
+        debug_assert_eq!(buf.len(), size, "actual size ≠ predicted size");
+        buf
     }
 }
 
@@ -758,11 +1008,22 @@ impl<T> Serialize for Flatten<T>
 where
     T: Serialize,
 {
+    type Buffer = Vec<u8>;
+
     fn size(&self) -> usize {
         self.0.size() // Transparent wrapper
     }
 
-    fn serialize_into(&self, buf: &mut Vec<u8>) {
+    fn serialize_into(&self, buf: &mut [u8]) {
         self.0.serialize_into(buf); // Transparent wrapper
     }
+
+    fn serialize(&self) -> Self::Buffer {
+        self.0.serialize() // Transparent wrapper
+    }
 }
+
+/* --------------------------------------------------------------------------------------- Tests */
+
+#[cfg(test)]
+mod tests {}

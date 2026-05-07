@@ -144,9 +144,17 @@ pub(crate) struct Header {
 }
 
 impl Serialize for Header {
-    fn serialize_into(&self, buf: &mut Vec<u8>) {
-        buf.extend_from_slice(&self.tail.get().to_le_bytes());
+    type Buffer = [u8; size_of::<Self>()];
+
+    fn serialize_into(&self, buf: &mut [u8]) {
+        self.tail.serialize_into(buf);
         self.manifest.serialize_into(buf);
+    }
+
+    fn serialize(&self) -> Self::Buffer {
+        let mut buf = [0u8; size_of::<Self>()];
+        self.serialize_into(&mut buf);
+        buf
     }
 }
 
