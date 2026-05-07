@@ -127,6 +127,15 @@ const HEADER: NonZeroUsize = { size_of_val(&MAGIC) + size_of_val(&VERSION) + siz
     .try_into()
     .expect("Header length is zero");
 
+/// A compile time [`Mmap`][`Options`](MmapOptions) instance used to create empty mmaps during
+/// [`File`]`::`[`create`](File::create).
+///
+/// The [`Mmap`] is tightly scoped to reduce the risk of undefined behaviour:
+/// - [`offset`](MmapOptions::offset) excludes the mutable file [`Header`]
+/// - Includes the immutable [`Segment`] file region
+/// - [`len`](MmapOptions::len) excludes the mutable [`Manifest`]
+const MMAP: MmapOptions = *MmapOptions::new().offset(HEADER.get() as u64).len(0);
+
 /// Mutable region of the file header.
 ///
 /// Excludes immutable header elements such as the [magic bytes][1] and [version number][2]. See the
