@@ -70,7 +70,7 @@ use std::num::NonZeroU64;
 /// Manifest of file segments and accompanying metadata for random access and predicate pruning.
 /// See the [module-level documentation](self) for details.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode, CborLen)]
+#[derive(Debug, Default, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode, CborLen)]
 #[cbor(tag(100))]
 pub(crate) struct Manifest {
     /// Schema segments keyed by name.
