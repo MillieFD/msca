@@ -262,7 +262,7 @@ impl File {
             .open(&path)
             .await?;
         file.write_all(&header.serialize()).await?;
-        file.write_all(manifest.serialize()).await?;
+        file.write_all(&manifest.serialize()).await?;
         file.flush().await?;
         // SAFETY: Undefined behaviour if the underlying file is modified while mmap is held.
         // 1. Segments are immutable once written. The mmap is tightly scoped to prevent UB:
