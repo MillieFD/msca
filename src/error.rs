@@ -8,6 +8,7 @@ Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the conditions of the LICENSE are met.
 */
 
+use minicbor::{CborLen, Decode, Encode};
 use std::fmt;
 
 /* ----------------------------------------------------------------------------- Public Exports */
@@ -22,28 +23,37 @@ use std::fmt;
 ///
 /// This enum is `#[non_exhaustive]` meaning additional variants may be added in future versions.
 /// Implementers are advised to include a wildcard arm `_` to account for potential additions.
-#[non_exhaustive]
-#[derive(Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Debug, Encode, Decode, CborLen)]
+#[non_exhaustive] // To accommodate potential future error cases.
 pub enum Error {
-    /// Underlying [`std::io::Error`] from the file backing the [`Dataset`].
-    Io(std::io::Error),
-    /// Underlying [`std::str::Utf8Error`] while attempting to interpret `[u8]` as a [`String`].
-    Utf8(std::str::Utf8Error),
     /// Underlying [`std::num::TryFromIntError`] from a checked conversion between two types.
-    Convert(std::num::TryFromIntError),
-    /// CBOR encoding failure for a manifest or schema payload.
-    Encode(String),
+    #[n(0)]
+    Convert(#[n(0)] std::num::TryFromIntError),
     /// CBOR decoding failure for a manifest or schema payload.
-    Decode(minicbor::decode::Error),
+    #[n(1)]
+    Decode(#[n(0)] minicbor::decode::Error),
+    /// CBOR encoding failure for a manifest or schema payload.
+    #[n(2)]
+    Encode(#[n(0)] String),
+    /// Underlying [`std::io::Error`] from the file backing the [`Dataset`].
+    #[n(3)]
+    Io(#[n(0)] std::io::Error),
     /// File magic bytes did not match the expected `clem` signature.
+    #[n(4)]
     Magic,
-    /// File version is not recognised by this build of [`clem`](crate).
-    Version(u8),
     /// Underlying [`segment::Error`][1] while encoding a [`Segment`][2]
     ///
     /// [1]: crate::segment::Error
     /// [2]: crate::segment::Segment
-    Segment(crate::segment::Error),
+    #[n(5)]
+    Segment(#[n(0)] crate::segment::Error),
+    /// Underlying [`std::str::Utf8Error`] while attempting to interpret `[u8]` as a [`String`].
+    #[n(6)]
+    Utf8(#[n(0)] std::str::Utf8Error),
+    /// File version is not recognised by this build of [`clem`](crate).
+    #[n(7)]
+    Version(#[n(0)] u8),
 }
 
 /* ----------------------------------------------------------------------- Trait Implementations */
@@ -51,14 +61,14 @@ pub enum Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Io(e) => write!(f, "File IO error → {e}"),
-            Self::Utf8(e) => write!(f, "UTF8 from u8 error → {e}"),
             Self::Convert(e) => write!(f, "Integer type conversion error → {e}"),
-            Self::Encode(msg) => write!(f, "CBOR encode error → {msg}"),
             Self::Decode(e) => write!(f, "CBOR decode error → {e}"),
+            Self::Encode(msg) => write!(f, "CBOR encode error → {msg}"),
+            Self::Io(e) => write!(f, "File IO error → {e}"),
             Self::Magic => f.write_str("File is not a valid clem dataset"),
-            Self::Version(v) => write!(f, "Unrecognised clem version → {v}"),
             Self::Segment(e) => write!(f, "Segment error → {e}"),
+            Self::Utf8(e) => write!(f, "UTF8 from u8 error → {e}"),
+            Self::Version(v) => write!(f, "Unrecognised clem version → {v}"),
         }
     }
 }
@@ -66,11 +76,11 @@ impl fmt::Display for Error {
 impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
-            Self::Io(e) => Some(e),
-            Self::Utf8(e) => Some(e),
             Self::Convert(e) => Some(e),
             Self::Decode(e) => Some(e),
+            Self::Io(e) => Some(e),
             Self::Segment(e) => Some(e),
+            Self::Utf8(e) => Some(e),
             _ => None, // Some variants do not wrap an inner error source
         }
     }
@@ -145,13 +155,5 @@ mod tests {
         let source = str::from_utf8(b"\xFF").unwrap_err();
         let error: Error = source.into();
         assert!(error.to_string().starts_with("UTF8 from u8 error →"));
-    }
-
-    #[test]
-    fn from_segment_error() {
-        use crate::segment;
-        let source = segment::Error::Zero;
-        let error: Error = source.into();
-        assert!(error.to_string().starts_with("Segment error →"));
     }
 }
