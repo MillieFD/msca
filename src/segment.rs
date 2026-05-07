@@ -185,16 +185,26 @@ pub trait Segment: Serialize {
 /* ---------------------------------------------------------------- Segment Trait Implementation */
 
 impl Serialize for Schema {
+    type Buffer = Vec<u8>;
+
     fn size(&self) -> usize {
         size_of::<Header>() + minicbor::len(self)
     }
 
-    fn serialize_into(&self, buf: &mut Vec<u8>) {
+    fn serialize_into(&self, buf: &mut [u8]) {
         let size = self.size() as u64;
         buf.push(Self::VARIANT as u8);
         buf.extend_from_slice(&size.to_le_bytes());
         // SAFETY: minicbor::encode is infallible when writing to Vec<u8>
         minicbor::encode(self, buf).expect("Failed to encode schema.");
+    }
+
+    fn serialize(&self) -> Self::Buffer {
+        let size = self.size();
+        let mut buf = Vec::with_capacity(size);
+        self.serialize_into(&mut buf);
+        debug_assert_eq!(buf.len(), size, "actual size ≠ predicted size");
+        buf
     }
 }
 
