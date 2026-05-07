@@ -201,21 +201,6 @@ impl Deserialize for Header {
     }
 }
 
-impl Deserialize for NonZeroU64 {
-    type Error = Error;
-
-    fn deserialize(src: &[u8]) -> Result<Self, Self::Error> {
-        let buf = src
-            .get(0..size_of::<Self>())
-            .ok_or_else(Error::Truncated {
-                expected: size_of::<Self>(),
-                actual: src.len(),
-            })?
-            .try_into()?;
-        u64::from_le_bytes(buf).try_into()
-    }
-}
-
 /// An exclusive owned file handle for an open [`clem`](crate) dataset.
 struct File {
     /// todo field doc comment
