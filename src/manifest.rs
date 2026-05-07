@@ -113,6 +113,19 @@ pub(crate) struct Manifest {
 }
 
 impl Manifest {
+    /// [`Deserialize`] a file [`Manifest`] from the provided [`File`](AsyncRead) at the specified
+    /// [`Sector`].
+    pub async fn from_file<F>(file: &mut F, sector: Sector) -> Result<Self, io::Error>
+    where
+        F: AsyncRead + ?Sized,
+    {
+        let size = sector.length.get() as usize;
+        let mut buf = Vec::with_capacity(size);
+        file.read_exact(&mut buf).await?;
+        debug_assert_eq!(buf.len(), size, "actual size ≠ predicted size");
+        Manifest::deserialize(&buf)
+    }
+
     /// Decode a [`Manifest`] from CBOR bytes.
     pub fn decode(bytes: &[u8]) -> Result<Self, Error> {
         minicbor::decode(bytes).map_err(Error::Decode)
