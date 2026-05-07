@@ -411,7 +411,7 @@ pub trait Buffer: AsRef<[u8]> + AsMut<[u8]> {}
 /// facilitating dynamic buffer sizing for types that require heap allocation.
 impl<T> Buffer for T where T: AsRef<[u8]> + AsMut<[u8]> {}
 
-/// A **type** that can be serialized into a canonical [`clem`](crate) byte representation for
+/// A **type** that can be serialized into a canonical [`clem`](crate) binary representation for
 /// on-disk storage.
 pub trait Serialize {
     /// The [`Buffer`] type returned by [`Self::serialize`].
