@@ -299,7 +299,7 @@ impl File {
         let mmap = unsafe { MMAP.map(&file)? }.into();
         let manifest = Manifest::from_file(&mut file, header.manifest)?;
         let state = State { manifest, mmap }.into();
-        let writer = Writer { file, header }.into();
+        let writer = Writer { file: file.into(), header }.into();
         Self { writer, state, path }.into()
     }
 }
