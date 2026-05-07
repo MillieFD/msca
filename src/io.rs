@@ -158,6 +158,40 @@ impl Serialize for Header {
     }
 }
 
+impl Deserialize for Header {
+    type Error = Error;
+
+    fn deserialize(src: &[u8]) -> Result<Self, Self::Error> {
+        let buf: [u8; HEADER] = match src.try_into().ok_or_else(Error::Truncated {
+            expected: HEADER,
+            actual: src.len(),
+        })? {
+            s if !src.starts_with(&MAGIC) => Err(Error::Magic),
+            s if let Some(v) = src.get(4) != Some(&VERSION) => Err(Error::Version(*v)),
+            s => Ok(s),
+        }?;
+        let tail = NonZeroU64::deserialize(&buf[5..13])?;
+        let offset = NonZeroU64::deserialize(&buf[13..21])?;
+        let length = NonZeroU64::deserialize(&buf[21..29])?;
+        let manifest = Sector { offset, length };
+        Ok(Self { tail, manifest })
+    }
+}
+
+impl Deserialize for NonZeroU64 {
+    type Error = Error;
+
+    fn deserialize(src: &[u8]) -> Result<Self, Self::Error> {
+        match src.get(0..size_of::<Self>()).ok_or_else(Error::Truncated {
+            expected: size_of::<Self>(),
+            actual: src.len(),
+        })? {
+            s if let Some(v) = u64::from_le_bytes(src.try_into()?).into() => Ok(v),
+            _ => Err(Error::Zero),
+        }
+    }
+}
+
 
 /* ------------------------------------------------------------------------------ Specific Error */
 
