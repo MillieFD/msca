@@ -131,13 +131,23 @@ impl Manifest {
 }
 
 impl Serialize for Manifest {
+    type Buffer = Vec<u8>;
+
     fn size(&self) -> usize {
         minicbor::len(self)
     }
 
-    fn serialize_into(&self, buf: &mut Vec<u8>) {
+    fn serialize_into(&self, buf: &mut [u8]) {
         // SAFETY: minicbor::encode is infallible when writing to Vec<u8>
         minicbor::encode(self, buf).expect("Failed to encode manifest as CBOR");
+    }
+
+    fn serialize(&self) -> Self::Buffer {
+        let size = self.size();
+        let mut buf = Vec::with_capacity(size);
+        self.serialize_into(&mut buf);
+        debug_assert_eq!(buf.len(), size, "actual size ≠ predicted size");
+        buf
     }
 }
 
