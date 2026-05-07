@@ -97,7 +97,7 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //!
 //! ```text
 //! [Header] [Segment 0] ... [Segment N] ... [Manifest] [Metadata]
-//!                                tail ↑   ↑ offset
+//!                                tail ↑   ↑ manifest.offset
 //! ```
 //!
 //! The [`tail`](NonZeroU64) field records the byte offset immediately following the final committed
