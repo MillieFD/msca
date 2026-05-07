@@ -192,6 +192,10 @@ impl Deserialize for NonZeroU64 {
     }
 }
 
+/// An exclusive owned file handle for an open [`clem`](crate) dataset.
+struct File {
+}
+
 
 /* ------------------------------------------------------------------------------ Specific Error */
 
