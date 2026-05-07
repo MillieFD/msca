@@ -247,6 +247,7 @@ impl fmt::Display for Error {
             Self::Truncated { .. } => write!(f, "Read was truncated → {self:?}"),
             Self::Version(v) => write!(f, "Unrecognised clem version → {v}"),
             Self::Zero => write!(f, "Expected non-zero value was zero"),
+            other => write!(f, "Unexpected IO error → {other:?}"),
         }
     }
 }
