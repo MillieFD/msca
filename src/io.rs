@@ -206,8 +206,74 @@ impl Deserialize for NonZeroU64 {
 
 /// An exclusive owned file handle for an open [`clem`](crate) dataset.
 struct File {
+    /// todo field doc comment
+    writer: Mutex<Writer>,
+    /// todo field doc comment
+    state: RwLock<State>,
+    /// todo field doc comment
+    path: PathBuf,
 }
 
+impl File {
+    /// Create a new [clem](crate) file with read and write permissions at the specified [path][1].
+    ///
+    /// The file is initialised in a valid empty state with a default [`Manifest`] and no
+    /// [`Segments`](Segment) or [`Metadata`][2]. The tail and manifest offset pointers are
+    /// guaranteed to align exactly.
+    ///
+    /// ```text
+    /// [Header] [Manifest]
+    ///         ↑ tail & manifest.offset
+    /// ```
+    ///
+    /// Implementors must ensure that the provided `path` remains valid and accessible for the
+    /// entire duration of the operation.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an [`Error::Io`] if:
+    ///
+    /// - A file already exists at the specified path.
+    /// - An issue occurs while creating, opening, or writing to the file.
+    /// - Memory mapping the file (`Mmap`) fails.
+    ///
+    /// [1]: PathBuf
+    // [2]: todo → link to metadata struct or feature documentation
+    async fn create(path: impl Into<PathBuf>) -> Result<Self, Error> {
+        let manifest = Manifest::default();
+        let sector = Sector::from(&manifest);
+        let header = Header { tail: sector.offset, manifest: sector };
+        let mut file = smol::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create_new(true)
+            .open(&path)
+            .await?;
+        file.write_all(&header.serialize()).await?;
+        file.write_all(manifest.serialize()).await?;
+        file.flush().await?;
+        // SAFETY: Undefined behaviour if the underlying file is modified while mmap is held.
+        // 1. Segments are immutable once written. The mmap is tightly scoped to prevent UB:
+        //   a. Excludes the mutable file header and manifest.
+        //   b. Includes only the immutable segments.
+        // 2. Appending a new segment updates the manifest and mmap simultaneously (one lock)
+        //   a. In-flight reader mmaps remain valid (existing segments unaltered)
+        //   b. New mmaps must await a read lock on the file state
+        let mmap = unsafe { MMAP.map(&file)? }.into();
+        let state = State { manifest, mmap }.into();
+        let writer = Writer { file, header }.into();
+        Self { writer, state, path }.into()
+    }
+}
+
+impl From<&Manifest> for Sector {
+    fn from(man: &Manifest) -> Self {
+        Self {
+            offset: HEADER.try_into().expect("Header size > u64::MAX"),
+            length: man.size().try_into().expect("Manifest size > u64::MAX"),
+        }
+    }
+}
 
 /* ------------------------------------------------------------------------------ Specific Error */
 
