@@ -173,12 +173,12 @@ impl Deserialize for Header {
     type Error = Error;
 
     fn deserialize(src: &[u8]) -> Result<Self, Self::Error> {
-        let buf: [u8; HEADER] = match src.try_into().ok_or_else(Error::Truncated {
-            expected: HEADER,
+        let buf: [u8; HEADER.get()] = match src.try_into().ok_or_else(Error::Truncated {
+            expected: HEADER.get(),
             actual: src.len(),
         })? {
-            s if !src.starts_with(&MAGIC) => Err(Error::Magic),
-            s if let Some(v) = src.get(4) != Some(&VERSION) => Err(Error::Version(*v)),
+            s if !s.starts_with(&MAGIC) => Err(Error::Magic),
+            s if s[4] != &VERSION => Err(Error::Version(s[4])),
             s => Ok(s),
         }?;
         let tail = NonZeroU64::deserialize(&buf[5..13])?;
