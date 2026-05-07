@@ -130,6 +130,14 @@ impl Serialize for Manifest {
     }
 }
 
+impl Deserialize for Manifest {
+    type Error = io::Error;
+
+    fn deserialize(src: &[u8]) -> Result<Self, Self::Error> {
+        minicbor::decode(src).map_err(io::Error::Decode)
+    }
+}
+
 /// A minimal schema segment **descriptor** that specifies:
 ///
 /// 1. [`Sector`] where the schema segment is located on disk.
