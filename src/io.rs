@@ -175,28 +175,55 @@ impl Serialize for Header {
 #[derive(Debug, Encode, Decode, CborLen)]
 #[non_exhaustive] // To accommodate potential future error cases.
 pub enum Error {
-    /// File magic bytes did not match the expected `clem` signature.
-    #[n(0)]
-    Magic,
-    /// File version number is not recognised by this build of [`clem`](crate).
-    #[n(1)]
-    Version(#[n(0)] u8),
     /// Underlying [`std::io::Error`] from the file backing the [`Dataset`](todo link).
-    #[n(2)]
+    #[n(0)]
     Io(#[n(0)] std::io::Error),
+    /// File magic bytes did not match the expected `clem` signature.
+    #[n(1)]
+    Magic,
+    /// Underlying [`TryFromSliceError`][1] while parsing a slice into a fixed-size array.
+    ///
+    /// [1]: std::array::TryFromSliceError
+    #[n(2)]
+    Slice(#[n(0)] std::array::TryFromSliceError),
+    /// A read operation attempted to access bytes beyond the end of the input slice.
+    #[n(3)]
+    Truncated {
+        /// Expected length of the input slice.
+        #[n(0)]
+        expected: usize,
+        /// Actual length of the input slice.
+        #[n(1)]
+        actual: usize,
+    },
+    /// File version number is not recognised by this build of [`clem`](crate).
+    #[n(4)]
+    Version(#[n(0)] u8),
+    /// Attempted to decode a zero value into a [`NonZero`](core::num::NonZero) field.
+    #[n(5)]
+    Zero,
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Magic => f.write_str("File is not a valid clem dataset"),
-            Self::Version(v) => write!(f, "Unrecognised clem version → {v}"),
             Self::Io(e) => write!(f, "File IO error → {e}"),
+            Self::Magic => f.write_str("File is not a valid clem dataset"),
+            Self::Slice(e) => write!(f, "Try from slice error → {e}"),
+            Self::Truncated { .. } => write!(f, "Read was truncated → {self:?}"),
+            Self::Version(v) => write!(f, "Unrecognised clem version → {v}"),
+            Self::Zero => write!(f, "Expected non-zero value was zero"),
         }
     }
 }
 
 impl std::error::Error for Error {}
+
+impl From<std::array::TryFromSliceError> for Error {
+    fn from(e: std::array::TryFromSliceError) -> Self {
+        Self::Slice(e)
+    }
+}
 
 /* --------------------------------------------------------------------------------------- Tests */
 
