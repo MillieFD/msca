@@ -368,7 +368,7 @@ pub trait Deserialize {
     type Error;
 
     /// Deserialize `self` from the provided source byte slice.
-    fn deserialize(buf: &[u8]) -> Result<Self, Self::Error>;
+    fn deserialize(src: &[u8]) -> Result<Self, Self::Error>;
 }
 
 /* --------------------------------------------------------------------------------------- Tests */
