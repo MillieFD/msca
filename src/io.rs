@@ -123,7 +123,9 @@ const VERSION: u8 = 1;
 ///
 /// [1]: MAGIC
 /// [2]: VERSION
-const HEADER: usize = size_of_val(&MAGIC) + size_of_val(&VERSION) + size_of::<Header>();
+const HEADER: NonZeroUsize = { size_of_val(&MAGIC) + size_of_val(&VERSION) + size_of::<Header>() }
+    .try_into()
+    .expect("Header length is zero");
 
 /// Mutable region of the file header.
 ///
