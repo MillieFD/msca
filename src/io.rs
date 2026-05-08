@@ -231,7 +231,9 @@ impl Deserialize for Header {
 }
 
 /// An exclusive owned file handle for an open [`clem`](crate) dataset.
-struct File {
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Debug)]
+pub(crate) struct File {
     /// todo field doc comment
     writer: Mutex<Writer>,
     /// todo field doc comment
