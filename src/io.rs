@@ -214,13 +214,10 @@ impl Deserialize for Header {
     type Error = Error;
 
     fn deserialize(src: &[u8]) -> Result<Self, Self::Error> {
-        let buf: [u8; HEADER.get()] = match src.try_into().ok_or_else(Error::Truncated {
-            expected: HEADER.get(),
-            actual: src.len(),
-        })? {
+        let buf: [u8; HEADER.get()] = match src {
             s if !s.starts_with(&MAGIC) => Err(Error::Magic),
-            s if s[4] != &VERSION => Err(Error::Version(s[4])),
-            s => Ok(s),
+            s if s[4] != VERSION => Err(Error::Version(s[4])),
+            s => s.try_into().map_err(Error::Slice),
         }?;
         let tail = NonZeroU64::deserialize(&buf[5..13])?;
         let offset = NonZeroU64::deserialize(&buf[13..21])?;
