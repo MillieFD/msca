@@ -444,7 +444,7 @@ pub trait Deserialize {
     type Error;
 
     /// Deserialize `self` from the provided source byte slice.
-    #[rustfmt::skip] // Single line where clause improves readability.
+    #[rustfmt::skip] // Single line where clause improves readability
     fn deserialize(src: &[u8]) -> Result<Self, Self::Error> where Self: Sized;
 }
 
