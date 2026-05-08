@@ -18,13 +18,11 @@ use minicbor::{CborLen, Decode, Encode};
 
 /// todo struct doc comment
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Debug, Encode, Decode, CborLen)]
+#[derive(Debug)]
 pub struct Dataset {
     /// todo field doc comment
-    #[n(0)]
     manifest: Manifest,
     /// todo field doc comment
-    #[n(1)]
     file: File,
 }
 
