@@ -187,7 +187,7 @@ impl Header {
     /// [`Deserialize`] the file [`Header`] using the provided file [`Reader`](AsyncRead).
     async fn from_file<F>(file: &mut F) -> Result<Self, Error>
     where
-        F: AsyncRead + ?Sized,
+        F: AsyncRead + Unpin + ?Sized,
     {
         let mut buf = [0u8; HEADER.get()];
         file.read_exact(&mut buf).await?;
