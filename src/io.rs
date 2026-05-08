@@ -203,10 +203,10 @@ impl Serialize for Header {
         self.manifest.serialize_into(buf);
     }
 
-    fn serialize(&self) -> Self::Buffer {
+    fn serialize(&self) -> Result<Self::Buffer, accumulate::Error> {
         let mut buf = [0u8; size_of::<Self>()];
         self.serialize_into(&mut buf);
-        buf
+        Ok(buf)
     }
 }
 
