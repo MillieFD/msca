@@ -305,8 +305,12 @@ impl File {
     /// - A file does not exist at the specified path.
     /// - An OS error occurs while opening the file.
     /// - Memory mapping the file (`Mmap`) fails.
-    async fn open(path: impl Into<PathBuf>) -> Result<Self, Error> {
-        let mut file = smol::fs::OpenOptions::new()
+    pub(crate) async fn open<P>(path: P) -> Result<Self, Error>
+    where
+        P: AsRef<Path>,
+    {
+        let path = path.as_ref().to_path_buf();
+        let mut file = OpenOptions::new()
             .read(true)
             .write(true)
             .create_new(false) // Explicitly disallow file creation. Use File::create instead.
@@ -325,10 +329,10 @@ impl File {
         //   a. In-flight reader mmaps remain valid (existing segments unaltered)
         //   b. New mmaps must await a read lock on the file state
         let mmap = unsafe { MMAP.map(&file)? }.into();
-        let manifest = Manifest::from_file(&mut file, header.manifest)?;
+        let manifest = Manifest::from_file(&mut file, header.manifest).await?;
         let state = State { manifest, mmap }.into();
-        let writer = Writer { file: file.into(), header }.into();
-        Self { writer, state, path }.into()
+        let writer = Writer { file: BufWriter::new(file), header }.into();
+        Ok(Self { writer, state, path })
     }
 }
 
