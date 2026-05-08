@@ -158,7 +158,12 @@ const HEADER: NonZeroUsize = {
 /// - [`offset`](MmapOptions::offset) excludes the mutable file [`Header`]
 /// - Includes the immutable [`Segment`] file region
 /// - [`len`](MmapOptions::len) excludes the mutable [`Manifest`]
-const MMAP: MmapOptions = *MmapOptions::new().offset(HEADER.get() as u64).len(0);
+const MMAP: LazyCell<&'static MmapOptions> = LazyCell::new(mmap);
+
+/// Initialisation function for the [`MMAP`] constant.
+fn mmap() -> &'static MmapOptions {
+    MmapOptions::new().offset(HEADER.get() as u64).len(0)
+}
 
 /// Mutable region of the file header.
 ///
