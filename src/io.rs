@@ -359,44 +359,36 @@ impl TryFrom<&Manifest> for Sector {
 /// This enum is `#[non_exhaustive]` meaning additional variants may be added in future versions.
 /// Implementers are advised to include a wildcard arm `_` to account for potential additions.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Debug, Encode, Decode, CborLen)]
+#[derive(Debug)]
 #[non_exhaustive] // To accommodate potential future error cases.
 pub enum Error {
+    /// Underlying [`TryFromIntError`] from a checked conversion between two types.
+    Convert(TryFromIntError),
     /// CBOR decoding failure for a manifest or schema payload.
-    #[n(0)]
-    Decode(#[n(0)] minicbor::decode::Error),
+    Decode(minicbor::decode::Error),
     /// Underlying [`std::io::Error`] from the file backing the [`Dataset`](todo link).
-    #[n(1)]
-    Io(#[n(0)] std::io::Error),
+    Io(std::io::Error),
     /// File magic bytes did not match the expected `clem` signature.
-    #[n(2)]
     Magic,
-    /// Underlying [`TryFromSliceError`][1] while parsing a slice into a fixed-size array.
-    ///
-    /// [1]: std::array::TryFromSliceError
-    #[n(3)]
-    Slice(#[n(0)] std::array::TryFromSliceError),
+    /// Underlying [`TryFromSliceError`] while parsing a slice into a fixed-size array.
+    Slice(TryFromSliceError),
     /// A read operation attempted to access bytes beyond the end of the input slice.
-    #[n(4)]
     Truncated {
         /// Expected length of the input slice.
-        #[n(0)]
         expected: usize,
         /// Actual length of the input slice.
-        #[n(1)]
         actual: usize,
     },
     /// File version number is not recognised by this build of [`clem`](crate).
-    #[n(5)]
-    Version(#[n(0)] u8),
+    Version(u8),
     /// Attempted to decode a zero value into a [`NonZero`](core::num::NonZero) field.
-    #[n(6)]
     Zero,
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::Convert(e) => write!(f, "Integer type conversion error → {e}"),
             Self::Decode(e) => write!(f, "CBOR decode error → {e}"),
             Self::Io(e) => write!(f, "File IO error → {e}"),
             Self::Magic => f.write_str("File is not a valid clem dataset"),
@@ -417,9 +409,24 @@ impl From<std::io::Error> for Error {
     }
 }
 
-impl From<std::array::TryFromSliceError> for Error {
-    fn from(e: std::array::TryFromSliceError) -> Self {
+impl From<TryFromSliceError> for Error {
+    fn from(e: TryFromSliceError) -> Self {
         Self::Slice(e)
+    }
+}
+
+impl From<TryFromIntError> for Error {
+    fn from(e: TryFromIntError) -> Self {
+        Self::Convert(e)
+    }
+}
+
+impl From<accumulate::Error> for Error {
+    fn from(e: accumulate::Error) -> Self {
+        match e {
+            accumulate::Error::Convert(inner) => Self::Convert(inner),
+            accumulate::Error::Zero => Self::Zero,
+        }
     }
 }
 
