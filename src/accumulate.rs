@@ -240,6 +240,10 @@ pub trait Accumulate: Default {
     /// The input type accepted by [`Self::push`].
     type Item;
 
+    /// Create a new empty instance of [`Self`].
+    #[rustfmt::skip] // Single line where clause improves readability
+    fn new() -> Self where Self: Sized;
+
     /// Append a single value of `T` to [`Self`].
     fn push(&mut self, value: Self::Item);
 
