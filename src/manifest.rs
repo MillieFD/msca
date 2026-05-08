@@ -194,7 +194,7 @@ pub(crate) struct Schema {
 ///
 /// [`Vec`] order in-memory is **not** guaranteed to reflect [`Sector`] order on-disk.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode, CborLen)]
+#[derive(Debug, Default, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode, CborLen)]
 pub(crate) struct Column {
     /// List of [`Buffer`] descriptors for this column across all data segments.
     #[cbor(n(0), skip_if = "Vec::is_empty")]
