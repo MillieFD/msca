@@ -12,7 +12,6 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 
 use crate::io::File;
 use crate::manifest::Manifest;
-use minicbor::{CborLen, Decode, Encode};
 
 /* ------------------------------------------------------------------------------ Public Exports */
 
