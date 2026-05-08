@@ -264,18 +264,18 @@ impl File {
     ///
     /// [1]: PathBuf
     // [2]: todo → link to metadata struct or feature documentation
-    async fn create(path: impl Into<PathBuf>) -> Result<Self, Error> {
+    pub(crate) async fn create<P>(path: P) -> Result<Self, Error>
+    where
+        P: AsRef<Path>,
+    {
+        let path = path.as_ref().to_path_buf();
         let manifest = Manifest::default();
-        let sector = Sector::from(&manifest);
+        let sector = Sector::try_from(&manifest)?;
         let header = Header { tail: sector.offset, manifest: sector };
-        let mut file = smol::fs::OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create_new(true)
-            .open(&path)
-            .await?;
-        file.write_all(&header.serialize()).await?;
-        file.write_all(&manifest.serialize()).await?;
+        let mut file =
+            OpenOptions::new().read(true).write(true).create_new(true).open(&path).await?;
+        file.write_all(&header.serialize()?).await?;
+        file.write_all(&manifest.serialize()?).await?;
         file.flush().await?;
         // SAFETY: Undefined behaviour if the underlying file is modified while mmap is held.
         // 1. Segments are immutable once written. The mmap is tightly scoped to prevent UB:
@@ -287,8 +287,8 @@ impl File {
         //   b. New mmaps must await a read lock on the file state
         let mmap = unsafe { MMAP.map(&file)? }.into();
         let state = State { manifest, mmap }.into();
-        let writer = Writer { file: file.into(), header }.into();
-        Self { writer, state, path }.into()
+        let writer = Writer { file: BufWriter::new(file), header }.into();
+        Ok(Self { writer, state, path })
     }
 
     /// Open an existing [clem](crate) file with read and write permissions at the specified
