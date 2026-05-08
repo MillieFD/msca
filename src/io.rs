@@ -143,9 +143,13 @@ const VERSION: u8 = 1;
 ///
 /// [1]: MAGIC
 /// [2]: VERSION
-const HEADER: NonZeroUsize = { size_of_val(&MAGIC) + size_of_val(&VERSION) + size_of::<Header>() }
-    .try_into()
-    .expect("Header length is zero");
+const HEADER: NonZeroUsize = {
+    let size = size_of_val(&MAGIC) + size_of_val(&VERSION) + size_of::<Header>();
+    match NonZeroUsize::new(size) {
+        Some(n) => n,
+        None => panic!("Header size is zero"),
+    }
+};
 
 /// A compile time [`Mmap`][`Options`](MmapOptions) instance used to create empty mmaps during
 /// [`File`]`::`[`create`](File::create).
