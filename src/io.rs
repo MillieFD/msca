@@ -336,12 +336,13 @@ impl File {
     }
 }
 
-impl From<&Manifest> for Sector {
-    fn from(man: &Manifest) -> Self {
-        Self {
-            offset: HEADER.try_into().expect("Header size > u64::MAX"),
-            length: man.size().try_into().expect("Manifest size > u64::MAX"),
-        }
+impl TryFrom<&Manifest> for Sector {
+    type Error = Error;
+
+    fn try_from(manifest: &Manifest) -> Result<Self, Self::Error> {
+        let offset = HEADER.try_into()?;
+        let length = manifest.size().map_err(Error::from)?;
+        Ok(Self { offset, length })
     }
 }
 
