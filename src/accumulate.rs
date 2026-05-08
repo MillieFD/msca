@@ -236,7 +236,7 @@ pub(crate) struct Flatten<T>(#[n(0)] pub T);
 
 /// An in-memory **data accumulator** that can ingest values of the specified [`type`](Self::Item)
 /// and encode into an optimised on-disk format.
-pub trait Accumulate: Default {
+pub trait Accumulate {
     /// The input type accepted by [`Self::push`].
     type Item;
 
