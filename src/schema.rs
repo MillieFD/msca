@@ -449,13 +449,7 @@ impl Error {
 impl Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Collision { name, ty1, ty2 } => write!(
-                f,
-                "Column collision while building schema:\n\t\
-                Tried to add column {{ name: {name}, type {ty1:?} }}\n\t\
-                Found existing column {{ name: {name}, type {ty2:?} }}
-                "
-            ),
+            Self::Collision { name, .. } => write!(f, "Column '{name}' already in schema"),
             Self::Unsupported(msg) => write!(f, "Unsupported type → {msg}"),
         }
     }
