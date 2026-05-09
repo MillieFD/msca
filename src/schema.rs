@@ -421,10 +421,10 @@ pub enum Error {
         name: &'static str,
         /// [`Type`] of the existing [`Column`] in the [`Schema`].
         #[n(1)]
-        ty1: Type,
+        existing: Type,
         /// [`Type`] of the new [`Column`] being added to the [`Schema`].
         #[n(2)]
-        ty2: Type,
+        new: Type,
     },
     /// The requested type is not supported by this version of [`clem`](crate).
     ///
@@ -440,8 +440,8 @@ impl Error {
     fn collision(occupied: Occupied, new: Type) -> Self {
         Self::Collision {
             name: occupied.key().clone(),
-            ty1: occupied.get().ty,
-            ty2: new,
+            existing: occupied.get().ty,
+            new,
         }
     }
 }
@@ -483,7 +483,7 @@ where
 /// integration with on-disk storage.
 // TODO [1] link to procedural macro documentation
 // TODO [2] link to procedural macro user guide
-pub trait Unfold {
+pub trait Unfold: Sized {
     /// The [accumulator](Accumulate) type used to ingest unwrapped values of [`Self`].
     type RawAcc: Accumulate<Item = Self>;
 
