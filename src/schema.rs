@@ -68,13 +68,17 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //! each `clem` file requires at least **one** schema segment. Multimodality and schema evolution
 //! are achieved by appending additional schema segments.
 
-use crate::accumulate::{Accumulate, Flatten, OptBitVec, OptInSitu, OptSeq, Seq};
-use bitvec::vec::BitVec;
-use minicbor::{CborLen, Decode, Encode};
 use std::collections::btree_map::{BTreeMap, Entry, OccupiedEntry, VacantEntry};
 use std::convert::Infallible;
 use std::fmt::{Display, Formatter};
 use std::num;
+
+use bitvec::vec::BitVec;
+use minicbor::{CborLen, Decode, Encode};
+
+use self::number::Number;
+use crate::accumulate::{Accumulate, Flatten, OptBitVec, OptInSitu, OptSeq, Seq};
+use crate::{Sector, manifest};
 
 /// Shorthand [`OccupiedEntry`] for a [`Column`] that already exists in the [`Schema`].
 type Occupied<'a> = OccupiedEntry<'a, &'static str, Column>;
