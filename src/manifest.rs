@@ -370,21 +370,21 @@ pub enum Error {
         /// Name shared by the new and existing schemas.
         #[n(0)]
         name: &'static str,
-        /// [`Sector`] of the existing [`Schema`] in the [`Manifest`].
+        /// The existing [`Schema`] in the [`Manifest`].
         #[n(1)]
-        existing: Sector,
-        /// [`Sector`] of the new [`Schema`] being added to the [`Manifest`].
+        existing: Schema,
+        /// The new [`Schema`] being added to the [`Manifest`].
         #[n(2)]
-        new: Sector,
+        new: Schema,
     },
 }
 
 impl Error {
     /// Returns a new [`Error::Collision`] variant wrapping the schema name and conflicting sectors.
-    fn collision(occupied: Occupied, new: Sector) -> Self {
+    fn collision(occupied: Occupied, new: Schema) -> Self {
         Self::Collision {
-            name: occupied.key().clone(),
-            existing: occupied.get().sector,
+            name: occupied.key(),
+            existing: *occupied.get(),
             new,
         }
     }
