@@ -995,7 +995,10 @@ where
 
     fn size(&self) -> Result<NonZeroU64, Error> {
         // Recursively sum the sizes of all elements.
-        self.iter().map(T::size).sum()
+        self.iter().try_fold(NonZeroU64::MIN, |total, element| {
+            let size = element.size()?.get();
+            total.checked_add(size).ok_or(Error::Zero)
+        })
     }
 
     fn serialize_into(&self, buf: &mut [u8]) {
