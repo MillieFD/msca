@@ -113,9 +113,7 @@ pub struct Schema {
 impl Schema {
     /// Initialises a new empty [`Schema`] with no columns.
     pub fn new() -> Self {
-        Self {
-            columns: BTreeMap::new(),
-        }
+        Self { columns: BTreeMap::new() }
     }
 
     /// Add a [`Column`] to [`self`](Schema) with the specified `name` and [`type`](R).
@@ -217,154 +215,86 @@ pub enum Type {
 }
 
 impl Type {
-    /// A [`Type::Number`] descriptor for the `u8` primitive type.
-    pub const U8: Self = Self::Number(number::Number {
-        kind: number::Kind::UInt,
-        size: 1,
-    });
-
-    /// A [`Type::Number`] descriptor for the `u16` primitive type.
-    pub const U16: Self = Self::Number(number::Number {
-        kind: number::Kind::UInt,
-        size: 2,
-    });
-
-    /// A [`Type::Number`] descriptor for the `u32` primitive type.
-    pub const U32: Self = Self::Number(number::Number {
-        kind: number::Kind::UInt,
-        size: 4,
-    });
-
-    /// A [`Type::Number`] descriptor for the `u64` primitive type.
-    pub const U64: Self = Self::Number(number::Number {
-        kind: number::Kind::UInt,
-        size: 8,
-    });
-
-    /// A [`Type::Number`] descriptor for the `u128` primitive type.
-    pub const U128: Self = Self::Number(number::Number {
-        kind: number::Kind::UInt,
-        size: 16,
-    });
-
-    /// A [`Number`](number::Number) descriptor for the [`NonZeroU8`](num::NonZeroU8) type.
-    pub const NZU8: Self = Self::Number(number::Number {
-        kind: number::Kind::NonZeroUInt,
-        size: 1,
-    });
-
-    /// A [`Number`](number::Number) descriptor for the [`NonZeroU16`](num::NonZeroU16) type.
-    pub const NZU16: Self = Self::Number(number::Number {
-        kind: number::Kind::NonZeroUInt,
-        size: 2,
-    });
-
-    /// A [`Number`](number::Number) descriptor for the [`NonZeroU32`](num::NonZeroU32) type.
-    pub const NZU32: Self = Self::Number(number::Number {
-        kind: number::Kind::NonZeroUInt,
-        size: 4,
-    });
-
-    /// A [`Number`](number::Number) descriptor for the [`NonZeroU64`](num::NonZeroU64) type.
-    pub const NZU64: Self = Self::Number(number::Number {
-        kind: number::Kind::NonZeroUInt,
-        size: 8,
-    });
-
-    /// A [`Number`](number::Number) descriptor for the [`NonZeroU128`](num::NonZeroU128) type.
-    pub const NZU128: Self = Self::Number(number::Number {
-        kind: number::Kind::NonZeroUInt,
-        size: 16,
-    });
-
-    /// A [`Type::Number`] descriptor for the `i8` primitive type.
-    pub const I8: Self = Self::Number(number::Number {
-        kind: number::Kind::Int,
-        size: 1,
-    });
-
-    /// A [`Type::Number`] descriptor for the `i16` primitive type.
-    pub const I16: Self = Self::Number(number::Number {
-        kind: number::Kind::Int,
-        size: 2,
-    });
-
-    /// A [`Type::Number`] descriptor for the `i32` primitive type.
-    pub const I32: Self = Self::Number(number::Number {
-        kind: number::Kind::Int,
-        size: 4,
-    });
-
-    /// A [`Type::Number`] descriptor for the `i64` primitive type.
-    pub const I64: Self = Self::Number(number::Number {
-        kind: number::Kind::Int,
-        size: 8,
-    });
-
-    /// A [`Type::Number`] descriptor for the `i128` primitive type.
-    pub const I128: Self = Self::Number(number::Number {
-        kind: number::Kind::Int,
-        size: 16,
-    });
-
-    /// A [`Number`](number::Number) descriptor for the [`NonZeroI8`](num::NonZeroI8) type.
-    pub const NZI8: Self = Self::Number(number::Number {
-        kind: number::Kind::NonZeroInt,
-        size: 1,
-    });
-
-    /// A [`Number`](number::Number) descriptor for the [`NonZeroI16`](num::NonZeroI16) type.
-    pub const NZI16: Self = Self::Number(number::Number {
-        kind: number::Kind::NonZeroInt,
-        size: 2,
-    });
-
-    /// A [`Number`](number::Number) descriptor for the [`NonZeroI32`](num::NonZeroI32) type.
-    pub const NZI32: Self = Self::Number(number::Number {
-        kind: number::Kind::NonZeroInt,
-        size: 4,
-    });
-
-    /// A [`Number`](number::Number) descriptor for the [`NonZeroI64`](num::NonZeroI64) type.
-    pub const NZI64: Self = Self::Number(number::Number {
-        kind: number::Kind::NonZeroInt,
-        size: 8,
-    });
-
-    /// A [`Number`](number::Number) descriptor for the [`NonZeroI128`](num::NonZeroI128) type.
-    pub const NZI128: Self = Self::Number(number::Number {
-        kind: number::Kind::NonZeroInt,
-        size: 16,
-    });
-
     /// A [`Type::Number`] descriptor for the `f32` primitive type.
-    pub const F32: Self = Self::Number(number::Number {
-        kind: number::Kind::Float,
-        size: 4,
-    });
+    pub const F32: Self = Self::Number(Number { kind: number::Kind::Float, size: 4 });
 
     /// A [`Type::Number`] descriptor for the `f64` primitive type.
-    pub const F64: Self = Self::Number(number::Number {
-        kind: number::Kind::Float,
-        size: 8,
-    });
+    pub const F64: Self = Self::Number(Number { kind: number::Kind::Float, size: 8 });
+
+    /// A [`Type::Number`] descriptor for the `i128` primitive type.
+    pub const I128: Self = Self::Number(Number { kind: number::Kind::Int, size: 16 });
+
+    /// A [`Type::Number`] descriptor for the `i16` primitive type.
+    pub const I16: Self = Self::Number(Number { kind: number::Kind::Int, size: 2 });
+
+    /// A [`Type::Number`] descriptor for the `i32` primitive type.
+    pub const I32: Self = Self::Number(Number { kind: number::Kind::Int, size: 4 });
+
+    /// A [`Type::Number`] descriptor for the `i64` primitive type.
+    pub const I64: Self = Self::Number(Number { kind: number::Kind::Int, size: 8 });
+
+    /// A [`Type::Number`] descriptor for the `i8` primitive type.
+    pub const I8: Self = Self::Number(Number { kind: number::Kind::Int, size: 1 });
+
+    /// A [`Number`](Number) descriptor for the [`NonZeroI128`](num::NonZeroI128) type.
+    pub const NZI128: Self = Self::Number(Number { kind: number::Kind::NonZeroInt, size: 16 });
+
+    /// A [`Number`](Number) descriptor for the [`NonZeroI16`](num::NonZeroI16) type.
+    pub const NZI16: Self = Self::Number(Number { kind: number::Kind::NonZeroInt, size: 2 });
+
+    /// A [`Number`](Number) descriptor for the [`NonZeroI32`](num::NonZeroI32) type.
+    pub const NZI32: Self = Self::Number(Number { kind: number::Kind::NonZeroInt, size: 4 });
+
+    /// A [`Number`](Number) descriptor for the [`NonZeroI64`](num::NonZeroI64) type.
+    pub const NZI64: Self = Self::Number(Number { kind: number::Kind::NonZeroInt, size: 8 });
+
+    /// A [`Number`](Number) descriptor for the [`NonZeroI8`](num::NonZeroI8) type.
+    pub const NZI8: Self = Self::Number(Number { kind: number::Kind::NonZeroInt, size: 1 });
+
+    /// A [`Number`](Number) descriptor for the [`NonZeroU128`](num::NonZeroU128) type.
+    pub const NZU128: Self = Self::Number(Number { kind: number::Kind::NonZeroUInt, size: 16 });
+
+    /// A [`Number`](Number) descriptor for the [`NonZeroU16`](num::NonZeroU16) type.
+    pub const NZU16: Self = Self::Number(Number { kind: number::Kind::NonZeroUInt, size: 2 });
+
+    /// A [`Number`](Number) descriptor for the [`NonZeroU32`](num::NonZeroU32) type.
+    pub const NZU32: Self = Self::Number(Number { kind: number::Kind::NonZeroUInt, size: 4 });
+
+    /// A [`Number`](Number) descriptor for the [`NonZeroU64`](num::NonZeroU64) type.
+    pub const NZU64: Self = Self::Number(Number { kind: number::Kind::NonZeroUInt, size: 8 });
+
+    /// A [`Number`](Number) descriptor for the [`NonZeroU8`](num::NonZeroU8) type.
+    pub const NZU8: Self = Self::Number(Number { kind: number::Kind::NonZeroUInt, size: 1 });
+
+    /// A [`Type::Number`] descriptor for the `u128` primitive type.
+    pub const U128: Self = Self::Number(Number { kind: number::Kind::UInt, size: 16 });
+
+    /// A [`Type::Number`] descriptor for the `u16` primitive type.
+    pub const U16: Self = Self::Number(Number { kind: number::Kind::UInt, size: 2 });
+
+    /// A [`Type::Number`] descriptor for the `u32` primitive type.
+    pub const U32: Self = Self::Number(Number { kind: number::Kind::UInt, size: 4 });
+
+    /// A [`Type::Number`] descriptor for the `u64` primitive type.
+    pub const U64: Self = Self::Number(Number { kind: number::Kind::UInt, size: 8 });
+
+    /// A [`Type::Number`] descriptor for the `u8` primitive type.
+    pub const U8: Self = Self::Number(Number { kind: number::Kind::UInt, size: 1 });
 
     /// Constructor for [`Type::Option`] wrapping the provided subtype.
     pub fn option(subtype: Self) -> Self {
         match subtype {
-            // Flatten nested options. Single null bitmap improves on-disk efficiency.
+            // 1. Flatten nested options. Single null bitmap improves on-disk efficiency.
             Self::Option { subtype } => Self::Option { subtype },
-            // Box non-option subtypes to prevent unbounded enum size from infinite recursion.
-            #[rustfmt::skip] // Single line match arm improves readability.
+            // 2. Box non-option subtypes to prevent unbounded enum size from infinite recursion.
+            #[rustfmt::skip] // Single line match arm improves readability
             subtype => Self::Option { subtype: Box::new(subtype) },
         }
     }
 
     /// Constructor for [`Type::Sequence`] wrapping the provided subtype.
     pub fn sequence(subtype: Self) -> Self {
-        Self::Sequence {
-            subtype: Box::new(subtype),
-        }
+        Self::Sequence { subtype: Box::new(subtype) }
     }
 }
 
