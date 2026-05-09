@@ -1135,7 +1135,7 @@ impl<T> Serialize for Flatten<T>
 where
     T: Serialize,
 {
-    type Buffer = Vec<u8>;
+    type Buffer = T::Buffer;
 
     fn size(&self) -> Result<NonZeroU64, Error> {
         self.0.size() // Transparent wrapper
@@ -1145,7 +1145,7 @@ where
         self.0.serialize_into(buf); // Transparent wrapper
     }
 
-    fn serialize(&self) -> Self::Buffer {
+    fn serialize(&self) -> Result<Self::Buffer, Error> {
         self.0.serialize() // Transparent wrapper
     }
 }
