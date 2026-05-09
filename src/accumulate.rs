@@ -1033,7 +1033,7 @@ impl Serialize for BitVec {
 
 impl<T> Serialize for OptInSitu<T>
 where
-    Vec<Option<T>>: Serialize,
+    Vec<Option<T>>: Serialize<Buffer = Vec<u8>>,
 {
     type Buffer = Vec<u8>;
 
