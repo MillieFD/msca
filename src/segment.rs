@@ -37,7 +37,7 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //! This module performs **only** in-memory ⇄ byte-buffer transformations. File I/O is the
 //! responsibility of the [`crate::io`] module.
 
-use crate::{Schema, Serialize};
+use crate::{Schema, Serialize, accumulate};
 use minicbor::{CborLen, Decode, Encode};
 use std::convert::Infallible;
 use std::fmt::{Display, Formatter};
@@ -84,7 +84,7 @@ mod variant {
     ///
     /// See the [module level documentation](self) for more details.
     #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-    #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode)]
+    #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode, CborLen)]
     #[non_exhaustive] // To accommodate future segment variants.
     #[repr(u8)] // To map discriminant values directly ⇄ variant byte in the segment header.
     pub enum Variant {
@@ -195,24 +195,29 @@ pub trait Segment: Serialize {
 impl Serialize for Schema {
     type Buffer = Vec<u8>;
 
-    fn size(&self) -> usize {
-        size_of::<Header>() + minicbor::len(self)
+    fn size(&self) -> Result<NonZeroU64, accumulate::Error> {
+        let size: u64 = { size_of::<Header>() + minicbor::len(self) }.try_into()?;
+        size.try_into().map_err(accumulate::Error::Convert)
     }
 
     fn serialize_into(&self, buf: &mut [u8]) {
-        let size = self.size() as u64;
-        buf.push(Self::VARIANT as u8);
-        buf.extend_from_slice(&size.to_le_bytes());
+        let size: u64 = self
+            .size()
+            .expect("Failed to calculate schema size")
+            .try_into()
+            .expect("Schema size exceeds u64::MAX");
+        buf[0] = Self::VARIANT as u8;
+        buf[1..].copy_from_slice(&size.to_le_bytes());
         // SAFETY: minicbor::encode is infallible when writing to Vec<u8>
         minicbor::encode(self, buf).expect("Failed to encode schema.");
     }
 
-    fn serialize(&self) -> Self::Buffer {
-        let size = self.size();
+    fn serialize(&self) -> Result<Self::Buffer, accumulate::Error> {
+        let size = self.size()?.get().try_into()?;
         let mut buf = Vec::with_capacity(size);
         self.serialize_into(&mut buf);
         debug_assert_eq!(buf.len(), size, "actual size ≠ predicted size");
-        buf
+        Ok(buf)
     }
 }
 
