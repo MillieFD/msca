@@ -171,6 +171,11 @@ impl Manifest {
             false => Error::collision(occupied, schema).into(),
         }
     }
+
+    /// todo → fn doc comment
+    pub fn rebuild(data: &[u8], tail: NonZeroU64) -> Result<Self, Error> {
+        unimplemented!("Manifest::rebuild is not yet implemented")
+    }
 }
 
 impl Serialize for Manifest {
