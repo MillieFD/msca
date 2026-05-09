@@ -324,7 +324,7 @@ pub enum Error {
         /// Name shared by the new and existing schemas.
         #[n(0)]
         name: &'static str,
-        /// [`Type`] of the existing [`Column`] in the [`crate::schema::Schema`].
+        /// [`Sector`] of the existing [`Schema`] in the [`Manifest`].
         #[n(1)]
         existing: Sector,
         /// [`Type`] of the new [`Column`] being added to the [`crate::schema::Schema`].
