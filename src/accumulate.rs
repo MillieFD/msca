@@ -427,15 +427,19 @@ pub trait Serialize {
     /// Returns the number of bytes required to encode `self`.
     ///
     /// Defaults to the [`size_of`](size_of)`::<Self>` if not otherwise specified.
-    fn size(&self) -> usize {
-        size_of::<Self>()
+    fn size(&self) -> Result<NonZeroU64, Error>
+    where
+        Self: Sized,
+    {
+        let size: u64 = size_of::<Self>().try_into()?;
+        size.try_into().map_err(Error::from)
     }
 
     /// Serialize `self` and append the encoded bytes to the provided existent [`Buffer`].
     fn serialize_into(&self, buf: &mut [u8]);
 
     /// Serialize `self` and return the encoded bytes in a new [`Buffer`].
-    fn serialize(&self) -> Self::Buffer;
+    fn serialize(&self) -> Result<Self::Buffer, Error>;
 }
 
 /* -------------------------------------------------------------- Serialize Trait Implementation */
