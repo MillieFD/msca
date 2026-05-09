@@ -370,6 +370,8 @@ pub enum Error {
     Io(std::io::Error),
     /// File magic bytes did not match the expected `clem` signature.
     Magic,
+    /// Underlying [`manifest::Error`] from a file manifest operation.
+    Manifest(manifest::Error),
     /// Underlying [`TryFromSliceError`] while parsing a slice into a fixed-size array.
     Slice(TryFromSliceError),
     /// A read operation attempted to access bytes beyond the end of the input slice.
@@ -392,6 +394,7 @@ impl fmt::Display for Error {
             Self::Decode(e) => write!(f, "CBOR decode error → {e}"),
             Self::Io(e) => write!(f, "File IO error → {e}"),
             Self::Magic => f.write_str("File is not a valid clem dataset"),
+            Self::Manifest(e) => write!(f, "Manifest error → {e}"),
             Self::Slice(e) => write!(f, "Try from slice error → {e}"),
             Self::Truncated { .. } => write!(f, "Read was truncated → {self:?}"),
             Self::Version(v) => write!(f, "Unrecognised clem version → {v}"),
@@ -421,6 +424,12 @@ impl From<TryFromIntError> for Error {
     }
 }
 
+impl From<minicbor::decode::Error> for Error {
+    fn from(e: minicbor::decode::Error) -> Self {
+        Self::Decode(e)
+    }
+}
+
 impl From<accumulate::Error> for Error {
     fn from(e: accumulate::Error) -> Self {
         match e {
@@ -430,9 +439,19 @@ impl From<accumulate::Error> for Error {
     }
 }
 
-impl From<minicbor::decode::Error> for Error {
-    fn from(e: minicbor::decode::Error) -> Self {
-        Self::Decode(e)
+impl From<manifest::Error> for Error {
+    fn from(e: manifest::Error) -> Self {
+        Self::Manifest(e)
+    }
+}
+
+//noinspection DuplicatedCode → Conversion is implemented for error types across different modules.
+impl<T, E> From<Error> for Result<T, E>
+where
+    E: From<Error>,
+{
+    fn from(error: Error) -> Self {
+        Err(E::from(error))
     }
 }
 
