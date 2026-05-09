@@ -193,7 +193,7 @@ pub enum Type {
     Char,
     /// Rust numeric primitives.
     #[n(2)]
-    Number(#[n(0)] number::Number),
+    Number(#[n(0)] Number),
     /* --------------------------------------------------------- Fixed Size Container Primitives */
     /// Optional (nullable) value wrapping one subtype.
     #[n(3)]
