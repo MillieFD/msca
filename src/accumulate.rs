@@ -429,7 +429,7 @@ where
         let prev = self.offsets.last().copied().unwrap_or(NonZeroU64::MIN);
         let next = prev.saturating_add(value.len() as u64);
         // 2. Push to buffers
-        self.data.extend(value);
+        value.into_iter().for_each(|x| self.data.push(x));
         self.offsets.push(next);
     }
 
@@ -460,16 +460,11 @@ where
     }
 
     fn push(&mut self, value: Self::Item) {
-        let prev = self
-            .offsets
-            .last()
-            .copied()
-            .flatten()
-            .unwrap_or(NonZeroU64::MIN);
+        let prev = self.offsets.last().copied().flatten().unwrap_or(NonZeroU64::MIN);
         match value {
             Some(value) => {
                 let next = prev.saturating_add(value.len() as u64);
-                self.data.extend(value);
+                value.into_iter().for_each(|x| self.data.push(x));
                 self.offsets.push(Some(next));
             }
             None => self.offsets.push(None),
