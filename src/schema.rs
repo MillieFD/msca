@@ -159,6 +159,14 @@ impl Schema {
             false => Error::collision(occupied, ty).into(),
         }
     }
+
+    /// Map the provided `Key` to generated [`Default`] values of [`V`]
+    fn map<V>(key: &'static str) -> (&'static str, V)
+    where
+        V: Default,
+    {
+        (key, V::default())
+    }
 }
 
 /* ---------------------------------------------------------------------------- Schema Internals */
