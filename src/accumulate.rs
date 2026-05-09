@@ -1006,7 +1006,7 @@ where
     }
 
     fn serialize(&self) -> Result<Self::Buffer, Error> {
-        let size = self.size()?.get() as usize;
+        let size = self.size()?.get().try_into()?;
         let mut buf = Vec::with_capacity(size);
         self.serialize_into(&mut buf);
         debug_assert_eq!(buf.len(), size, "actual size ≠ predicted size");
@@ -1077,7 +1077,7 @@ where
     }
 
     fn serialize(&self) -> Result<Self::Buffer, Error> {
-        let size = self.size()?.get() as usize;
+        let size = self.size()?.get().try_into()?;
         let mut buf = Vec::with_capacity(size);
         self.serialize_into(&mut buf);
         debug_assert_eq!(buf.len(), size, "actual size ≠ predicted size");
@@ -1104,7 +1104,7 @@ where
     }
 
     fn serialize(&self) -> Result<Self::Buffer, Error> {
-        let size = self.size()?.get() as usize;
+        let size = self.size()?.get().try_into()?;
         let mut buf = Vec::with_capacity(size);
         self.serialize_into(&mut buf);
         debug_assert_eq!(buf.len(), size, "actual size ≠ predicted size");
@@ -1131,7 +1131,7 @@ where
     }
 
     fn serialize(&self) -> Result<Self::Buffer, Error> {
-        let size = self.size()?.get() as usize;
+        let size = self.size()?.get().try_into()?;
         let mut buf = Vec::with_capacity(size);
         self.serialize_into(&mut buf);
         debug_assert_eq!(buf.len(), size, "actual size ≠ predicted size");
