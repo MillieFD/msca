@@ -68,6 +68,12 @@ use smol::io::{AsyncRead, AsyncReadExt};
 
 use crate::{Deserialize, Record, Sector, Serialize, accumulate, io};
 
+/// Shorthand [`OccupiedEntry`] for a [`Schema`] that already exists in the [`Manifest`].
+type Occupied<'a> = OccupiedEntry<'a, &'static str, Schema>;
+
+/// Shorthand [`VacantEntry`] for a [`Schema`] that does not yet exist in the [`Manifest`].
+type Vacant<'a> = VacantEntry<'a, &'static str, Schema>;
+
 /* ------------------------------------------------------------------------------ Public Exports */
 
 /// Manifest of file segments and accompanying metadata for random access and predicate pruning.
