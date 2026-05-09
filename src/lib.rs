@@ -36,16 +36,13 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //! starting [`offset`](Sector::offset) and [`length`](Sector::length) in bytes. A sector can
 //! describe any contiguous file region, from a single columnar buffer to an entire segment.
 
+pub mod accumulate;
 mod dataset;
-mod dictionary;
 mod error;
 mod io;
 mod manifest;
-mod query;
 mod schema;
 mod segment;
-mod stream;
-mod substream;
 
 /* ----------------------------------------------------------------------------- Private Imports */
 
