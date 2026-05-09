@@ -299,6 +299,60 @@ pub(crate) struct Index {
     pub next: Vec<u8>,
 }
 
+/* ------------------------------------------------------------------------------ Specific Error */
+
+/// Errors returned by [`Manifest`] operations.
+///
+/// Enum variants cover various granular error cases that may arise when working with the manifest.
+/// Users should consider handling errors explicitly wherever possible to provide meaningful error
+/// messages and recovery actions.
+///
+/// ### Implementation
+///
+/// This enum is `#[non_exhaustive]` meaning additional variants may be added in future versions.
+/// Implementers are advised to include a wildcard arm `_` to account for potential additions.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode, CborLen)]
+#[non_exhaustive] // To accommodate potential future error cases.
+pub enum Error {
+    /// A [`Schema`] with the same name but different contents already exists in the [`Manifest`].
+    ///
+    /// The manifest stores schemas in a [`BTreeMap`] keyed by name. Reusing an existing name
+    /// therefore overwrites the existing schema definition, resulting in possible data loss.
+    #[n(0)]
+    Collision {
+        /// Name shared by the new and existing schemas.
+        #[n(0)]
+        name: &'static str,
+        /// [`Type`] of the existing [`Column`] in the [`crate::schema::Schema`].
+        #[n(1)]
+        existing: Sector,
+        /// [`Type`] of the new [`Column`] being added to the [`crate::schema::Schema`].
+        #[n(2)]
+        new: Sector,
+    },
+}
+
+impl Display for Error {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Collision { name, .. } => write!(f, "Schema '{name}' already in manifest"),
+        }
+    }
+}
+
+impl std::error::Error for Error {}
+
+//noinspection DuplicatedCode → Conversion is implemented for error types across different modules.
+impl<T, E> From<Error> for Result<T, E>
+where
+    E: From<Error>,
+{
+    fn from(error: Error) -> Self {
+        Err(E::from(error))
+    }
+}
+
 /* --------------------------------------------------------------------------------------- Tests */
 
 #[cfg(test)]
