@@ -23,6 +23,7 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 use std::fmt;
 use std::num::*;
 
+use bitvec::field::BitField;
 use bitvec::vec::BitVec;
 use minicbor::{CborLen, Decode, Encode};
 
