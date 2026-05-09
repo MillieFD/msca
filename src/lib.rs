@@ -58,12 +58,12 @@ use std::num::{NonZeroU8, NonZeroU16, NonZeroU32, NonZeroU64, NonZeroU128};
 pub use self::dataset::Dataset;
 pub use self::error::Error;
 
-/// A contiguous byte range within the [`clem`](crate) file.
+/// A contiguous byte region within the [`clem`](crate) file.
 ///
 /// Implementers must [`Copy`] into an owned type when mutability is required e.g. for downstream
 /// data processing.
-#[derive(Debug, Copy, Clone, Eq, PartialEq, PartialOrd, Serialize, Deserialize, Encode, Decode)]
-#[cbor(tag(102))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, PartialOrd, Hash, Encode, Decode, CborLen)]
 pub struct Sector {
     /// Byte offset to the start of the sector.
     #[n(0)]
