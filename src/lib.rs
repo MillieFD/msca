@@ -46,19 +46,17 @@ mod segment;
 
 /* ----------------------------------------------------------------------------- Private Imports */
 
-use minicbor::{Decode, Encode};
-use serde::{Deserialize, Serialize};
+use crate::accumulate::Serialize;
+use crate::io::Deserialize;
+use crate::schema::Schema;
+use minicbor::{CborLen, Decode, Encode};
 use std::cmp::Ordering;
-use std::num::{NonZeroU8, NonZeroU16, NonZeroU32, NonZeroU64, NonZeroU128, NonZeroUsize};
+use std::num::{NonZeroU8, NonZeroU16, NonZeroU32, NonZeroU64, NonZeroU128};
 
 /* ------------------------------------------------------------------------------ Public Exports */
 
 pub use self::dataset::Dataset;
-pub use self::dictionary::{Dictionary, Index};
 pub use self::error::Error;
-pub use self::query::{Cursor, Query};
-pub use self::stream::Stream;
-pub use self::substream::SubStream;
 
 /// A contiguous byte range within the [`clem`](crate) file.
 ///
