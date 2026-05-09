@@ -244,6 +244,14 @@ pub trait Accumulate {
     #[rustfmt::skip] // Single line where clause improves readability
     fn new() -> Self where Self: Sized;
 
+    /// Returns a new empty instance of [`Self`] boxed as a trait object.
+    fn boxed() -> Box<Self>
+    where
+        Self: Sized,
+    {
+        Box::new(Self::new())
+    }
+
     /// Append a single value of `T` to [`Self`].
     fn push(&mut self, value: Self::Item);
 
