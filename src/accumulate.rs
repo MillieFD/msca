@@ -309,6 +309,13 @@ pub trait Accumulate {
 impl Accumulate for BitVec {
     type Item = bool;
 
+    fn new() -> Self
+    where
+        Self: Sized,
+    {
+        BitVec::new()
+    }
+
     fn push(&mut self, value: Self::Item) {
         BitVec::push(self, value);
     }
@@ -325,6 +332,13 @@ impl Accumulate for BitVec {
 impl<T> Accumulate for Vec<T> {
     type Item = T;
 
+    fn new() -> Self
+    where
+        Self: Sized,
+    {
+        Vec::new()
+    }
+
     fn push(&mut self, value: Self::Item) {
         Vec::push(self, value);
     }
@@ -340,6 +354,14 @@ impl<T> Accumulate for Vec<T> {
 
 impl<T> Accumulate for OptInSitu<T> {
     type Item = Option<T>;
+
+    fn new() -> Self
+    where
+        Self: Sized,
+    {
+        debug_assert_eq!(size_of::<Option<T>>(), size_of::<T>(), "Use OptBitVec");
+        Self { data: Vec::new() }
+    }
 
     fn push(&mut self, value: Self::Item) {
         self.data.push(value);
@@ -359,6 +381,17 @@ where
     T: Unfold + Default,
 {
     type Item = Option<T>;
+
+    fn new() -> Self
+    where
+        Self: Sized,
+    {
+        debug_assert!(size_of::<Option<T>>() > size_of::<T>(), "Use OptInSitu");
+        Self {
+            mask: BitVec::new(),
+            data: T::RawAcc::new(),
+        }
+    }
 
     fn push(&mut self, value: Self::Item) {
         self.mask.push(value.is_some());
@@ -380,6 +413,16 @@ where
     T: Unfold,
 {
     type Item = Vec<T>;
+
+    fn new() -> Self
+    where
+        Self: Sized,
+    {
+        Self {
+            offsets: Vec::new(),
+            data: T::RawAcc::new(),
+        }
+    }
 
     fn push(&mut self, value: Self::Item) {
         // 1. Calculate offset
@@ -405,6 +448,16 @@ where
     T: Unfold,
 {
     type Item = Option<Vec<T>>;
+
+    fn new() -> Self
+    where
+        Self: Sized,
+    {
+        Self {
+            offsets: Vec::new(),
+            data: T::RawAcc::new(),
+        }
+    }
 
     fn push(&mut self, value: Self::Item) {
         let prev = self
@@ -433,11 +486,18 @@ where
     }
 }
 
-impl<S, T> Accumulate for Flatten<S>
+impl<A, B> Accumulate for Flatten<A>
 where
-    S: Accumulate<Item = Option<T>>,
+    A: Accumulate<Item = Option<B>>,
 {
-    type Item = Option<Option<T>>;
+    type Item = Option<Option<B>>;
+
+    fn new() -> Self
+    where
+        Self: Sized,
+    {
+        Self(A::new())
+    }
 
     fn push(&mut self, value: Self::Item) {
         self.0.push(value.flatten());
@@ -449,6 +509,15 @@ where
 
     fn is_empty(&self) -> bool {
         self.0.is_empty()
+    }
+}
+
+impl<A, B> From<A> for Flatten<A>
+where
+    A: Accumulate<Item = Option<B>>,
+{
+    fn from(value: A) -> Self {
+        Self(value)
     }
 }
 
