@@ -88,21 +88,21 @@ pub(crate) struct Manifest {
         feature = "serde",
         serde(default, skip_serializing_if = "BTreeMap::is_empty")
     )]
-    pub schemas: BTreeMap<String, Schema>,
+    pub schemas: BTreeMap<&'static str, Schema>,
     /// Dictionaries keyed by name. Entries are **not** duplicated in the generic `schemas` map.
     #[cbor(n(1), skip_if = "BTreeMap::is_empty")]
     #[cfg_attr(
         feature = "serde",
         serde(default, skip_serializing_if = "BTreeMap::is_empty")
     )]
-    pub dictionaries: BTreeMap<String, Dictionary>,
+    pub dictionaries: BTreeMap<&'static str, Dictionary>,
     /// Indexes keyed by name. Entries are **not** duplicated in the generic `dictionaries` map.
     #[cbor(n(2), skip_if = "BTreeMap::is_empty")]
     #[cfg_attr(
         feature = "serde",
         serde(default, skip_serializing_if = "BTreeMap::is_empty")
     )]
-    pub indexes: BTreeMap<String, Index>,
+    pub indexes: BTreeMap<&'static str, Index>,
     /// Implementers can use the optional free-form `metadata.toml` to attach file-level
     /// domain-specific information such as:
     ///
@@ -308,7 +308,7 @@ pub(crate) struct Dictionary {
         feature = "serde",
         serde(default, skip_serializing_if = "BTreeMap::is_empty")
     )]
-    pub columns: BTreeMap<String, Column>,
+    pub columns: BTreeMap<&'static str, Column>,
 }
 
 impl Dictionary {
