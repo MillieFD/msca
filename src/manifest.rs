@@ -333,6 +333,17 @@ pub enum Error {
     },
 }
 
+impl Error {
+    /// Returns a new [`Error::Collision`] variant wrapping the schema name and conflicting sectors.
+    fn collision(occupied: Occupied, new: Sector) -> Self {
+        Self::Collision {
+            name: occupied.key().clone(),
+            existing: occupied.get().sector,
+            new,
+        }
+    }
+}
+
 impl Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
