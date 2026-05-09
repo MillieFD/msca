@@ -1024,13 +1024,18 @@ impl Serialize for BitVec {
     }
 
     fn serialize_into(&self, buf: &mut [u8]) {
-        // TODO → Check correctness & write unit test.
-        buf.extend_from_slice(&self.chunks(8));
+        // Intermediate chucks contain 8 bits in Lsb0 order. The final chunk may contain ≤ 8 bits.
+        // BitVec::load_le packs each chunk into one u8 in LE order, padding with zeros if the final
+        // chunk is shorter than 8 bits. The resulting bytes are copied into the provided buffer.
+        self.chunks(8).zip(buf).for_each(|(bits, byte)| *byte = bits.load_le::<u8>());
     }
 
-    fn serialize(&self) -> Self::Buffer {
-        // TODO → Check correctness & write unit test.
-        self.chunks(8).collect()
+    fn serialize(&self) -> Result<Self::Buffer, Error> {
+        let size = self.size()?.get().try_into()?;
+        let mut buf = Vec::with_capacity(size);
+        self.serialize_into(&mut buf);
+        debug_assert_eq!(buf.len(), size, "actual size ≠ predicted size");
+        Ok(buf)
     }
 }
 
