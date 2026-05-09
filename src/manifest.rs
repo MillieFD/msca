@@ -118,7 +118,7 @@ impl Manifest {
     /// [`Sector`].
     pub async fn from_file<F>(file: &mut F, sector: Sector) -> Result<Self, io::Error>
     where
-        F: AsyncRead + ?Sized,
+        F: AsyncRead + Unpin + ?Sized,
     {
         let size = sector.length.get() as usize;
         let mut buf = Vec::with_capacity(size);
