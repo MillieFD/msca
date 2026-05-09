@@ -95,7 +95,10 @@ pub(crate) struct OptBitVec<T: Unfold + Default> {
     pub data: T::RawAcc,
 }
 
-impl<T: Unfold + Default> Default for OptBitVec<T> {
+impl<T> Default for OptBitVec<T>
+where
+    T: Unfold + Default,
+{
     fn default() -> Self {
         debug_assert!(size_of::<Option<T>>() > size_of::<T>(), "Use OptInSitu");
         Self {
@@ -172,7 +175,7 @@ impl<T: Unfold> Default for Seq<T> {
     fn default() -> Self {
         Self {
             offsets: Vec::new(),
-            data: T::RawAcc::default(),
+            data: T::RawAcc::new(),
         }
     }
 }
@@ -215,7 +218,7 @@ impl<T: Unfold> Default for OptSeq<T> {
     fn default() -> Self {
         Self {
             offsets: Vec::new(),
-            data: T::RawAcc::default(),
+            data: T::RawAcc::new(),
         }
     }
 }
