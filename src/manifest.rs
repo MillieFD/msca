@@ -327,7 +327,7 @@ pub enum Error {
         /// [`Sector`] of the existing [`Schema`] in the [`Manifest`].
         #[n(1)]
         existing: Sector,
-        /// [`Type`] of the new [`Column`] being added to the [`crate::schema::Schema`].
+        /// [`Sector`] of the new [`Schema`] being added to the [`Manifest`].
         #[n(2)]
         new: Sector,
     },
