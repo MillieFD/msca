@@ -318,9 +318,7 @@ impl Dictionary {
         // 1. Serializer rejects incompatible type layouts during dictionary initialisation.
         // 2. Deserializer compares the type tree root against the required { key: K, value: V }
         //    layout. Only exact matches are deserialized into Dictionary instances.
-        self.columns
-            .get("key")
-            .expect("Dictionary does not contain a 'key' column")
+        self.columns.get("key").expect("Dictionary does not contain a 'key' column")
     }
 }
 
