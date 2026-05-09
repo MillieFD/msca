@@ -69,17 +69,17 @@ pub use self::substream::SubStream;
 pub struct Sector {
     /// Byte offset to the start of the sector.
     #[n(0)]
-    pub offset: usize,
+    pub offset: NonZeroU64,
     /// Total length of the sector in bytes.
     #[n(1)]
-    pub length: NonZeroUsize,
+    pub length: NonZeroU64,
 }
 
 impl Sector {
     pub fn new<A, B>(offset: A, length: B) -> Result<Self, Error>
     where
-        A: TryInto<usize>,
-        B: TryInto<NonZeroUsize>,
+        A: TryInto<NonZeroU64>,
+        B: TryInto<NonZeroU64>,
         Error: From<A::Error> + From<B::Error>,
     {
         Ok(Self {
