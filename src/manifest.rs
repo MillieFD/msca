@@ -58,12 +58,15 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //! Each `Buffer` contains a `sector: Sector` alongside data statistics such as `min` and `max` for
 //! predicate pruning.
 
-use crate::accumulate::Serialize;
-use crate::{Deserialize, Error, Sector, io};
+use std::collections::BTreeMap;
+use std::collections::btree_map::{Entry, OccupiedEntry, VacantEntry};
+use std::fmt::{self, Display, Formatter};
+use std::num::NonZeroU64;
+
 use minicbor::{CborLen, Decode, Encode};
 use smol::io::{AsyncRead, AsyncReadExt};
-use std::collections::BTreeMap;
-use std::num::NonZeroU64;
+
+use crate::{Deserialize, Record, Sector, Serialize, accumulate, io};
 
 /* ------------------------------------------------------------------------------ Public Exports */
 
