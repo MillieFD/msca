@@ -92,6 +92,16 @@ impl Sector {
     }
 }
 
+/* --------------------------------------------------------------------- Record Trait Definition */
+
+/// todo → trait doc comment
+pub trait Record {
+    /// todo → fn doc comment
+    fn schema() -> Schema;
+}
+
+/* ---------------------------------------------------------------- NonZeroUInt Trait Definition */
+
 /// Marker trait for unsigned [`non-zero`](core::num::nonzero::NonZero) integer types.
 pub trait NonZeroUInt: Copy + Ord + Sized {
     /// A constant representing the multiplicative identity element for the implementing type.
