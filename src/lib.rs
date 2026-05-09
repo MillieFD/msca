@@ -111,7 +111,7 @@ pub trait NonZeroUInt: Copy + Ord + Sized {
     const ONE: Self;
 }
 
-/* ----------------------------------------------------------------------- Trait Implementations */
+/* ------------------------------------------------------------ NonZeroUInt Trait Implementation */
 
 impl Ord for Sector {
     fn cmp(&self, other: &Self) -> Ordering {
