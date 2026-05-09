@@ -167,6 +167,14 @@ impl Schema {
     {
         (key, V::default())
     }
+
+    /// Consumes [`self`][1] and converts into a [`manifest::Schema`] at the provided [`Sector`].
+    ///
+    /// [1]: Schema
+    pub(crate) fn build(self, sector: Sector) -> manifest::Schema {
+        let columns = self.columns.into_keys().map(Self::map).collect();
+        manifest::Schema { columns, sector }
+    }
 }
 
 /* ---------------------------------------------------------------------------- Schema Internals */
