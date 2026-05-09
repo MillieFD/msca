@@ -136,6 +136,40 @@ impl Manifest {
         Manifest::deserialize(&buf)
     }
 
+    /// Add a [`Schema`] to [`self`](Manifest) with the specified `name` and [`Sector`].
+    ///
+    /// Resolves name conflicts by comparing the new and existing schema definitions; returning
+    /// [`Ok`] if the underlying definitions are identical (deduplication) or [`Error::Collision`]
+    /// if the underlying definitions differ.
+    ///
+    /// Returns an immutable reference to the inserted or existing [`Schema`] on success.
+    pub fn schema(&mut self, name: &'static str, schema: Schema) -> Result<&Schema, Error> {
+        match self.schemas.entry(name) {
+            Entry::Vacant(vacant) => Self::vacant(vacant, schema),
+            Entry::Occupied(occupied) => Self::occupied(occupied, schema),
+        }
+    }
+
+    /// Insert a new [`Schema`] into the [`Manifest`] at the provided vacant entry.
+    ///
+    /// Returns an immutable reference to the inserted schema.
+    fn vacant(vacant: Vacant, schema: Schema) -> Result<&Schema, Error> {
+        Ok(vacant.insert(schema))
+    }
+
+    /// Resolve a [`Schema`] name collision by comparing the underlying schema definitions.
+    ///
+    /// - [`Ok`] if the schema definitions are identical.
+    /// - [`Error::Collision`] if the schema definitions differ.
+    ///
+    /// Returns an immutable reference to the schema on success.
+    fn occupied(occupied: Occupied, schema: Schema) -> Result<&Schema, Error> {
+        match occupied.get() == &schema {
+            // Idempotent schema definition
+            true => Ok(&mut occupied.get()),
+            // Name collision with sector mismatch
+            false => Error::collision(occupied, schema).into(),
+        }
     }
 }
 
