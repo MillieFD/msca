@@ -102,7 +102,7 @@ impl<T: Unfold + Default> Default for OptBitVec<T> {
         debug_assert!(size_of::<Option<T>>() > size_of::<T>(), "Use OptInSitu");
         Self {
             mask: BitVec::new(),
-            data: T::RawAcc::default(),
+            data: T::RawAcc::new(),
         }
     }
 }
