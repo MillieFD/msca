@@ -36,7 +36,7 @@ be overwritten in the next write cycle as `tail` remains unmoved.
                                           Reserved for Incoming Segment
                                     ├───────────────────────────────────────┤
 [Header] [Segment 0] ... [Segment N] ... [Prev Manifest] [Prev Metadata] ... [New Manifest] [New Metadata]
-                               tail ↑   ↑ offset
+                               tail ↑   ↑ manifest.offset
 ```
 
 **Phase 2:** Update the file header manifest pointer.
@@ -49,7 +49,7 @@ next `open` call.
                                           Reserved for Incoming Segment
                                     ├───────────────────────────────────────┤
 [Header] [Segment 0] ... [Segment N] ... [Prev Manifest] [Prev Metadata] ... [New Manifest] [New Metadata]
-                               tail ↑                                       ↑ offset
+                               tail ↑                                       ↑ manifest.offset
 ```
 
 **Phase 3:** Write the incoming segment.
@@ -59,7 +59,7 @@ Crash detection and recovery are identical to phase 2.
 
 ```text
 [Header] [Segment 0] ... [Segment N] [New Segment] ... [New Manifest] [New Metadata]
-                               tail ↑                 ↑ offset
+                               tail ↑                 ↑ manifest.offset
 ```
 
 **Phase 4:** Update the file header tail pointer.
@@ -69,5 +69,5 @@ write-cycle is complete with `manifest.offset <= tail` and the manifest correctl
 
 ```text
 [Header] [Segment 0] ... [New Segment] ... [New Manifest] [New Metadata]
-                                 tail ↑   ↑ offset
+                                 tail ↑   ↑ manifest.offset
 ```
