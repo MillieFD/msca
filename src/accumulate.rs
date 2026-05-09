@@ -20,10 +20,13 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //! Each accumulator type implements the [`Accumulate`] trait, which defines a shared interface for
 //! handling in-memory value accumulation.
 
-use crate::schema::Unfold;
+use std::fmt;
+use std::num::*;
+
 use bitvec::vec::BitVec;
 use minicbor::{CborLen, Decode, Encode};
-use std::num::*;
+
+use crate::schema::Unfold;
 
 /* --------------------------------------------------------------------------- Data Accumulators */
 
