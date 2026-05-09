@@ -79,17 +79,15 @@ impl<T> Default for OptInSitu<T> {
 /// buffer for supported niche types; no validity mask required. Implementors are advised to use
 /// niche-optimised types when possible to improve storage efficiency and random read performance.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode, CborLen)]
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub(crate) struct OptBitVec<T: Unfold + Default> {
     /// Validity mask where `true → `[`Some`] and `false → `[`None`].
-    #[cbor(n(0), skip_if = "BitVec::is_empty")]
     #[cfg_attr(
         feature = "serde",
         serde(default, skip_serializing_if = "BitVec::is_empty")
     )]
     pub mask: BitVec,
     /// Contiguous payload padded with [`Default::default`] for [`None`] entries.
-    #[cbor(n(1), skip_if = "Accumulate::is_empty")]
     #[cfg_attr(
         feature = "serde",
         serde(default, skip_serializing_if = "Accumulate::is_empty")
@@ -152,11 +150,10 @@ impl<T: Unfold + Default> Default for OptBitVec<T> {
 ///
 /// [1]: https://doc.rust-lang.org/reference/dynamically-sized-types.html
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode, CborLen)]
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub(crate) struct Seq<T: Unfold> {
     /// Cumulative end offsets. `offsets[i]` marks the inclusive end of element `i` and the
     /// exclusive start of element `i + 1`.
-    #[cbor(n(0), skip_if = "Vec::is_empty")]
     #[cfg_attr(
         feature = "serde",
         serde(default, skip_serializing_if = "Vec::is_empty")
@@ -164,7 +161,6 @@ pub(crate) struct Seq<T: Unfold> {
     // TODO Allow users to specify the offset type based on the number of expected elements.
     pub offsets: Vec<NonZeroU64>,
     /// Flattened element buffer.
-    #[cbor(n(1), skip_if = "Accumulate::is_empty")]
     #[cfg_attr(
         feature = "serde",
         serde(default, skip_serializing_if = "Accumulate::is_empty")
@@ -199,17 +195,15 @@ impl<T: Unfold> Default for Seq<T> {
 ///
 /// [1]: https://doc.rust-lang.org/reference/dynamically-sized-types.html
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode, CborLen)]
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub(crate) struct OptSeq<T: Unfold> {
     /// Cumulative end offsets per row; [`None`] marks a null row (no data appended).
-    #[cbor(n(0), skip_if = "Vec::is_empty")]
     #[cfg_attr(
         feature = "serde",
         serde(default, skip_serializing_if = "Vec::is_empty")
     )]
     pub offsets: Vec<Option<NonZeroU64>>,
     /// Flattened element buffer; only [`Some`] rows contribute entries.
-    #[cbor(n(1), skip_if = "Accumulate::is_empty")]
     #[cfg_attr(
         feature = "serde",
         serde(default, skip_serializing_if = "Accumulate::is_empty")
