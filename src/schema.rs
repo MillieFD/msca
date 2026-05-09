@@ -125,28 +125,36 @@ impl Schema {
         R: Unfold,
         Schema: Unfolder<R, Ok = Type>,
     {
-        let ty = R::with_unfolder(self)?;
         match self.columns.entry(name) {
-            Entry::Vacant(vacant) => self.vacant(vacant, ty),
-            Entry::Occupied(occupied) => self.occupied(occupied, ty)?,
+            Entry::Vacant(vacant) => self.vacant::<R>(vacant),
+            Entry::Occupied(occupied) => self.occupied::<R>(occupied)?,
         };
-        R::RawAcc::default().into()
+        Ok(R::RawAcc::boxed())
     }
 
     /// Insert a new [`Column`] into the [`Schema`] at the provided vacant entry.
-    fn vacant(mut self, vacant: Vacant, ty: Type) -> Self {
-        vacant.insert(Column { ty });
-        self // Return self to builder pattern
+    fn vacant<R>(&mut self, vacant: Vacant) -> &mut Column
+    where
+        R: Unfold,
+        Schema: Unfolder<R, Ok = Type>,
+    {
+        let col = R::with_unfolder(self)?.into();
+        vacant.insert(col)
     }
 
     /// Resolve a [`Column`] name collision by comparing the associated metadata.
     ///
     /// - Returns [`Self`](Schema) unaltered if the column definitions are identical.
     /// - Returns [`Error::Collision`] if the column definitions differ.
-    fn occupied(mut self, occupied: Occupied, ty: Type) -> Result<Self, Error> {
+    fn occupied<R>(&mut self, occupied: Occupied) -> Result<&mut Column, Error>
+    where
+        R: Unfold,
+        Schema: Unfolder<R, Ok = Type>,
+    {
+        let mut ty = R::with_unfolder(self)?;
         match occupied.get().ty == ty {
             // Idempotent column definition
-            true => Ok(self),
+            true => Ok(&mut occupied.get()),
             // Name collision with type mismatch
             false => Error::collision(occupied, ty).into(),
         }
