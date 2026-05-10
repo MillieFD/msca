@@ -20,8 +20,6 @@ use crate::manifest::Manifest;
 #[derive(Debug)]
 pub struct Dataset {
     /// todo field doc comment
-    manifest: Manifest,
-    /// todo field doc comment
     file: File,
 }
 
