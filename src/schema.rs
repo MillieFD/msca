@@ -614,7 +614,7 @@ where
 
 impl<T> Unfold for Vec<T>
 where
-    T: Unfold,
+    T: Unfold + 'static,
 {
     type RawAcc = Seq<T>;
     type OptAcc = OptSeq<T>;
