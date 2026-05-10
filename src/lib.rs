@@ -86,6 +86,21 @@ impl Sector {
     }
 }
 
+impl Serialize for Sector {
+    type Buffer = [u8; size_of::<Self>()];
+
+    fn serialize_into(&self, buf: &mut [u8]) {
+        buf[..size_of::<NonZeroU64>()].copy_from_slice(self.offset.get().to_be_bytes().as_ref());
+        buf[size_of::<NonZeroU64>()..].copy_from_slice(self.length.get().to_be_bytes().as_ref());
+    }
+
+    fn serialize(&self) -> Result<Self::Buffer, accumulate::Error> {
+        let mut buf = [u8::MIN; size_of::<Self>()];
+        self.serialize_into(&mut buf);
+        Ok(buf)
+    }
+}
+
 /* --------------------------------------------------------------------- Record Trait Definition */
 
 /// todo → trait doc comment
