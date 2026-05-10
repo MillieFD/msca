@@ -363,11 +363,9 @@ pub enum Error {
 impl Error {
     /// Returns a new [`Error::Collision`] variant wrapping the schema name and conflicting sectors.
     fn collision(occupied: Occupied, new: Schema) -> Self {
-        Self::Collision {
-            name: occupied.key(),
-            existing: *occupied.get(),
-            new,
-        }
+        let name = occupied.key().clone();
+        let existing = occupied.get().clone();
+        Self::Collision { name, existing, new }
     }
 }
 
