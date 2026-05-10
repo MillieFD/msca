@@ -115,48 +115,24 @@ impl Schema {
         Self { columns: BTreeMap::new() }
     }
 
-    /// Add a [`Column`] to [`self`](Schema) with the specified `name` and [`type`](R).
+    /// Add a [`Column`] to [`self`](Schema) with the specified `name` and [`type`](A).
     ///
     /// Returns an empty [`Accumulator`](acc) for in-memory data accumulation. This design ensures
     /// schema verification is performed exactly once.
-    pub fn column<R>(&mut self, name: &'static str) -> Result<Box<dyn Accumulate<Item = R>>, Error>
+    pub fn column<A, B>(&mut self, name: B) -> Result<Box<dyn Accumulate<Item = A>>, Error>
     where
-        R: Unfold,
-        Schema: Unfolder<R, Ok = Type>,
+        A: Unfold,
+        Schema: Unfolder<A>,
+        String: From<B>,
     {
+        let name = String::from(name);
+        let col = Column::new::<A, Schema>();
         match self.columns.entry(name) {
-            Entry::Vacant(vacant) => self.vacant::<R>(vacant),
-            Entry::Occupied(occupied) => self.occupied::<R>(occupied)?,
+            Entry::Vacant(entry) => entry.insert(col),
+            Entry::Occupied(entry) if entry.get() == &col => entry.into_mut(),
+            Entry::Occupied(entry) => return Error::collision(entry, col.ty).into(),
         };
-        Ok(R::RawAcc::boxed())
-    }
-
-    /// Insert a new [`Column`] into the [`Schema`] at the provided vacant entry.
-    fn vacant<R>(&mut self, vacant: Vacant) -> &mut Column
-    where
-        R: Unfold,
-        Schema: Unfolder<R, Ok = Type>,
-    {
-        let col = R::with_unfolder(self)?.into();
-        vacant.insert(col)
-    }
-
-    /// Resolve a [`Column`] name collision by comparing the associated metadata.
-    ///
-    /// - Returns [`Self`](Schema) unaltered if the column definitions are identical.
-    /// - Returns [`Error::Collision`] if the column definitions differ.
-    fn occupied<R>(&mut self, occupied: Occupied) -> Result<&mut Column, Error>
-    where
-        R: Unfold,
-        Schema: Unfolder<R, Ok = Type>,
-    {
-        let mut ty = R::with_unfolder(self)?;
-        match occupied.get().ty == ty {
-            // Idempotent column definition
-            true => Ok(&mut occupied.get()),
-            // Name collision with type mismatch
-            false => Error::collision(occupied, ty).into(),
-        }
+        Ok(A::RawAcc::boxed())
     }
 
     /// Map the provided `Key` to generated [`Default`] values of [`V`]
