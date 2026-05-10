@@ -464,11 +464,11 @@ pub(crate) trait Unfold: Sized {
     type OptAcc: Accumulate<Item = Option<Self>> + 'static;
 
     /// Delegates to [`unfold`](Unfolder::unfold) on the provided [`Unfolder`].
-    fn with_unfolder<U>(unfolder: &mut U) -> Result<U::Ok, U::Error>
+    fn with_unfolder<U>() -> Type
     where
         U: Unfolder<Self>,
     {
-        unfolder.unfold()
+        U::unfold()
     }
 }
 
@@ -620,231 +620,153 @@ pub trait Unfolder<T>
 where
     T: ?Sized,
 {
-    /// The output type returned by [`unfold`](Self::unfold) on success.
-    type Ok;
-
-    /// The error type returned by [`unfold`](Self::unfold) on failure.
-    type Error;
-
     /// Specific unfolding logic for the supported type `T`.
-    fn unfold(&mut self) -> Result<Self::Ok, Self::Error>;
+    fn unfold() -> Type;
 }
 
 /* --------------------------------------------------------------- Unfolder Trait Implementation */
 
 impl Unfolder<bool> for Schema {
-    type Ok = Type;
-    type Error = Infallible;
-
-    fn unfold(&mut self) -> Result<Self::Ok, Self::Error> {
-        Ok(Type::Bool)
+    fn unfold() -> Type {
+        Type::Bool
     }
 }
 
 impl Unfolder<char> for Schema {
-    type Ok = Type;
-    type Error = Infallible;
-
-    fn unfold(&mut self) -> Result<Self::Ok, Self::Error> {
-        Ok(Type::Char)
+    fn unfold() -> Type {
+        Type::Char
     }
 }
 
 impl Unfolder<u8> for Schema {
-    type Ok = Type;
-    type Error = Infallible;
-
-    fn unfold(&mut self) -> Result<Self::Ok, Self::Error> {
-        Ok(Type::U8)
+    fn unfold() -> Type {
+        Type::U8
     }
 }
 
 impl Unfolder<u16> for Schema {
-    type Ok = Type;
-    type Error = Infallible;
-
-    fn unfold(&mut self) -> Result<Self::Ok, Self::Error> {
-        Ok(Type::U16)
+    fn unfold() -> Type {
+        Type::U16
     }
 }
 
 impl Unfolder<u32> for Schema {
-    type Ok = Type;
-    type Error = Infallible;
-
-    fn unfold(&mut self) -> Result<Self::Ok, Self::Error> {
-        Ok(Type::U32)
+    fn unfold() -> Type {
+        Type::U32
     }
 }
 
 impl Unfolder<u64> for Schema {
-    type Ok = Type;
-    type Error = Infallible;
-
-    fn unfold(&mut self) -> Result<Self::Ok, Self::Error> {
-        Ok(Type::U64)
+    fn unfold() -> Type {
+        Type::U64
     }
 }
 
 impl Unfolder<u128> for Schema {
-    type Ok = Type;
-    type Error = Infallible;
-
-    fn unfold(&mut self) -> Result<Self::Ok, Self::Error> {
-        Ok(Type::U128)
+    fn unfold() -> Type {
+        Type::U128
     }
 }
 
 impl Unfolder<num::NonZeroU8> for Schema {
-    type Ok = Type;
-    type Error = Infallible;
-
-    fn unfold(&mut self) -> Result<Self::Ok, Self::Error> {
-        Ok(Type::NZU8)
+    fn unfold() -> Type {
+        Type::NZU8
     }
 }
 
 impl Unfolder<num::NonZeroU16> for Schema {
-    type Ok = Type;
-    type Error = Infallible;
-
-    fn unfold(&mut self) -> Result<Self::Ok, Self::Error> {
-        Ok(Type::NZU16)
+    fn unfold() -> Type {
+        Type::NZU16
     }
 }
 
 impl Unfolder<num::NonZeroU32> for Schema {
-    type Ok = Type;
-    type Error = Infallible;
-
-    fn unfold(&mut self) -> Result<Self::Ok, Self::Error> {
-        Ok(Type::NZU32)
+    fn unfold() -> Type {
+        Type::NZU32
     }
 }
 
 impl Unfolder<num::NonZeroU64> for Schema {
-    type Ok = Type;
-    type Error = Infallible;
-
-    fn unfold(&mut self) -> Result<Self::Ok, Self::Error> {
-        Ok(Type::NZU64)
+    fn unfold() -> Type {
+        Type::NZU64
     }
 }
 
 impl Unfolder<num::NonZeroU128> for Schema {
-    type Ok = Type;
-    type Error = Infallible;
-
-    fn unfold(&mut self) -> Result<Self::Ok, Self::Error> {
-        Ok(Type::NZU128)
+    fn unfold() -> Type {
+        Type::NZU128
     }
 }
 
 impl Unfolder<i8> for Schema {
-    type Ok = Type;
-    type Error = Infallible;
-
-    fn unfold(&mut self) -> Result<Self::Ok, Self::Error> {
-        Ok(Type::I8)
+    fn unfold() -> Type {
+        Type::I8
     }
 }
 
 impl Unfolder<i16> for Schema {
-    type Ok = Type;
-    type Error = Infallible;
-
-    fn unfold(&mut self) -> Result<Self::Ok, Self::Error> {
-        Ok(Type::I16)
+    fn unfold() -> Type {
+        Type::I16
     }
 }
 
 impl Unfolder<i32> for Schema {
-    type Ok = Type;
-    type Error = Infallible;
-
-    fn unfold(&mut self) -> Result<Self::Ok, Self::Error> {
-        Ok(Type::I32)
+    fn unfold() -> Type {
+        Type::I32
     }
 }
 
 impl Unfolder<i64> for Schema {
-    type Ok = Type;
-    type Error = Infallible;
-
-    fn unfold(&mut self) -> Result<Self::Ok, Self::Error> {
-        Ok(Type::I64)
+    fn unfold() -> Type {
+        Type::I64
     }
 }
 
 impl Unfolder<i128> for Schema {
-    type Ok = Type;
-    type Error = Infallible;
-
-    fn unfold(&mut self) -> Result<Self::Ok, Self::Error> {
-        Ok(Type::I128)
+    fn unfold() -> Type {
+        Type::I128
     }
 }
 
 impl Unfolder<num::NonZeroI8> for Schema {
-    type Ok = Type;
-    type Error = Infallible;
-
-    fn unfold(&mut self) -> Result<Self::Ok, Self::Error> {
-        Ok(Type::NZI8)
+    fn unfold() -> Type {
+        Type::NZI8
     }
 }
 
 impl Unfolder<num::NonZeroI16> for Schema {
-    type Ok = Type;
-    type Error = Infallible;
-
-    fn unfold(&mut self) -> Result<Self::Ok, Self::Error> {
-        Ok(Type::NZI16)
+    fn unfold() -> Type {
+        Type::NZI16
     }
 }
 
 impl Unfolder<num::NonZeroI32> for Schema {
-    type Ok = Type;
-    type Error = Infallible;
-
-    fn unfold(&mut self) -> Result<Self::Ok, Self::Error> {
-        Ok(Type::NZI32)
+    fn unfold() -> Type {
+        Type::NZI32
     }
 }
 
 impl Unfolder<num::NonZeroI64> for Schema {
-    type Ok = Type;
-    type Error = Infallible;
-
-    fn unfold(&mut self) -> Result<Self::Ok, Self::Error> {
-        Ok(Type::NZI64)
+    fn unfold() -> Type {
+        Type::NZI64
     }
 }
 
 impl Unfolder<num::NonZeroI128> for Schema {
-    type Ok = Type;
-    type Error = Infallible;
-
-    fn unfold(&mut self) -> Result<Self::Ok, Self::Error> {
-        Ok(Type::NZI128)
+    fn unfold() -> Type {
+        Type::NZI128
     }
 }
 
 impl Unfolder<f32> for Schema {
-    type Ok = Type;
-    type Error = Infallible;
-
-    fn unfold(&mut self) -> Result<Self::Ok, Self::Error> {
-        Ok(Type::F32)
+    fn unfold() -> Type {
+        Type::F32
     }
 }
 
 impl Unfolder<f64> for Schema {
-    type Ok = Type;
-    type Error = Infallible;
-
-    fn unfold(&mut self) -> Result<Self::Ok, Self::Error> {
-        Ok(Type::F64)
+    fn unfold() -> Type {
+        Type::F64
     }
 }
 
