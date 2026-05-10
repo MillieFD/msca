@@ -413,11 +413,9 @@ pub enum Error {
 impl Error {
     /// Returns a new [`Error::Collision`] variant wrapping the column name and conflicting types.
     fn collision(occupied: Occupied, new: Type) -> Self {
-        Self::Collision {
-            name: occupied.key().clone(),
-            existing: occupied.get().ty,
-            new,
-        }
+        let name = occupied.key().clone();
+        let existing = occupied.get().clone().ty;
+        Self::Collision { name, existing, new }
     }
 }
 
