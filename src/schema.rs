@@ -80,10 +80,10 @@ use self::number::Number;
 use crate::accumulate::{Accumulate, Flatten, OptBitVec, OptInSitu, OptSeq, Seq};
 
 /// Shorthand [`OccupiedEntry`] for a [`Column`] that already exists in the [`Schema`].
-type Occupied<'a> = OccupiedEntry<'a, &'static str, Column>;
+type Occupied<'a> = OccupiedEntry<'a, String, Column>;
 
 /// Shorthand [`VacantEntry`] for a [`Column`] that does not yet exist in the [`Schema`].
-type Vacant<'a> = VacantEntry<'a, &'static str, Column>;
+type Vacant<'a> = VacantEntry<'a, String, Column>;
 
 /* ------------------------------------------------------------------------------ Public Exports */
 
@@ -106,7 +106,7 @@ pub struct Schema {
         feature = "serde",
         serde(default, skip_serializing_if = "BTreeMap::is_empty")
     )]
-    pub columns: BTreeMap<&'static str, Column>,
+    pub columns: BTreeMap<String, Column>,
 }
 
 impl Schema {
@@ -160,7 +160,7 @@ impl Schema {
     }
 
     /// Map the provided `Key` to generated [`Default`] values of [`V`]
-    fn map<V>(key: &'static str) -> (&'static str, V)
+    pub(crate) fn map<V>(key: String) -> (String, V)
     where
         V: Default,
     {
@@ -425,7 +425,7 @@ pub enum Error {
     Collision {
         /// Name shared by the new and existing columns.
         #[n(0)]
-        name: &'static str,
+        name: String,
         /// [`Type`] of the existing [`Column`] in the [`Schema`].
         #[n(1)]
         existing: Type,
