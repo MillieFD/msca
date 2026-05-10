@@ -10,8 +10,8 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 
 //! todo mod doc
 
-use crate::io::File;
-use crate::manifest::Manifest;
+use crate::Record;
+use crate::io::{Error, File};
 
 /* ------------------------------------------------------------------------------ Public Exports */
 
@@ -23,4 +23,13 @@ pub struct Dataset {
     file: File,
 }
 
-impl Dataset {}
+impl Dataset {
+    /// todo fn doc comment
+    pub async fn schema<R>(&mut self, name: &'static str) -> Result<(), Error>
+    where
+        R: Record,
+    {
+        let schema = self.file.schema::<R>(name).await?;
+        unimplemented!("Defer to inner File::schema fn")
+    }
+}
