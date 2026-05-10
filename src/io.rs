@@ -283,10 +283,9 @@ impl File {
         // 2. Appending a new segment updates the manifest and mmap simultaneously (one lock)
         //   a. In-flight reader mmaps remain valid (existing segments unaltered)
         //   b. New mmaps must await a read lock on the file state
-        let mmap = unsafe { MMAP.map(&file)? }.into();
-        let state = State { manifest, mmap }.into();
-        let writer = Writer { file: BufWriter::new(file), header }.into();
-        Ok(Self { writer, state, path })
+        let mmap = unsafe { file.mmap(0)? }.into();
+        let file = BufWriter::new(file);
+        Ok(Self { file, header, manifest, mmap, path })
     }
 
     /// Open an existing [clem](crate) file with read and write permissions at the specified
@@ -326,11 +325,10 @@ impl File {
         // 2. Appending a new segment updates the manifest and mmap simultaneously (one lock)
         //   a. In-flight reader mmaps remain valid (existing segments unaltered)
         //   b. New mmaps must await a read lock on the file state
-        let mmap = unsafe { MMAP.map(&file)? }.into();
+        let mmap = unsafe { file.mmap(0)? }.into(); // todo → length should ≠ 0
         let manifest = Manifest::from_file(&mut file, header.manifest).await?;
-        let state = State { manifest, mmap }.into();
-        let writer = Writer { file: BufWriter::new(file), header }.into();
-        Ok(Self { writer, state, path })
+        let file = BufWriter::new(file);
+        Ok(Self { file, header, manifest, mmap, path })
     }
 }
 
