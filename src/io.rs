@@ -111,23 +111,22 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 #![doc = include_str!("../docs/write-cycle.md")]
 #![doc = include_str!("../docs/read-cycle.md")]
 
-use crate::accumulate::{Buffer, Serialize};
-use crate::manifest::Manifest;
-use crate::segment::Segment;
-use crate::{Sector, accumulate};
-use memmap2::{Mmap, MmapOptions};
-use minicbor::{CborLen, Decode, Encode};
-use smol::fs::OpenOptions;
-use smol::io::{AsyncRead, AsyncReadExt, AsyncSeekExt, AsyncWriteExt, BufWriter};
-use smol::lock::{Mutex, RwLock, RwLockReadGuard};
 use std::array::TryFromSliceError;
-use std::cell::LazyCell;
 use std::convert::TryInto;
 use std::fmt;
 use std::io::SeekFrom;
 use std::num::{NonZeroU64, NonZeroUsize, TryFromIntError};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+
+use memmap2::{Mmap, MmapOptions};
+use minicbor::{CborLen, Decode, Encode};
+use smol::fs::OpenOptions;
+use smol::io::{AsyncRead, AsyncReadExt, AsyncSeekExt, AsyncWriteExt, BufWriter};
+
+use crate::manifest::Manifest;
+use crate::segment::Segment;
+use crate::{Assign, Record, Sector, Serialize, accumulate, manifest};
 
 /* ------------------------------------------------------------------------------ Public Exports */
 
