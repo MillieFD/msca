@@ -27,6 +27,8 @@ use bitvec::field::BitField;
 use bitvec::vec::BitVec;
 use minicbor::{CborLen, Decode, Encode};
 
+use crate::Sector;
+use crate::io::File;
 use crate::schema::Unfold;
 
 /* --------------------------------------------------------------------------- Data Accumulators */
@@ -546,6 +548,15 @@ pub trait Serialize {
     {
         let size: u64 = size_of::<Self>().try_into()?;
         size.try_into().map_err(Error::from)
+    }
+
+    fn sector(&self, file: &File) -> Result<Sector, Error>
+    where
+        Self: Sized,
+    {
+        let offset = file.header.tail;
+        let length = self.size()?;
+        Ok(Sector { offset, length })
     }
 
     /// Serialize `self` and append the encoded bytes to the provided existent [`Buffer`].
