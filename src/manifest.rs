@@ -143,32 +143,15 @@ impl Manifest {
     /// if the underlying definitions differ.
     ///
     /// Returns an immutable reference to the inserted or existing [`Schema`] on success.
-    pub fn schema(&mut self, name: &'static str, schema: Schema) -> Result<&Schema, Error> {
+    pub fn schema<S>(&mut self, name: S, schema: Schema) -> Result<&Schema, Error>
+    where
+        String: From<S>,
+    {
+        let name = String::from(name);
         match self.schemas.entry(name) {
-            Entry::Vacant(vacant) => Self::vacant(vacant, schema),
-            Entry::Occupied(occupied) => Self::occupied(occupied, schema),
-        }
-    }
-
-    /// Insert a new [`Schema`] into the [`Manifest`] at the provided vacant entry.
-    ///
-    /// Returns an immutable reference to the inserted schema.
-    fn vacant(vacant: Vacant, schema: Schema) -> Result<&Schema, Error> {
-        Ok(vacant.insert(schema))
-    }
-
-    /// Resolve a [`Schema`] name collision by comparing the underlying schema definitions.
-    ///
-    /// - [`Ok`] if the schema definitions are identical.
-    /// - [`Error::Collision`] if the schema definitions differ.
-    ///
-    /// Returns an immutable reference to the schema on success.
-    fn occupied(occupied: Occupied, schema: Schema) -> Result<&Schema, Error> {
-        match occupied.get() == &schema {
-            // Idempotent schema definition
-            true => Ok(&mut occupied.get()),
-            // Name collision with sector mismatch
-            false => Error::collision(occupied, schema).into(),
+            Entry::Vacant(entry) => Ok(entry.insert(schema)),
+            Entry::Occupied(entry) if entry.get() == &schema => Ok(entry.into_mut()),
+            Entry::Occupied(entry) => Error::collision(entry, schema).into(),
         }
     }
 
