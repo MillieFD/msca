@@ -71,9 +71,6 @@ use crate::{Deserialize, Sector, Serialize, accumulate, io};
 /// Shorthand [`OccupiedEntry`] for a [`Schema`] that already exists in the [`Manifest`].
 type Occupied<'a> = OccupiedEntry<'a, String, Schema>;
 
-/// Shorthand [`VacantEntry`] for a [`Schema`] that does not yet exist in the [`Manifest`].
-type Vacant<'a> = VacantEntry<'a, String, Schema>;
-
 /* ------------------------------------------------------------------------------ Public Exports */
 
 /// Manifest of file segments and accompanying metadata for random access and predicate pruning.
