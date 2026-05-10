@@ -69,10 +69,10 @@ use smol::io::{AsyncRead, AsyncReadExt};
 use crate::{Deserialize, Sector, Serialize, accumulate, io};
 
 /// Shorthand [`OccupiedEntry`] for a [`Schema`] that already exists in the [`Manifest`].
-type Occupied<'a> = OccupiedEntry<'a, &'static str, Schema>;
+type Occupied<'a> = OccupiedEntry<'a, String, Schema>;
 
 /// Shorthand [`VacantEntry`] for a [`Schema`] that does not yet exist in the [`Manifest`].
-type Vacant<'a> = VacantEntry<'a, &'static str, Schema>;
+type Vacant<'a> = VacantEntry<'a, String, Schema>;
 
 /* ------------------------------------------------------------------------------ Public Exports */
 
@@ -88,21 +88,21 @@ pub(crate) struct Manifest {
         feature = "serde",
         serde(default, skip_serializing_if = "BTreeMap::is_empty")
     )]
-    pub schemas: BTreeMap<&'static str, Schema>,
+    pub schemas: BTreeMap<String, Schema>,
     /// Dictionaries keyed by name. Entries are **not** duplicated in the generic `schemas` map.
     #[cbor(n(1), skip_if = "BTreeMap::is_empty")]
     #[cfg_attr(
         feature = "serde",
         serde(default, skip_serializing_if = "BTreeMap::is_empty")
     )]
-    pub dictionaries: BTreeMap<&'static str, Dictionary>,
+    pub dictionaries: BTreeMap<String, Dictionary>,
     /// Indexes keyed by name. Entries are **not** duplicated in the generic `dictionaries` map.
     #[cbor(n(2), skip_if = "BTreeMap::is_empty")]
     #[cfg_attr(
         feature = "serde",
         serde(default, skip_serializing_if = "BTreeMap::is_empty")
     )]
-    pub indexes: BTreeMap<&'static str, Index>,
+    pub indexes: BTreeMap<String, Index>,
     /// Implementers can use the optional free-form `metadata.toml` to attach file-level
     /// domain-specific information such as:
     ///
@@ -229,7 +229,7 @@ pub(crate) struct Schema {
         feature = "serde",
         serde(default, skip_serializing_if = "BTreeMap::is_empty")
     )]
-    pub columns: BTreeMap<&'static str, Column>,
+    pub columns: BTreeMap<String, Column>,
     /// Location of the schema segment including header.
     #[n(1)]
     pub sector: Sector,
@@ -309,7 +309,7 @@ pub(crate) struct Dictionary {
         feature = "serde",
         serde(default, skip_serializing_if = "BTreeMap::is_empty")
     )]
-    pub columns: BTreeMap<&'static str, Column>,
+    pub columns: BTreeMap<String, Column>,
 }
 
 impl Dictionary {
@@ -370,7 +370,7 @@ pub enum Error {
     Collision {
         /// Name shared by the new and existing schemas.
         #[n(0)]
-        name: &'static str,
+        name: String,
         /// The existing [`Schema`] in the [`Manifest`].
         #[n(1)]
         existing: Schema,
