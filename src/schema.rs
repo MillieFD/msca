@@ -78,7 +78,6 @@ use minicbor::{CborLen, Decode, Encode};
 
 use self::number::Number;
 use crate::accumulate::{Accumulate, Flatten, OptBitVec, OptInSitu, OptSeq, Seq};
-use crate::{Sector, manifest};
 
 /// Shorthand [`OccupiedEntry`] for a [`Column`] that already exists in the [`Schema`].
 type Occupied<'a> = OccupiedEntry<'a, &'static str, Column>;
