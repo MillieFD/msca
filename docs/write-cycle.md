@@ -39,10 +39,10 @@ be overwritten in the next write cycle as `tail` remains unmoved.
                                tail ↑   ↑ manifest.offset
 ```
 
-**Phase 2:** Update the file header manifest pointer.
+**Phase 2:** Update the file header manifest sector.
 
-The manifest `offset` and `length` fields in the file header are overwritten to point to the new manifest. The
-newly-authoritative manifest references a (currently unwritten) segment after `tail` which will be detected during the
+The manifest `offset` and `length` fields in the file header are overwritten to point to the new manifest. The newly
+authoritative manifest references a (currently unwritten) segment after `tail` which will be detected during the
 next `open` call.
 
 ```text
