@@ -230,12 +230,11 @@ impl Deserialize for Header {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug)]
 pub(crate) struct File {
-    /// todo field doc comment
-    writer: Mutex<Writer>,
-    /// todo field doc comment
-    state: RwLock<State>,
-    /// todo field doc comment
-    path: PathBuf,
+    pub file: BufWriter<smol::fs::File>,
+    pub header: Header,
+    pub manifest: Manifest,
+    pub mmap: Arc<Mmap>,
+    pub path: PathBuf,
 }
 
 impl File {
