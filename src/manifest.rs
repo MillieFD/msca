@@ -66,7 +66,7 @@ use std::num::NonZeroU64;
 use minicbor::{CborLen, Decode, Encode};
 use smol::io::{AsyncRead, AsyncReadExt};
 
-use crate::{Deserialize, Record, Sector, Serialize, accumulate, io};
+use crate::{Deserialize, Sector, Serialize, accumulate, io};
 
 /// Shorthand [`OccupiedEntry`] for a [`Schema`] that already exists in the [`Manifest`].
 type Occupied<'a> = OccupiedEntry<'a, &'static str, Schema>;
