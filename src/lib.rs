@@ -48,7 +48,6 @@ mod segment;
 
 use crate::accumulate::Serialize;
 use crate::io::Deserialize;
-use crate::schema::Schema;
 use minicbor::{CborLen, Decode, Encode};
 use std::cmp::Ordering;
 use std::num::{NonZeroU8, NonZeroU16, NonZeroU32, NonZeroU64, NonZeroU128};
