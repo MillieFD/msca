@@ -159,6 +159,16 @@ pub(crate) struct Column {
     ty: Type,
 }
 
+impl Column {
+    fn new<T, U>() -> Self
+    where
+        T: Unfold,
+        U: Unfolder<T>,
+    {
+        Self { ty: T::with_unfolder::<U>() }
+    }
+}
+
 /// A minimal type **descriptor** that provides a stable and extensible representation for
 /// platform-agnostic Rust primitives; used when walking the type graph for schema encoding.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
