@@ -398,7 +398,7 @@ impl Writer {
     /// ```
     ///
     /// Refer to the [module documentation](self) documentation for more details.
-    fn sector<S: Serialize>(&self, src: &S) -> Result<Sector, Error> {
+    fn segment<S: Segment>(&self, src: &S) -> Result<Sector, Error> {
         let offset = self.header.tail;
         let length = src.size()?;
         Ok(Sector { offset, length })
