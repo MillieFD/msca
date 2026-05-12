@@ -101,30 +101,6 @@ impl Serialize for Sector {
     }
 }
 
-/* --------------------------------------------------------------------- Assign Trait Definition */
-
-/// todo → trait doc comment
-trait Assign<S>
-where
-    S: ?Sized,
-{
-    /// todo → type doc comment
-    type Output;
-    /// todo → fn doc comment
-    fn assign(self, src: &S) -> Self::Output;
-}
-
-/* ----------------------------------------------------------------- Assign Trait Implementation */
-
-impl Assign<schema::Schema> for Sector {
-    type Output = manifest::Schema;
-
-    fn assign(self, src: &schema::Schema) -> Self::Output {
-        let columns = src.columns.keys().cloned().map(schema::Schema::map).collect();
-        manifest::Schema { columns, sector: self }
-    }
-}
-
 /* --------------------------------------------------------------------- Record Trait Definition */
 
 /// todo → trait doc comment
