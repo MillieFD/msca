@@ -142,18 +142,6 @@ const MAGIC: [u8; 4] = *b"clem";
 /// version numbers is not guaranteed. Implementers must reject any unrecognised version number.
 const VERSION: u8 = 1;
 
-/// Total length of the file header in bytes. Includes the [magic bytes][1] and [version number][2].
-///
-/// [1]: MAGIC
-/// [2]: VERSION
-const HEADER: NonZeroUsize = {
-    let size = size_of_val(&MAGIC) + size_of_val(&VERSION) + size_of::<Header>();
-    match NonZeroUsize::new(size) {
-        Some(n) => n,
-        None => panic!("Header size is zero"),
-    }
-};
-
 /// Creates a read-only [memory map](Mmap) backed by the specified [clem](crate) file.
 ///
 /// ### Errors
@@ -187,7 +175,7 @@ const HEADER: NonZeroUsize = {
 ///
 /// [1]: https://doc.rust-lang.org/book/ch20-01-unsafe-rust.html
 unsafe fn mmap(file: &smol::fs::File, length: usize) -> Result<Mmap, Error> {
-    let offset: u64 = HEADER.get().try_into()?;
+    let offset: u64 = Header::SECTOR.offset.get();
     // SAFETY: Undefined behaviour if mapped file is modified (refer to function documentation).
     unsafe { MmapOptions::new().offset(offset).len(length).map(file).map_err(Error::Io) }
 }
@@ -261,6 +249,26 @@ pub(crate) struct Header {
 }
 
 impl Header {
+    /// Total length of the file header in bytes. Includes the [magic bytes][1] and [version number][2].
+    ///
+    /// [1]: MAGIC
+    /// [2]: VERSION
+    pub const SIZE: NonZeroUsize = {
+        let size = size_of_val(&MAGIC) + size_of_val(&VERSION) + size_of::<Header>();
+        // SAFETY: Const fn can panic at compile time. Value is guaranteed at runtime.
+        NonZeroUsize::new(size).expect("Header size is zero")
+    };
+
+    /// todo → const doc comment
+    pub const SECTOR: Sector = {
+        let offset = { size_of_val(&MAGIC) + size_of_val(&VERSION) } as u64;
+        let length = Self::SIZE.get() as u64;
+        Sector {
+            offset: NonZeroU64::new(offset).expect("Header offset is zero"),
+            length: NonZeroU64::new(length).expect("Header length is zero"),
+        }
+    };
+
     /// Create a new [clem](crate) file [`Header`] pointing to the provided manifest [`Sector`].
     ///
     /// ```text
@@ -285,7 +293,7 @@ impl Header {
     where
         F: AsyncRead + Unpin + ?Sized,
     {
-        let mut buf = [0u8; HEADER.get()];
+        let mut buf = [0u8; Self::SIZE.get()];
         file.read_exact(&mut buf).await?;
         Header::deserialize(&buf)
     }
@@ -310,7 +318,7 @@ impl Deserialize for Header {
     type Error = Error;
 
     fn deserialize(src: &[u8]) -> Result<Self, Self::Error> {
-        let buf: [u8; HEADER.get()] = match src {
+        let buf: [u8; Self::SIZE.get()] = match src {
             s if !s.starts_with(&MAGIC) => Err(Error::Magic),
             s if s[4] != VERSION => Err(Error::Version(s[4])),
             s => s.try_into().map_err(Error::Slice),
@@ -368,7 +376,7 @@ impl File {
         let path = path.as_ref().to_path_buf();
         let manifest = Manifest::default();
         let sector = Sector {
-            offset: HEADER.try_into()?, // Manifest directly after header (no segments)
+            offset: Header::SECTOR.offset, // Manifest directly after header (no segments)
             length: manifest.size()?,
         };
         let header = Header::new(sector);
