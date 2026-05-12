@@ -127,7 +127,7 @@ use smol::lock::RwLock;
 
 use crate::manifest::Manifest;
 use crate::segment::Segment;
-use crate::{Assign, Record, Sector, Serialize, accumulate, manifest};
+use crate::{Record, Sector, Serialize, accumulate, manifest, schema};
 
 /* ------------------------------------------------------------------------------ Public Exports */
 
@@ -151,18 +151,32 @@ const HEADER: NonZeroUsize = {
     }
 };
 
-/// A compile time [`Mmap`][`Options`](MmapOptions) instance used to create empty mmaps during
-/// [`File`]`::`[`create`](File::create).
+/// Creates a read-only [memory map](Mmap) backed by the specified [clem](crate) file.
 ///
-/// The [`Mmap`] is tightly scoped to reduce the risk of undefined behaviour:
-/// - [`offset`](MmapOptions::offset) excludes the mutable file [`Header`]
-/// - Includes the immutable [`Segment`] file region
-/// - [`len`](MmapOptions::len) excludes the mutable [`Manifest`]
-const MMAP: LazyCell<&'static MmapOptions> = LazyCell::new(mmap);
-
-/// Initialisation function for the [`MMAP`] constant.
-fn mmap() -> &'static MmapOptions {
-    MmapOptions::new().offset(HEADER.get() as u64).len(0)
+/// ### Safety
+///
+/// This function is marked as [unsafe][1] because of the potential for undefined behaviour if the
+/// underlying file region is subsequently modified, in or out of process. Implementers are strongly
+/// advised to take appropriate precautions and ensure the mapped region is not accessed or modified
+/// concurrently in a way that causes undefined behaviour.
+///
+/// [`Segments`](Segment) are immutable once written. The [`Mmap`] is tightly scoped to reduce the
+/// risk of undefined behaviour:
+///
+/// - [`offset`](MmapOptions::offset) excludes the mutable [`Header`]
+/// - [`length`](MmapOptions::len) excludes the mutable [`Manifest`]
+/// - Only the immutable segment region is mapped
+///
+/// Appending a new segment updates the [`Arc`]`<`[`Mmap`](Mmap)`>` after the [write-cycle](self) is
+/// complete. New readers must await a [read lock](RwLock) on the [file state](File) before cloning
+/// the [`Arc`]. Existing mmaps are released only when their reference count drops to zero.
+/// In-flight reader mmaps remain valid (existing segments unaltered).
+///
+/// [1]: https://doc.rust-lang.org/book/ch20-01-unsafe-rust.html
+unsafe fn mmap(file: &smol::fs::File, length: usize) -> Result<Mmap, Error> {
+    let offset: u64 = HEADER.get().try_into()?;
+    // SAFETY: Undefined behaviour if the file region is modified while mmap is held (see fn doc).
+    unsafe { MmapOptions::new().offset(offset).len(length).map(file).map_err(Error::Io) }
 }
 
 /// Mutable region of the file header.
