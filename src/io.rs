@@ -153,6 +153,14 @@ const HEADER: NonZeroUsize = {
 
 /// Creates a read-only [memory map](Mmap) backed by the specified [clem](crate) file.
 ///
+/// ### Errors
+///
+/// [`Error::Zero`] if the [`Header`](HEADER) size exceeds [`u64::MAX`].
+// todo → Static assert HEADER size as u64, remove try_into runtime checks, use faster unchecked fn.
+///
+/// [`Error::Io`] if the underlying system call fails. This can occur for a variety of reasons,
+/// such as the file is no longer accessible, or the platform does not support memory mapping.
+///
 /// ### Safety
 ///
 /// This function is marked as [unsafe][1] because of the potential for undefined behaviour if the
