@@ -177,7 +177,7 @@ const HEADER: NonZeroUsize = {
 /// [1]: https://doc.rust-lang.org/book/ch20-01-unsafe-rust.html
 unsafe fn mmap(file: &smol::fs::File, length: usize) -> Result<Mmap, Error> {
     let offset: u64 = HEADER.get().try_into()?;
-    // SAFETY: Undefined behaviour if the file region is modified while mmap is held (see fn doc).
+    // SAFETY: Undefined behaviour if mapped file is modified (refer to function documentation).
     unsafe { MmapOptions::new().offset(offset).len(length).map(file).map_err(Error::Io) }
 }
 
