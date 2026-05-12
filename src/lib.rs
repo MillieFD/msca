@@ -46,12 +46,7 @@ mod segment;
 
 /* ----------------------------------------------------------------------------- Private Imports */
 
-use std::cmp::Ordering;
-use std::io::{Seek, SeekFrom};
 use std::num::{NonZeroU8, NonZeroU16, NonZeroU32, NonZeroU64, NonZeroU128};
-
-use minicbor::{CborLen, Decode, Encode};
-use smol::io::{AsyncSeek, AsyncSeekExt, AsyncWriteExt};
 
 /* ------------------------------------------------------------------------------ Public Exports */
 
@@ -59,8 +54,6 @@ pub use self::dataset::Dataset;
 pub use self::error::Error;
 use crate::accumulate::Serialize;
 use crate::io::Deserialize;
-
-
 
 /* --------------------------------------------------------------------- Record Trait Definition */
 
