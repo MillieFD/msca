@@ -172,6 +172,8 @@ const HEADER: NonZeroUsize = {
 /// the [`Arc`]. Existing mmaps are released only when their reference count drops to zero.
 /// In-flight reader mmaps remain valid (existing segments unaltered).
 ///
+/// Refer to the [memmap](memmap2) crate for more details.
+///
 /// [1]: https://doc.rust-lang.org/book/ch20-01-unsafe-rust.html
 unsafe fn mmap(file: &smol::fs::File, length: usize) -> Result<Mmap, Error> {
     let offset: u64 = HEADER.get().try_into()?;
