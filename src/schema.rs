@@ -69,7 +69,6 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //! are achieved by appending additional schema segments.
 
 use std::collections::btree_map::{BTreeMap, Entry, OccupiedEntry, VacantEntry};
-use std::convert::Infallible;
 use std::fmt::{Display, Formatter};
 use std::num;
 
@@ -119,7 +118,7 @@ impl Schema {
     ///
     /// Returns an empty [`Accumulator`](acc) for in-memory data accumulation. This design ensures
     /// schema verification is performed exactly once.
-    pub fn column<A, B>(&mut self, name: B) -> Result<Box<dyn Accumulate<Item = A>>, Error>
+    pub(crate) fn column<A, B>(&mut self, name: B) -> Result<Box<dyn Accumulate<Item = A>>, Error>
     where
         A: Unfold,
         Schema: Unfolder<A>,
@@ -135,12 +134,12 @@ impl Schema {
         Ok(A::RawAcc::boxed())
     }
 
-    /// Map the provided `Key` to generated [`Default`] values of [`V`]
-    pub(crate) fn map<V>(key: String) -> (String, V)
+    /// Map the provided `Key` to a generated [`Default`] value of [`T`]
+    pub(crate) fn map<T>(key: String) -> (String, T)
     where
-        V: Default,
+        T: Default,
     {
-        (key, V::default())
+        (key, T::default())
     }
 }
 
@@ -630,7 +629,7 @@ pub trait Unfolder<T>
 where
     T: ?Sized,
 {
-    /// Specific unfolding logic for the supported type `T`.
+    /// Returns the [`Type`] descriptor produced by unfolding the supported [`T`].
     fn unfold() -> Type;
 }
 
@@ -780,26 +779,26 @@ impl Unfolder<f64> for Schema {
     }
 }
 
-impl<T: Unfold> Unfolder<Option<T>> for Schema
-where
-    Schema: Unfolder<T, Ok = Type>,
-{
-    type Ok = Type;
-    type Error = Infallible;
+// impl<T: Unfold> Unfolder<Option<T>> for Schema
+// where
+//     Schema: Unfolder<T, Ok = Type>,
+// {
+//     type Ok = Type;
+//     type Error = Infallible;
+//
+//     fn unfold(&mut self) -> Result<Self::Ok, Self::Error> {
+//         Type::option(T::with_unfolder(self)?).into()
+//     }
+// }
 
-    fn unfold(&mut self) -> Result<Self::Ok, Self::Error> {
-        Type::option(T::with_unfolder(self)?).into()
-    }
-}
-
-impl<T: Unfold> Unfolder<Vec<T>> for Schema
-where
-    Schema: Unfolder<T, Ok = Type>,
-{
-    type Ok = Type;
-    type Error = Infallible;
-
-    fn unfold(&mut self) -> Result<Self::Ok, Self::Error> {
-        Type::sequence(T::with_unfolder(self)?).into()
-    }
-}
+// impl<T: Unfold> Unfolder<Vec<T>> for Schema
+// where
+//     Schema: Unfolder<T, Ok = Type>,
+// {
+//     type Ok = Type;
+//     type Error = Infallible;
+//
+//     fn unfold(&mut self) -> Result<Self::Ok, Self::Error> {
+//         Type::sequence(T::with_unfolder(self)?).into()
+//     }
+// }
