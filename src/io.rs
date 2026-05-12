@@ -231,6 +231,16 @@ impl Sector {
     }
 }
 
+impl Add for Sector {
+    type Output = Result<Self, Error>;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        let offset = self.offset.min(rhs.offset);
+        let length = self.length.checked_add(rhs.length.get()).ok_or(Error::Zero)?;
+        Ok(Self { offset, length })
+    }
+}
+
 impl Ord for Sector {
     fn cmp(&self, other: &Self) -> Ordering {
         self.offset.cmp(&other.offset)
