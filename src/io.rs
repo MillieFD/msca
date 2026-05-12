@@ -274,9 +274,7 @@ impl Deserialize for Header {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug)]
 pub(crate) struct File {
-    pub file: BufWriter<smol::fs::File>,
-    pub header: Header,
-    pub manifest: Manifest,
+    pub writer: RwLock<Writer>,
     pub mmap: Arc<Mmap>,
     pub path: PathBuf,
 }
@@ -334,7 +332,8 @@ impl File {
         // SAFETY: Undefined behaviour if mapped file is modified (refer to function documentation).
         let mmap = unsafe { mmap(&file, 0)? }.into();
         let file = BufWriter::new(file);
-        Ok(Self { file, header, manifest, mmap, path })
+        let writer = Writer { file, header, manifest }.into();
+        Ok(Self { writer, mmap, path })
     }
 
     /// Open an existing [clem](crate) file with read and write permissions at the specified
@@ -373,9 +372,28 @@ impl File {
         let mmap = unsafe { mmap(&file, header.tail.get() as usize)? }.into();
         let manifest = Manifest::from_file(&mut file, header.manifest).await?;
         let file = BufWriter::new(file);
-        Ok(Self { file, header, manifest, mmap, path })
+        let writer = Writer { file, header, manifest }.into();
+        Ok(Self { writer, mmap, path })
     }
 }
+
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Debug)]
+pub(crate) struct Writer {
+    pub file: BufWriter<smol::fs::File>,
+    pub header: Header,
+    pub manifest: Manifest,
+}
+
+impl Writer {
+    }
+
+    /// Returns the byte offset immediately following the final committed segment, or [`None`] on
+    /// `u64` overflow.
+    fn eof(&self) -> Option<NonZeroU64> {
+        let length = self.header.manifest.length.get();
+        self.header.manifest.offset.checked_add(length)
+    }
 
 impl TryFrom<&Manifest> for Sector {
     type Error = Error;
