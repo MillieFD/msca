@@ -336,18 +336,8 @@ impl File {
             .open(&path)
             .await?;
         let header = Header::from_file(&mut file).await?;
-        let mmap = MmapOptions::new()
-            .offset(HEADER.get() as u64)
-            .len(header.tail.get() as usize - HEADER.get());
-        // SAFETY: Undefined behaviour if the underlying file is modified while mmap is held.
-        // 1. Segments are immutable once written. The mmap is tightly scoped to prevent UB:
-        //   a. Offset excludes the mutable file header
-        //   b. Length excludes the mutable manifest and metadata (if present)
-        //   c. Only immutable segment region included in mmap
-        // 2. Appending a new segment updates the manifest and mmap simultaneously (one lock)
-        //   a. In-flight reader mmaps remain valid (existing segments unaltered)
-        //   b. New mmaps must await a read lock on the file state
-        let mmap = unsafe { file.mmap(0)? }.into(); // todo → length should ≠ 0
+        // SAFETY: Undefined behaviour if mapped file is modified (refer to function documentation).
+        let mmap = unsafe { mmap(&file, header.tail.get() as usize)? }.into();
         let manifest = Manifest::from_file(&mut file, header.manifest).await?;
         let file = BufWriter::new(file);
         Ok(Self { file, header, manifest, mmap, path })
