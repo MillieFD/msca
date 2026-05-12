@@ -382,7 +382,7 @@ pub enum Error {
     Convert(TryFromIntError),
     /// CBOR decoding failure for a manifest or schema payload.
     Decode(minicbor::decode::Error),
-    /// Underlying [`std::io::Error`] from the file backing the [`Dataset`](todo link).
+    /// Underlying [`std::io::Error`] from the file backing the [`Dataset`](crate::Dataset).
     Io(std::io::Error),
     /// File magic bytes did not match the expected `clem` signature.
     Magic,
