@@ -105,7 +105,7 @@ impl Serialize for Sector {
 
 /// todo → trait doc comment
 pub trait Record {
-    /// todo → fn doc comment
+    /// Constructs a [`Schema`](schema::Schema) describing the layout of [`Self`].
     fn schema() -> schema::Schema;
 }
 
