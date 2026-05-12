@@ -198,6 +198,18 @@ pub(crate) struct Header {
 }
 
 impl Header {
+    /// Create a new [clem](crate) file [`Header`] pointing to the provided manifest [`Sector`].
+    ///
+    /// ```text
+    /// [Header] [Manifest]
+    ///         ↑ tail & manifest.offset
+    /// ```
+    ///
+    /// The `tail` and `manifest.offset` pointers are guaranteed to align exactly.
+    fn new(manifest: Sector) -> Self {
+        Self { tail: manifest.offset, manifest }
+    }
+
     /// [`Deserialize`] the file [`Header`] using the provided file [`Reader`](AsyncRead).
     async fn from_file<F>(file: &mut F) -> Result<Self, Error>
     where
