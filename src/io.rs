@@ -112,6 +112,7 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 #![doc = include_str!("../docs/read-cycle.md")]
 
 use std::array::TryFromSliceError;
+use std::cmp::Ordering;
 use std::convert::TryInto;
 use std::fmt;
 use std::io::SeekFrom;
@@ -127,7 +128,7 @@ use smol::lock::RwLock;
 
 use crate::manifest::Manifest;
 use crate::segment::Segment;
-use crate::{Record, Sector, Serialize, accumulate, manifest, schema};
+use crate::{Record, Serialize, accumulate, manifest, schema};
 
 /* ------------------------------------------------------------------------------ Public Exports */
 
@@ -189,6 +190,56 @@ unsafe fn mmap(file: &smol::fs::File, length: usize) -> Result<Mmap, Error> {
     let offset: u64 = HEADER.get().try_into()?;
     // SAFETY: Undefined behaviour if mapped file is modified (refer to function documentation).
     unsafe { MmapOptions::new().offset(offset).len(length).map(file).map_err(Error::Io) }
+}
+
+/// A contiguous byte region within the [`clem`](crate) file.
+///
+/// Implementers must [`Copy`] into an owned type when mutability is required e.g. for downstream
+/// data processing.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, PartialOrd, Hash, Encode, Decode, CborLen)]
+pub struct Sector {
+    /// Byte offset to the start of the sector.
+    #[n(0)]
+    pub offset: NonZeroU64,
+    /// Total length of the sector in bytes.
+    #[n(1)]
+    pub length: NonZeroU64,
+}
+
+impl Sector {
+    pub fn new<A, B>(offset: A, length: B) -> Result<Self, Error>
+    where
+        A: TryInto<NonZeroU64>,
+        B: TryInto<NonZeroU64>,
+        Error: From<A::Error> + From<B::Error>,
+    {
+        Ok(Self {
+            offset: offset.try_into()?,
+            length: length.try_into()?,
+        })
+    }
+}
+
+impl Ord for Sector {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.offset.cmp(&other.offset)
+    }
+}
+
+impl Serialize for Sector {
+    type Buffer = [u8; size_of::<Self>()];
+
+    fn serialize_into(&self, buf: &mut [u8]) {
+        buf[..size_of::<NonZeroU64>()].copy_from_slice(self.offset.get().to_be_bytes().as_ref());
+        buf[size_of::<NonZeroU64>()..].copy_from_slice(self.length.get().to_be_bytes().as_ref());
+    }
+
+    fn serialize(&self) -> Result<Self::Buffer, accumulate::Error> {
+        let mut buf = [u8::MIN; size_of::<Self>()];
+        self.serialize_into(&mut buf);
+        Ok(buf)
+    }
 }
 
 /// Mutable region of the file header.

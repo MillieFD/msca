@@ -46,60 +46,21 @@ mod segment;
 
 /* ----------------------------------------------------------------------------- Private Imports */
 
-use crate::accumulate::Serialize;
-use crate::io::Deserialize;
-use minicbor::{CborLen, Decode, Encode};
 use std::cmp::Ordering;
+use std::io::{Seek, SeekFrom};
 use std::num::{NonZeroU8, NonZeroU16, NonZeroU32, NonZeroU64, NonZeroU128};
+
+use minicbor::{CborLen, Decode, Encode};
+use smol::io::{AsyncSeek, AsyncSeekExt, AsyncWriteExt};
 
 /* ------------------------------------------------------------------------------ Public Exports */
 
 pub use self::dataset::Dataset;
 pub use self::error::Error;
+use crate::accumulate::Serialize;
+use crate::io::Deserialize;
 
-/// A contiguous byte region within the [`clem`](crate) file.
-///
-/// Implementers must [`Copy`] into an owned type when mutability is required e.g. for downstream
-/// data processing.
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Debug, Copy, Clone, Eq, PartialEq, PartialOrd, Hash, Encode, Decode, CborLen)]
-pub struct Sector {
-    /// Byte offset to the start of the sector.
-    #[n(0)]
-    pub offset: NonZeroU64,
-    /// Total length of the sector in bytes.
-    #[n(1)]
-    pub length: NonZeroU64,
-}
 
-impl Sector {
-    pub fn new<A, B>(offset: A, length: B) -> Result<Self, Error>
-    where
-        A: TryInto<NonZeroU64>,
-        B: TryInto<NonZeroU64>,
-        Error: From<A::Error> + From<B::Error>,
-    {
-        Ok(Self {
-            offset: offset.try_into()?,
-            length: length.try_into()?,
-        })
-    }
-}
-
-impl Serialize for Sector {
-    type Buffer = [u8; size_of::<Self>()];
-
-    fn serialize_into(&self, buf: &mut [u8]) {
-        buf[..size_of::<NonZeroU64>()].copy_from_slice(self.offset.get().to_be_bytes().as_ref());
-        buf[size_of::<NonZeroU64>()..].copy_from_slice(self.length.get().to_be_bytes().as_ref());
-    }
-
-    fn serialize(&self) -> Result<Self::Buffer, accumulate::Error> {
-        let mut buf = [u8::MIN; size_of::<Self>()];
-        self.serialize_into(&mut buf);
-        Ok(buf)
-    }
-}
 
 /* --------------------------------------------------------------------- Record Trait Definition */
 
@@ -131,12 +92,6 @@ pub trait NonZeroUInt: Copy + Ord + Sized {
 }
 
 /* ------------------------------------------------------------ NonZeroUInt Trait Implementation */
-
-impl Ord for Sector {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.offset.cmp(&other.offset)
-    }
-}
 
 impl NonZeroUInt for NonZeroU8 {
     const ONE: Self = Self::MIN;
