@@ -208,6 +208,18 @@ impl Sector {
         })
     }
 
+    /// [`Seek`](AsyncSeek::poll_seek) the provided bytes stream to the start of [`self`](Sector)
+    /// and return the new position.
+    ///
+    /// Returns [`Error::Io`] if the underlying seek operation fails.
+    pub async fn seek_to_start<F>(&self, stream: &mut F) -> Result<u64, Error>
+    where
+        F: AsyncSeek + Unpin + ?Sized,
+    {
+        let offset = self.offset.get();
+        stream.seek(SeekFrom::Start(offset)).await.map_err(Error::from)
+    }
+
     /// Returns the offset immediately following [`self`](Sector), or [`None`] on `u64` overflow.
     pub fn next(&self) -> Option<NonZeroU64> {
         let length = self.length.get();
