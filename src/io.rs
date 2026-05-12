@@ -386,6 +386,50 @@ pub(crate) struct Writer {
 }
 
 impl Writer {
+    /// Returns a suitable [`Sector`] to write the specified [`Segment`]. This function is purely
+    /// predictive; no file IO is executed.
+    ///
+    /// New segments are appended from the `tail` pointer, overwriting the previous manifest and any
+    /// empty regions if present.
+    ///
+    /// ```text
+    /// [Header] [Segment 0] ... [Segment N] [New Segment] ... [New Manifest]
+    ///                                tail ↑                 ↑ manifest.offset
+    /// ```
+    ///
+    /// Refer to the [module documentation](self) documentation for more details.
+    fn sector<S: Serialize>(&self, src: &S) -> Result<Sector, Error> {
+        let offset = self.header.tail;
+        let length = src.size()?;
+        Ok(Sector { offset, length })
+    }
+
+    /// Returns a suitable [`Sector`] to write the updated [`Manifest`].
+    ///
+    /// 1. Reserves space for the incoming [`Segment`]
+    /// 2. Does not overwrite the existing manifest.
+    ///
+    /// This function is purely predictive; no file IO is executed.
+    ///
+    /// ```text
+    /// [Header] [Segment 0] ... [Segment N] [New Segment] ... [New Manifest]
+    ///                                tail ↑                 ↑ manifest.offset
+    /// ```
+    ///
+    /// Refer to the [module documentation](self) documentation for more details.
+    ///
+    /// ### Errors
+    ///
+    /// Returns [`Error::Zero`] if a `u64` overflow occurs while calculating `size` or `offset` for
+    /// the relevant file regions.
+    async fn manifest<S: Segment>(&mut self, seg: &S) -> Result<Sector, Error> {
+        let length = seg.size()?;
+        let offset = match self.manifest.size()? < length {
+            true => self.header.tail.checked_add(length.get()),
+            false => self.eof(),
+        }
+        .ok_or(Error::Zero)?;
+        Ok(Sector { offset, length })
     }
 
     /// Returns the byte offset immediately following the final committed segment, or [`None`] on
