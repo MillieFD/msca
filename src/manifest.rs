@@ -59,7 +59,7 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //! predicate pruning.
 
 use std::collections::BTreeMap;
-use std::collections::btree_map::{Entry, OccupiedEntry, VacantEntry};
+use std::collections::btree_map::{Entry, OccupiedEntry};
 use std::fmt::{self, Display, Formatter};
 use std::num::NonZeroU64;
 
@@ -140,11 +140,8 @@ impl Manifest {
     /// if the underlying definitions differ.
     ///
     /// Returns an immutable reference to the inserted or existing [`Schema`] on success.
-    pub fn schema<S>(&mut self, name: S, schema: Schema) -> Result<&Schema, Error>
-    where
-        String: From<S>,
-    {
-        let name = String::from(name);
+    pub fn schema(&mut self, name: impl Into<String>, schema: Schema) -> Result<&Schema, Error> {
+        let name = name.into();
         match self.schemas.entry(name) {
             Entry::Vacant(entry) => Ok(entry.insert(schema)),
             Entry::Occupied(entry) if entry.get() == &schema => Ok(entry.into_mut()),
