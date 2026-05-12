@@ -140,6 +140,12 @@ const MAGIC: [u8; 4] = *b"clem";
 /// version numbers is not guaranteed. Implementers must reject any unrecognised version number.
 const VERSION: u8 = 1;
 
+/// Total length of the file header in bytes. Includes the [magic bytes][1] and [version number][2].
+///
+/// [1]: MAGIC
+/// [2]: VERSION
+pub const HEADER: usize = size_of_val(&MAGIC) + size_of_val(&VERSION) + size_of::<Header>();
+
 /// Creates a read-only [memory map](Mmap) backed by the specified [clem](crate) file.
 ///
 /// ### Errors
