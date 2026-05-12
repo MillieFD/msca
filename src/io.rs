@@ -221,6 +221,13 @@ impl Header {
     }
 
     /// [`Deserialize`] the file [`Header`] using the provided file [`Reader`](AsyncRead).
+    ///
+    /// ### Error
+    ///
+    /// Returns [`Error::Io`] if the underlying [read operation][1] fails or the reader encounters
+    /// an unexpected end of file.
+    ///
+    /// [1]: AsyncReadExt::poll_read
     async fn from_file<F>(file: &mut F) -> Result<Self, Error>
     where
         F: AsyncRead + Unpin + ?Sized,
