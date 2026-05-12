@@ -30,7 +30,7 @@ are written to a postition relative to `tail` depending on `s` and `m`:
 
 At the end of step 1, the file contains two manifests. The old manifest remains authoritative because the file header
 has not yet been updated. A crash in phase 1 leaves the file contents intact. The new manifest is unreferenced and will
-be overwritten in the next write cycle as `tail` remains unmoved.
+be overwritten in the next write-cycle as the `tail` remains unmoved.
 
 ```text
                                           Reserved for Incoming Segment
@@ -42,8 +42,8 @@ be overwritten in the next write cycle as `tail` remains unmoved.
 **Phase 2:** Update the file header manifest sector.
 
 The manifest `offset` and `length` fields in the file header are overwritten to point to the new manifest. The newly
-authoritative manifest references a (currently unwritten) segment after `tail` which will be detected during the
-next `open` call.
+authoritative manifest references a (currently unwritten) segment after the `tail` pointer. A crash in phase 2 can
+therefore be recovered by ignoring any manifest segments with offsets past the `tail` pointer.
 
 ```text
                                           Reserved for Incoming Segment
