@@ -131,6 +131,8 @@ use crate::{Record, Sector, Serialize, accumulate, manifest, schema};
 
 /* ------------------------------------------------------------------------------ Public Exports */
 
+type BufWriter = smol::io::BufWriter<smol::fs::File>;
+
 /// Magic byte sequence used to identify a valid [`clem`](crate) file.
 const MAGIC: [u8; 4] = *b"clem";
 
@@ -380,7 +382,7 @@ impl File {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug)]
 pub(crate) struct Writer {
-    pub file: BufWriter<smol::fs::File>,
+    pub file: BufWriter,
     pub header: Header,
     pub manifest: Manifest,
 }
