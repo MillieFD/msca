@@ -298,11 +298,15 @@ impl File {
     ///
     /// # Errors
     ///
-    /// This function will return an [`Error::Io`] if:
+    /// Returns [`Error::Io`] if the underlying system call fails. This can occur for a variety of
+    /// reasons, including:
     ///
-    /// - A file already exists at the specified path.
-    /// - An OS error occurs while creating, opening, or writing to the file.
-    /// - Memory mapping the file (`Mmap`) fails.
+    /// - A file already exists at the specified [`Path`](P)
+    /// - The current process lacks read and write permissions
+    /// - The platform does not support [memory mapping](memmap2)
+    ///
+    /// Returns [`Error::Zero`] if a `u64` overflow occurs while calculating `size` or `offset` for
+    /// the relevant file regions.
     ///
     /// [1]: PathBuf
     // [2]: todo → link to metadata struct or feature documentation
@@ -312,10 +316,18 @@ impl File {
     {
         let path = path.as_ref().to_path_buf();
         let manifest = Manifest::default();
-        let sector = Sector::try_from(&manifest)?;
-        let header = Header { tail: sector.offset, manifest: sector };
-        let mut file =
-            OpenOptions::new().read(true).write(true).create_new(true).open(&path).await?;
+        let sector = Sector {
+            offset: HEADER.try_into()?, // Manifest directly after header (no segments)
+            length: manifest.size()?,
+        };
+        let header = Header::new(sector);
+        let mut file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create_new(true)
+            .truncate(false)
+            .open(&path)
+            .await?;
         file.write_all(&header.serialize()?).await?;
         file.write_all(&manifest.serialize()?).await?;
         file.flush().await?;
@@ -334,11 +346,16 @@ impl File {
     ///
     /// # Errors
     ///
-    /// This function will return an [`Error::Io`] if:
+    /// Returns [`Error::Io`] if the underlying system call fails. This can occur for a variety of
+    /// reasons, including:
     ///
-    /// - A file does not exist at the specified path.
-    /// - An OS error occurs while opening the file.
-    /// - Memory mapping the file (`Mmap`) fails.
+    /// - A file already exists at the specified [`Path`](P)
+    /// - The current process lacks read and write permissions
+    /// - Unexpected `EOF` while parsing the [`Header`] or [`Manifest`]
+    /// - The platform does not support [memory mapping](memmap2)
+    ///
+    /// Returns [`Error::Zero`] if a `u64` overflow occurs while calculating `size` or `offset` for
+    /// the relevant file regions.
     pub(crate) async fn open<P>(path: P) -> Result<Self, Error>
     where
         P: AsRef<Path>,
@@ -348,6 +365,7 @@ impl File {
             .read(true)
             .write(true)
             .create_new(false) // Explicitly disallow file creation. Use File::create instead.
+            .truncate(false)
             .open(&path)
             .await?;
         let header = Header::from_file(&mut file).await?;
