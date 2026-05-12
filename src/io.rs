@@ -122,7 +122,7 @@ use std::sync::Arc;
 
 use memmap2::{Mmap, MmapOptions};
 use minicbor::{CborLen, Decode, Encode};
-use smol::fs::OpenOptions;
+use smol::fs::{self, OpenOptions};
 use smol::io::{AsyncRead, AsyncReadExt, AsyncSeek, AsyncSeekExt, AsyncWrite, AsyncWriteExt};
 use smol::lock::RwLock;
 
@@ -131,8 +131,6 @@ use crate::segment::Segment;
 use crate::{Record, Serialize, accumulate, manifest, schema};
 
 /* ------------------------------------------------------------------------------ Public Exports */
-
-type BufWriter = smol::io::BufWriter<smol::fs::File>;
 
 /// Magic byte sequence used to identify a valid [`clem`](crate) file.
 const MAGIC: [u8; 4] = *b"clem";
@@ -466,7 +464,6 @@ impl File {
         file.flush().await?;
         // SAFETY: Undefined behaviour if mapped file is modified (refer to function documentation).
         let mmap = unsafe { mmap(&file, 0)? }.into();
-        let file = BufWriter::new(file);
         let writer = Writer { file, header, manifest }.into();
         Ok(Self { writer, mmap, path })
     }
@@ -506,7 +503,6 @@ impl File {
         // SAFETY: Undefined behaviour if mapped file is modified (refer to function documentation).
         let mmap = unsafe { mmap(&file, header.tail.get() as usize)? }.into();
         let manifest = Manifest::from_file(&mut file, header.manifest).await?;
-        let file = BufWriter::new(file);
         let writer = Writer { file, header, manifest }.into();
         Ok(Self { writer, mmap, path })
     }
@@ -515,7 +511,7 @@ impl File {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug)]
 pub(crate) struct Writer {
-    pub file: BufWriter,
+    pub file: fs::File,
     pub header: Header,
     pub manifest: Manifest,
 }
