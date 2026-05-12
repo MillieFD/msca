@@ -650,4 +650,28 @@ impl Deserialize for NonZeroU64 {
 /* --------------------------------------------------------------------------------------- Tests */
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sector_ord() {
+        let hi = Sector::new(200, 16).expect("Sector::new failed for hi");
+        let lo = Sector::new(100, 16).expect("Sector::new failed for lo");
+        assert!(hi > lo);
+        assert!(lo < hi);
+    }
+
+    #[test]
+    fn sector_eq() {
+        let short = Sector::new(100, 16).expect("Sector::new failed for short");
+        let long = Sector::new(100, 32).expect("Sector::new failed for long");
+        assert_ne!(short, long);
+    }
+
+    #[test]
+    fn sector_copy() {
+        let a = Sector::new(10, 5).expect("Sector::new failed");
+        let b = a;
+        assert_eq!(a, b);
+    }
+}
