@@ -123,6 +123,7 @@ use memmap2::{Mmap, MmapOptions};
 use minicbor::{CborLen, Decode, Encode};
 use smol::fs::OpenOptions;
 use smol::io::{AsyncRead, AsyncReadExt, AsyncSeekExt, AsyncWriteExt, BufWriter};
+use smol::lock::RwLock;
 
 use crate::manifest::Manifest;
 use crate::segment::Segment;
