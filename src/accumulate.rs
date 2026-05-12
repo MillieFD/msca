@@ -532,7 +532,7 @@ impl<T> Buffer for T where T: AsRef<[u8]> + AsMut<[u8]> {}
 
 /// A **type** that can be serialized into a canonical [`clem`](crate) binary representation for
 /// on-disk storage.
-pub trait Serialize {
+pub(crate) trait Serialize {
     /// The [`Buffer`] type returned by [`Self::serialize`].
     ///
     /// Fixed-size types can specify an appropriate array to leverage stack allocation. Unsized
