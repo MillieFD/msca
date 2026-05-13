@@ -78,7 +78,7 @@ use minicbor::{CborLen, Decode, Encode};
 use self::number::Number;
 use crate::accumulate::{Accumulate, Flatten, OptBitVec, OptInSitu, OptSeq, Seq};
 use crate::io::File;
-use crate::manifest::{self};
+use crate::manifest;
 
 /// Shorthand [`OccupiedEntry`] for a [`Column`] that already exists in the [`Schema`].
 type Occupied<'a> = OccupiedEntry<'a, String, Column>;
@@ -143,12 +143,30 @@ impl Schema {
         match self.columns.entry(name) {
             Entry::Vacant(entry) => entry.insert(col),
             Entry::Occupied(entry) if entry.get() == &col => entry.into_mut(),
-            Entry::Occupied(entry) => return Error::collision(entry, col.ty).into(),
+            Entry::Occupied(entry) => return Error::Collision { name: entry.key().clone() }.into(),
         };
         Ok(A::RawAcc::boxed())
     }
 
-    /// Map the provided `Key` to a generated [`Default`] value of [`T`]
+    /// Consumes [`self`](Schema) and adds to the provided [`file`](File)` `[`manifest`](Manifest).
+    ///
+    /// Resolves name conflicts by comparing the new and existing schema definitions; returning
+    /// [`Ok`] if the underlying definitions are identical (deduplication) or [`Error::Collision`]
+    /// if the underlying definitions differ.
+    ///
+    /// Returns an immutable reference to the inserted or existing [`manifest::Schema`] on success.
+    pub fn finish(self, file: &mut File) -> Result<&manifest::Schema, Error> {
+        let columns = self.columns.keys().cloned().map(Schema::map).collect();
+        let sector = file.header.segment(&self)?;
+        let schema = manifest::Schema { columns, sector };
+        match file.manifest.schemas.entry(self.name) {
+            Entry::Vacant(entry) => Ok(&*entry.insert(schema)),
+            Entry::Occupied(entry) if entry.get() == &schema => Ok(&*entry.into_mut()),
+            Entry::Occupied(entry) => Error::Collision { name: entry.key().clone() }.into(),
+        }
+    }
+
+    /// Map the provided [`Key`](String) to a generated [`Default`] value of [`T`]
     pub(crate) fn map<T>(key: String) -> (String, T)
     where
         T: Default,
@@ -455,10 +473,6 @@ pub enum Error {
     Collision {
         /// Name shared by the new and existing columns.
         name: String,
-        /// [`Type`] of the existing [`Column`] in the [`Schema`].
-        existing: Type,
-        /// [`Type`] of the new [`Column`] being added to the [`Schema`].
-        new: Type,
     },
     /// Underlying [`Error`](number::Error) from a numerical operation or conversion.
     Numeric(number::Error),
@@ -470,19 +484,10 @@ pub enum Error {
     Unsupported(&'static str),
 }
 
-impl Error {
-    /// Returns a new [`Error::Collision`] variant wrapping the column name and conflicting types.
-    fn collision(occupied: Occupied, new: Type) -> Self {
-        let name = occupied.key().clone();
-        let existing = occupied.get().clone().ty;
-        Self::Collision { name, existing, new }
-    }
-}
-
 impl Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Collision { name, .. } => write!(f, "Column '{name}' already in schema"),
+            Self::Collision { name } => write!(f, "Name collision → {name}"),
             Self::Numeric(e) => write!(f, "Numeric error → {e}"),
             Self::Unsupported(msg) => write!(f, "Unsupported type → {msg}"),
         }
