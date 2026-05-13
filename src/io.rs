@@ -256,7 +256,7 @@ impl Serialize for Sector {
         buf[size_of::<NonZeroU64>()..].copy_from_slice(self.length.get().to_be_bytes().as_ref());
     }
 
-    fn serialize(&self) -> Result<Self::Buffer, accumulate::Error> {
+    fn serialize(&self) -> Result<Self::Buffer, number::Error> {
         let mut buf = [u8::MIN; size_of::<Self>()];
         self.serialize_into(&mut buf);
         Ok(buf)
@@ -330,7 +330,7 @@ impl Header {
     /// ```
     ///
     /// Refer to the [write-cycle](self) documentation for more details.
-    fn segment<S: Segment>(&self, src: &S) -> Result<Sector, Error> {
+    pub(crate) fn segment<S: Segment>(&self, src: &S) -> Result<Sector, number::Error> {
         Ok(Sector { offset: self.tail, length: src.size()? })
     }
 
@@ -537,15 +537,18 @@ impl Writer {
     ///
     /// Refer to the [module documentation](self) documentation for more details.
     ///
-
-
-impl TryFrom<&Manifest> for Sector {
-    type Error = Error;
-
-    fn try_from(manifest: &Manifest) -> Result<Self, Self::Error> {
-        let offset = HEADER.try_into()?;
-        let length = manifest.size().map_err(Error::from)?;
-        Ok(Self { offset, length })
+    /// ### Errors
+    ///
+    /// Returns [`Error::Zero`](number::Error::Zero) if a `u64` overflow occurs while calculating
+    /// [`size`](NonZeroU64) or [`offset`](NonZeroU64) for the relevant file regions.
+    pub async fn manifest<S: Segment>(&self, seg: &S) -> Result<Sector, number::Error> {
+        let length = seg.size()?;
+        let offset = match self.manifest.size()? < length {
+            true => self.header.tail.checked_add(length.get()),
+            false => self.header.manifest.next(),
+        }
+        .ok_or(number::Error::Zero)?;
+        Ok(Sector { offset, length })
     }
 }
 
@@ -667,7 +670,7 @@ impl Deserialize for NonZeroU64 {
                 actual: src.len(),
             })?
             .try_into()?;
-        u64::from_le_bytes(buf).try_into().map_err(Error::Convert)
+        u64::from_le_bytes(buf).try_into().map_err(Error::from)
     }
 }
 
