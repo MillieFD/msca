@@ -585,8 +585,6 @@ pub enum Error {
     Io(std::io::Error),
     /// File magic bytes did not match the expected `clem` signature.
     Magic,
-    /// Underlying [`manifest::Error`] from a file manifest operation.
-    Manifest(manifest::Error),
     /// Underlying [`TryFromSliceError`] while parsing a slice into a fixed-size array.
     Slice(TryFromSliceError),
     /// A read operation attempted to access bytes beyond the end of the input slice.
