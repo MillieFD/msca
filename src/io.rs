@@ -644,11 +644,11 @@ impl From<minicbor::decode::Error> for Error {
     }
 }
 
-impl From<accumulate::Error> for Error {
-    fn from(e: accumulate::Error) -> Self {
+impl From<number::Error> for Error {
+    fn from(e: number::Error) -> Self {
         match e {
-            accumulate::Error::Convert(inner) => Self::Convert(inner),
-            accumulate::Error::Zero => Self::Zero,
+            number::Error::Convert(src) => Self::Convert(src),
+            number::Error::Zero => Self::Zero,
         }
     }
 }
