@@ -197,19 +197,19 @@ impl Deserialize for Manifest {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode, CborLen)]
 pub(crate) struct Schema {
+    /// Location of the schema segment including header.
+    #[n(0)]
+    pub sector: Sector,
     /// [`Column`] descriptors keyed by name.
     ///
     /// The [`BTreeMap`] guarantees a stable deterministic column order for consistent binary
     /// encoding and schema comparison.
-    #[cbor(n(0), skip_if = "BTreeMap::is_empty")]
+    #[cbor(n(1), skip_if = "BTreeMap::is_empty")]
     #[cfg_attr(
         feature = "serde",
         serde(default, skip_serializing_if = "BTreeMap::is_empty")
     )]
     pub columns: BTreeMap<String, Column>,
-    /// Location of the schema segment including header.
-    #[n(1)]
-    pub sector: Sector,
 }
 
 /// A minimal column **descriptor** that wraps a list of [`Buffer`] descriptors.
