@@ -226,7 +226,7 @@ impl Sector {
     }
 
     /// Returns the offset immediately following [`self`](Sector), or [`None`] on `u64` overflow.
-    pub fn next(&self) -> Option<NonZeroU64> {
+    pub const fn next(&self) -> Option<NonZeroU64> {
         let length = self.length.get();
         self.offset.checked_add(length)
     }
