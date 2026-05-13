@@ -113,13 +113,19 @@ pub struct Schema {
         feature = "serde",
         serde(default, skip_serializing_if = "str::is_empty")
     )]
-    pub name: &'static str,
+    pub name: String,
 }
 
 impl Schema {
     /// Initialises a new empty [`Schema`] with no columns.
-    pub fn new(name: &'static str) -> Self {
-        Self { columns: BTreeMap::new(), name }
+    pub fn new<N>(name: N) -> Self
+    where
+        String: From<N>,
+    {
+        Self {
+            columns: BTreeMap::new(),
+            name: String::from(name),
+        }
     }
 
     /// Add a [`Column`] to [`self`](Schema) with the specified `name` and [`type`](A).
