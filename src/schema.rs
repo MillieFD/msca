@@ -306,7 +306,7 @@ impl Type {
     }
 }
 
-mod number {
+pub mod number {
     //! This module provides a minimal and extensible [`Number`] **descriptor** for Rust numeric
     //! primitives.
     //!
