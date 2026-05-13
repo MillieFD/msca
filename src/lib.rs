@@ -55,6 +55,7 @@ use self::schema::number;
 /* ------------------------------------------------------------------------------ Public Exports */
 
 pub use self::error::Error;
+pub use self::io::Sector;
 
 /* --------------------------------------------------------------------- Record Trait Definition */
 
