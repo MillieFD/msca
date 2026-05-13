@@ -651,12 +651,6 @@ impl From<number::Error> for Error {
     }
 }
 
-impl From<manifest::Error> for Error {
-    fn from(e: manifest::Error) -> Self {
-        Self::Manifest(e)
-    }
-}
-
 //noinspection DuplicatedCode → Conversion is implemented for error types across different modules.
 impl<T, E> From<Error> for Result<T, E>
 where
