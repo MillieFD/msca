@@ -20,16 +20,14 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //! Each accumulator type implements the [`Accumulate`] trait, which defines a shared interface for
 //! handling in-memory value accumulation.
 
-use std::fmt;
 use std::num::*;
 
 use bitvec::field::BitField;
 use bitvec::vec::BitVec;
 use minicbor::{CborLen, Decode, Encode};
 
-use crate::Sector;
-use crate::io::File;
 use crate::schema::Unfold;
+use crate::schema::number::Error;
 
 /* --------------------------------------------------------------------------- Data Accumulators */
 
@@ -234,46 +232,6 @@ impl<T: Unfold> Default for OptSeq<T> {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Default, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode, CborLen)]
 pub(crate) struct Flatten<T>(#[n(0)] pub T);
-
-/* ------------------------------------------------------------------------------ Specific Error */
-
-/// Errors returned by data [accumulation](Accumulate).
-///
-/// Enum variants cover various granular error cases that may arise when working with in-memory data
-/// [accumulators](self). Users should consider handling errors explicitly wherever possible to
-/// provide meaningful error messages and recovery actions.
-///
-/// ### Implementation
-///
-/// This enum is `#[non_exhaustive]` meaning additional variants may be added in future versions.
-/// Implementers are advised to include a wildcard arm `_` to account for potential additions.
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Debug)]
-#[non_exhaustive] // To accommodate potential future error cases.
-pub enum Error {
-    /// Underlying [`TryFromIntError`] from a checked conversion between two types.
-    Convert(TryFromIntError),
-    /// Attempted to decode a zero value into a [`NonZero`] field.
-    Zero,
-}
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Convert(e) => write!(f, "Integer type conversion error → {e}"),
-            Self::Zero => write!(f, "Expected non-zero value was zero"),
-            other => write!(f, "Unexpected accumulation error → {other:?}"),
-        }
-    }
-}
-
-impl std::error::Error for Error {}
-
-impl From<TryFromIntError> for Error {
-    fn from(e: TryFromIntError) -> Self {
-        Self::Convert(e)
-    }
-}
 
 /* ----------------------------------------------------------------- Accumulate Trait Definition */
 
