@@ -23,13 +23,4 @@ pub struct Dataset {
     file: File,
 }
 
-impl Dataset {
-    /// todo fn doc comment
-    pub async fn schema<R>(&mut self, name: &'static str) -> Result<(), Error>
-    where
-        R: Record,
-    {
-        let schema = self.file.schema::<R>(name).await?;
-        unimplemented!("Defer to inner File::schema fn")
-    }
-}
+impl Dataset {}
