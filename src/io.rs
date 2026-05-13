@@ -124,11 +124,10 @@ use memmap2::{Mmap, MmapOptions};
 use minicbor::{CborLen, Decode, Encode};
 use smol::fs::{self, OpenOptions};
 use smol::io::{AsyncRead, AsyncReadExt, AsyncSeek, AsyncSeekExt, AsyncWrite, AsyncWriteExt};
-use smol::lock::RwLock;
 
 use crate::manifest::Manifest;
 use crate::segment::Segment;
-use crate::{Record, Serialize, accumulate, manifest, schema};
+use crate::{Serialize, number};
 
 /* ------------------------------------------------------------------------------ Public Exports */
 
@@ -395,7 +394,7 @@ impl Serialize for Header {
         self.manifest.serialize_into(buf);
     }
 
-    fn serialize(&self) -> Result<Self::Buffer, accumulate::Error> {
+    fn serialize(&self) -> Result<Self::Buffer, number::Error> {
         let mut buf = [0u8; size_of::<Self>()];
         self.serialize_into(&mut buf);
         Ok(buf)
@@ -577,14 +576,14 @@ impl TryFrom<&Manifest> for Sector {
 #[derive(Debug)]
 #[non_exhaustive] // To accommodate potential future error cases.
 pub enum Error {
-    /// Underlying [`TryFromIntError`] from a checked conversion between two types.
-    Convert(TryFromIntError),
     /// CBOR decoding failure for a manifest or schema payload.
     Decode(minicbor::decode::Error),
     /// Underlying [`std::io::Error`] from the file backing the [`Dataset`](crate::Dataset).
     Io(std::io::Error),
     /// File magic bytes did not match the expected `clem` signature.
     Magic,
+    /// Underlying [`Error`](number::Error) from a numerical operation or conversion.
+    Numeric(number::Error),
     /// Underlying [`TryFromSliceError`] while parsing a slice into a fixed-size array.
     Slice(TryFromSliceError),
     /// A read operation attempted to access bytes beyond the end of the input slice.
@@ -596,22 +595,18 @@ pub enum Error {
     },
     /// File version number is not recognised by this build of [`clem`](crate).
     Version(u8),
-    /// Attempted to decode a zero value into a [`NonZero`](core::num::NonZero) field.
-    Zero,
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Convert(e) => write!(f, "Integer type conversion error → {e}"),
             Self::Decode(e) => write!(f, "CBOR decode error → {e}"),
             Self::Io(e) => write!(f, "File IO error → {e}"),
             Self::Magic => f.write_str("File is not a valid clem dataset"),
-            Self::Manifest(e) => write!(f, "Manifest error → {e}"),
+            Self::Numeric(e) => write!(f, "Numeric error → {e}"),
             Self::Slice(e) => write!(f, "Try from slice error → {e}"),
             Self::Truncated { .. } => write!(f, "Read was truncated → {self:?}"),
             Self::Version(v) => write!(f, "Unrecognised clem version → {v}"),
-            Self::Zero => write!(f, "Expected non-zero value was zero"),
         }
     }
 }
@@ -632,7 +627,7 @@ impl From<TryFromSliceError> for Error {
 
 impl From<TryFromIntError> for Error {
     fn from(e: TryFromIntError) -> Self {
-        Self::Convert(e)
+        number::Error::from(e).into()
     }
 }
 
@@ -644,10 +639,7 @@ impl From<minicbor::decode::Error> for Error {
 
 impl From<number::Error> for Error {
     fn from(e: number::Error) -> Self {
-        match e {
-            number::Error::Convert(src) => Self::Convert(src),
-            number::Error::Zero => Self::Zero,
-        }
+        Self::Numeric(e)
     }
 }
 
