@@ -178,8 +178,9 @@ pub const HEADER: usize = size_of_val(&MAGIC) + size_of_val(&VERSION) + size_of:
 /// Refer to the [memmap](memmap2) crate for more details.
 ///
 /// [1]: https://doc.rust-lang.org/book/ch20-01-unsafe-rust.html
-unsafe fn mmap(file: &smol::fs::File, length: usize) -> Result<Mmap, Error> {
-    let offset: u64 = Header::SECTOR.offset.get();
+unsafe fn mmap(file: &fs::File, tail: NonZeroU64) -> Result<Mmap, Error> {
+    let offset: u64 = HEADER.try_into()?;
+    let length: usize = { tail.get() - offset }.try_into()?;
     // SAFETY: Undefined behaviour if mapped file is modified (refer to function documentation).
     unsafe { MmapOptions::new().offset(offset).len(length).map(file).map_err(Error::Io) }
 }
