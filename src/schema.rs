@@ -106,12 +106,18 @@ pub struct Schema {
         serde(default, skip_serializing_if = "BTreeMap::is_empty")
     )]
     pub columns: BTreeMap<String, Column>,
+    #[cbor(n(1), skip_if = "str::is_empty")]
+    #[cfg_attr(
+        feature = "serde",
+        serde(default, skip_serializing_if = "str::is_empty")
+    )]
+    pub name: &'static str,
 }
 
 impl Schema {
     /// Initialises a new empty [`Schema`] with no columns.
-    pub fn new() -> Self {
-        Self { columns: BTreeMap::new() }
+    pub fn new(name: &'static str) -> Self {
+        Self { columns: BTreeMap::new(), name }
     }
 
     /// Add a [`Column`] to [`self`](Schema) with the specified `name` and [`type`](A).
