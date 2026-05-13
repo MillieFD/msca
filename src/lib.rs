@@ -36,7 +36,7 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //! starting [`offset`](Sector::offset) and [`length`](Sector::length) in bytes. A sector can
 //! describe any contiguous file region, from a single columnar buffer to an entire segment.
 
-pub mod accumulate;
+mod accumulate;
 mod dataset;
 mod error;
 mod io;
@@ -48,12 +48,13 @@ mod segment;
 
 use std::num::{NonZeroU8, NonZeroU16, NonZeroU32, NonZeroU64, NonZeroU128};
 
+use self::accumulate::Serialize;
+use self::io::Deserialize;
+use self::schema::number;
+
 /* ------------------------------------------------------------------------------ Public Exports */
 
-pub use self::dataset::Dataset;
 pub use self::error::Error;
-use crate::accumulate::Serialize;
-use crate::io::Deserialize;
 
 /* --------------------------------------------------------------------- Record Trait Definition */
 
