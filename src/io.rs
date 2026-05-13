@@ -233,12 +233,12 @@ impl Sector {
 }
 
 impl Add for Sector {
-    type Output = Result<Self, Error>;
+    type Output = Option<Self>;
 
     fn add(self, rhs: Self) -> Self::Output {
         let offset = self.offset.min(rhs.offset);
-        let length = self.length.checked_add(rhs.length.get()).ok_or(Error::Zero)?;
-        Ok(Self { offset, length })
+        let length = self.length.checked_add(rhs.length.get())?;
+        Some(Self { offset, length })
     }
 }
 
