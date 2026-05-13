@@ -37,7 +37,8 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //! This module performs **only** in-memory ⇄ byte-buffer transformations. File I/O is the
 //! responsibility of the [`crate::io`] module.
 
-use crate::{Serialize, accumulate, schema::Schema};
+use crate::schema::{Schema, number};
+use crate::{Serialize, accumulate};
 use minicbor::{CborLen, Decode, Encode};
 use std::convert::Infallible;
 use std::fmt::{Display, Formatter};
@@ -132,17 +133,17 @@ mod variant {
         /// The actual variant byte did not match the [`Variant`] expected by the caller.
         #[n(0)]
         Unexpected {
-            /// The [`Variant`] expected by the caller.
+            /// The [`Variant`] byte expected by the caller.
             #[n(0)]
-            expected: Variant,
-            /// The actual variant byte encountered by the caller.
+            expected: u8,
+            /// The actual [`Variant`] byte encountered by the caller.
             #[n(1)]
-            found: Variant,
+            found: u8,
         },
         /// The actual variant byte did not map to any known [`Variant`].
         #[n(1)]
         Unknown {
-            /// The actual variant byte encountered by the caller.
+            /// The actual [`Variant`] byte encountered by the caller.
             #[n(0)]
             found: u8,
         },
@@ -151,13 +152,8 @@ mod variant {
     impl Display for Error {
         fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
             match self {
-                Error::Unexpected { expected, found } => write!(
-                    f,
-                    "Unexpected segment variant:\n\t\
-                    Expected {expected:?}\n\t\
-                    Found {found:?}"
-                ),
-                Error::Unknown { found } => write!(f, "Unknown segment variant → 0x{found:02X}"),
+                Error::Unexpected { found, .. } => write!(f, "Unexpected variant → 0x{found:02X}"),
+                Error::Unknown { found } => write!(f, "Unknown variant → 0x{found:02X}"),
             }
         }
     }
@@ -195,9 +191,9 @@ pub trait Segment: Serialize {
 impl Serialize for Schema {
     type Buffer = Vec<u8>;
 
-    fn size(&self) -> Result<NonZeroU64, accumulate::Error> {
+    fn size(&self) -> Result<NonZeroU64, number::Error> {
         let size: u64 = { size_of::<Header>() + minicbor::len(self) }.try_into()?;
-        size.try_into().map_err(accumulate::Error::Convert)
+        size.try_into().map_err(number::Error::Convert)
     }
 
     fn serialize_into(&self, buf: &mut [u8]) {
@@ -212,7 +208,7 @@ impl Serialize for Schema {
         minicbor::encode(self, buf).expect("Failed to encode schema.");
     }
 
-    fn serialize(&self) -> Result<Self::Buffer, accumulate::Error> {
+    fn serialize(&self) -> Result<Self::Buffer, number::Error> {
         let size = self.size()?.get().try_into()?;
         let mut buf = Vec::with_capacity(size);
         self.serialize_into(&mut buf);
