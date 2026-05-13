@@ -77,8 +77,8 @@ pub trait NonZeroUInt: Copy + Ord + Sized {
     ///
     /// ```rust
     /// fn noop<T: NonZeroUInt>(value: T) {
-    ///    assert_eq!(T::ONE * value, value);
-    ///    assert_eq!(value * T::ONE, value);
+    ///     assert_eq!(T::ONE * value, value);
+    ///     assert_eq!(value * T::ONE, value);
     /// }
     /// ```
     ///
