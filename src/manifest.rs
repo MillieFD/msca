@@ -59,17 +59,13 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //! predicate pruning.
 
 use std::collections::BTreeMap;
-use std::collections::btree_map::{Entry, OccupiedEntry};
 use std::fmt::{self, Display, Formatter};
 use std::num::NonZeroU64;
 
 use minicbor::{CborLen, Decode, Encode};
 use smol::io::{AsyncRead, AsyncReadExt};
 
-use crate::{Deserialize, Sector, Serialize, accumulate, io};
-
-/// Shorthand [`OccupiedEntry`] for a [`Schema`] that already exists in the [`Manifest`].
-type Occupied<'a> = OccupiedEntry<'a, String, Schema>;
+use crate::{Deserialize, Sector, Serialize, io, number};
 
 /* ------------------------------------------------------------------------------ Public Exports */
 
@@ -133,23 +129,11 @@ impl Manifest {
         Manifest::deserialize(&buf)
     }
 
-    /// Add a [`Schema`] to [`self`](Manifest) with the specified `name` and [`Sector`].
+    /// Reconstructs a [`Manifest`] by walking segments in `data` up to the specified `tail`
+    /// offset.
     ///
-    /// Resolves name conflicts by comparing the new and existing schema definitions; returning
-    /// [`Ok`] if the underlying definitions are identical (deduplication) or [`Error::Collision`]
-    /// if the underlying definitions differ.
-    ///
-    /// Returns an immutable reference to the inserted or existing [`Schema`] on success.
-    pub fn schema(&mut self, name: impl Into<String>, schema: Schema) -> Result<&Schema, Error> {
-        let name = name.into();
-        match self.schemas.entry(name) {
-            Entry::Vacant(entry) => Ok(entry.insert(schema)),
-            Entry::Occupied(entry) if entry.get() == &schema => Ok(entry.into_mut()),
-            Entry::Occupied(entry) => Error::collision(entry, schema).into(),
-        }
-    }
-
-    /// todo → fn doc comment
+    /// Used to recover a corrupt or truncated manifest by replaying intact segments. Each segment
+    /// header is decoded sequentially and re-registered in a fresh [`Manifest`].
     pub fn rebuild(data: &[u8], tail: NonZeroU64) -> Result<Self, Error> {
         unimplemented!("Manifest::rebuild is not yet implemented")
     }
@@ -158,9 +142,9 @@ impl Manifest {
 impl Serialize for Manifest {
     type Buffer = Vec<u8>;
 
-    fn size(&self) -> Result<NonZeroU64, accumulate::Error> {
+    fn size(&self) -> Result<NonZeroU64, number::Error> {
         let size: u64 = minicbor::len(self).try_into()?;
-        size.try_into().map_err(accumulate::Error::Convert)
+        size.try_into().map_err(number::Error::Convert)
     }
 
     fn serialize_into(&self, buf: &mut [u8]) {
@@ -168,7 +152,7 @@ impl Serialize for Manifest {
         minicbor::encode(self, buf).expect("Failed to encode manifest as CBOR");
     }
 
-    fn serialize(&self) -> Result<Self::Buffer, accumulate::Error> {
+    fn serialize(&self) -> Result<Self::Buffer, number::Error> {
         let size = self.size()?.get().try_into()?;
         let mut buf = Vec::with_capacity(size);
         self.serialize_into(&mut buf);
@@ -336,40 +320,14 @@ pub(crate) struct Index {
 /// This enum is `#[non_exhaustive]` meaning additional variants may be added in future versions.
 /// Implementers are advised to include a wildcard arm `_` to account for potential additions.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode, CborLen)]
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode)]
 #[non_exhaustive] // To accommodate potential future error cases.
-pub enum Error {
-    /// A [`Schema`] with the same name but different contents already exists in the [`Manifest`].
-    ///
-    /// The manifest stores schemas in a [`BTreeMap`] keyed by name. Reusing an existing name
-    /// therefore overwrites the existing schema definition, resulting in possible data loss.
-    #[n(0)]
-    Collision {
-        /// Name shared by the new and existing schemas.
-        #[n(0)]
-        name: String,
-        /// The existing [`Schema`] in the [`Manifest`].
-        #[n(1)]
-        existing: Schema,
-        /// The new [`Schema`] being added to the [`Manifest`].
-        #[n(2)]
-        new: Schema,
-    },
-}
-
-impl Error {
-    /// Returns a new [`Error::Collision`] variant wrapping the schema name and conflicting sectors.
-    fn collision(occupied: Occupied, new: Schema) -> Self {
-        let name = occupied.key().clone();
-        let existing = occupied.get().clone();
-        Self::Collision { name, existing, new }
-    }
-}
+pub enum Error {}
 
 impl Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Collision { name, .. } => write!(f, "Schema '{name}' already in manifest"),
+            any => todo!("No error variants exist"),
         }
     }
 }
