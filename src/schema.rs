@@ -318,7 +318,8 @@ mod number {
     //! [1]: https://rust-lang.github.io/rfcs/3453-f16-and-f128.html
 
     use minicbor::{CborLen, Decode, Encode};
-    use std::fmt::{Display, Formatter};
+    use std::fmt;
+    use std::num::TryFromIntError;
 
     /// Semantic classification of the numeric primitive type.
     #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -345,8 +346,8 @@ mod number {
         Float,
     }
 
-    impl Display for Kind {
-        fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    impl fmt::Display for Kind {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             match self {
                 Self::UInt => f.write_str("u"),
                 Self::NonZeroUInt => f.write_str("NonZeroU"),
@@ -376,9 +377,48 @@ mod number {
         pub size: u8,
     }
 
-    impl Display for Number {
-        fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    impl fmt::Display for Number {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             write!(f, "{}{}", self.kind, self.size * 8)
+        }
+    }
+
+    /* -------------------------------------------------------------------------- Specific Error */
+
+    /// Errors returned by [numerical](self) operations and conversions.
+    ///
+    /// Enum variants cover various granular error cases that may arise when working with numbers.
+    /// Users should consider handling errors explicitly wherever possible to provide meaningful
+    /// error messages and recovery actions.
+    ///
+    /// ### Implementation
+    ///
+    /// This enum is `#[non_exhaustive]` meaning additional variants may be added in future versions.
+    /// Implementers are advised to include a wildcard arm `_` to account for potential additions.
+    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+    #[derive(Debug, Clone, Eq, PartialEq)]
+    #[non_exhaustive] // To accommodate potential future error cases.
+    pub enum Error {
+        /// Underlying [`TryFromIntError`] from a checked conversion between two types.
+        Convert(TryFromIntError),
+        /// Attempted to decode a zero value into a [`NonZero`](core::num::NonZero) field.
+        Zero,
+    }
+
+    impl fmt::Display for Error {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            match self {
+                Self::Convert(e) => write!(f, "Integer type conversion error → {e}"),
+                Self::Zero => write!(f, "Expected non-zero value was zero"),
+            }
+        }
+    }
+
+    impl std::error::Error for Error {}
+
+    impl From<TryFromIntError> for Error {
+        fn from(e: TryFromIntError) -> Self {
+            Self::Convert(e)
         }
     }
 }
