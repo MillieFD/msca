@@ -77,6 +77,8 @@ use minicbor::{CborLen, Decode, Encode};
 
 use self::number::Number;
 use crate::accumulate::{Accumulate, Flatten, OptBitVec, OptInSitu, OptSeq, Seq};
+use crate::io::File;
+use crate::manifest::{self};
 
 /// Shorthand [`OccupiedEntry`] for a [`Column`] that already exists in the [`Schema`].
 type Occupied<'a> = OccupiedEntry<'a, String, Column>;
@@ -436,7 +438,7 @@ mod number {
 /// This enum is `#[non_exhaustive]` meaning additional variants may be added in future versions.
 /// Implementers are advised to include a wildcard arm `_` to account for potential additions.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode, CborLen)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 #[non_exhaustive] // To accommodate potential future error cases.
 pub enum Error {
     /// A [`Column`] with the same [name](String) but a different [type](Type) already exists in
@@ -444,25 +446,22 @@ pub enum Error {
     ///
     /// Each schema stores columns in a [`BTreeMap`] keyed by column name. Reusing an existing
     /// name therefore overwrites the existing column definition, resulting in possible data loss.
-    #[n(0)]
     Collision {
         /// Name shared by the new and existing columns.
-        #[n(0)]
         name: String,
         /// [`Type`] of the existing [`Column`] in the [`Schema`].
-        #[n(1)]
         existing: Type,
         /// [`Type`] of the new [`Column`] being added to the [`Schema`].
-        #[n(2)]
         new: Type,
     },
+    /// Underlying [`Error`](number::Error) from a numerical operation or conversion.
+    Numeric(number::Error),
     /// The requested type is not supported by this version of [`clem`](crate).
     ///
     /// Some types are deliberately omitted. Please read the [type documentation](Type) for more
     /// details. If you think a type should be supported, please open a new GitHub feature request
     /// with your use case and justification for inclusion.
-    #[n(1)]
-    Unsupported(#[n(0)] &'static str),
+    Unsupported(&'static str),
 }
 
 impl Error {
@@ -478,12 +477,19 @@ impl Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Collision { name, .. } => write!(f, "Column '{name}' already in schema"),
+            Self::Numeric(e) => write!(f, "Numeric error → {e}"),
             Self::Unsupported(msg) => write!(f, "Unsupported type → {msg}"),
         }
     }
 }
 
 impl std::error::Error for Error {}
+
+impl From<number::Error> for Error {
+    fn from(e: number::Error) -> Self {
+        Self::Numeric(e)
+    }
+}
 
 //noinspection DuplicatedCode → Conversion is implemented for error types across different modules.
 impl<T, E> From<Error> for Result<T, E>
