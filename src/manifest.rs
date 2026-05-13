@@ -59,7 +59,6 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //! predicate pruning.
 
 use std::collections::BTreeMap;
-use std::fmt::{self, Display, Formatter};
 use std::num::NonZeroU64;
 
 use minicbor::{CborLen, Decode, Encode};
@@ -134,7 +133,7 @@ impl Manifest {
     ///
     /// Used to recover a corrupt or truncated manifest by replaying intact segments. Each segment
     /// header is decoded sequentially and re-registered in a fresh [`Manifest`].
-    pub fn rebuild(data: &[u8], tail: NonZeroU64) -> Result<Self, Error> {
+    pub fn rebuild(data: &[u8], tail: NonZeroU64) -> Self {
         unimplemented!("Manifest::rebuild is not yet implemented")
     }
 }
@@ -305,43 +304,6 @@ pub(crate) struct Index {
     /// platform-native endianness. Decode according to the `Key` type described by the schema.
     #[n(1)]
     pub next: Vec<u8>,
-}
-
-/* ------------------------------------------------------------------------------ Specific Error */
-
-/// Errors returned by [`Manifest`] operations.
-///
-/// Enum variants cover various granular error cases that may arise when working with the manifest.
-/// Users should consider handling errors explicitly wherever possible to provide meaningful error
-/// messages and recovery actions.
-///
-/// ### Implementation
-///
-/// This enum is `#[non_exhaustive]` meaning additional variants may be added in future versions.
-/// Implementers are advised to include a wildcard arm `_` to account for potential additions.
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode)]
-#[non_exhaustive] // To accommodate potential future error cases.
-pub enum Error {}
-
-impl Display for Error {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match self {
-            any => todo!("No error variants exist"),
-        }
-    }
-}
-
-impl std::error::Error for Error {}
-
-//noinspection DuplicatedCode → Conversion is implemented for error types across different modules.
-impl<T, E> From<Error> for Result<T, E>
-where
-    E: From<Error>,
-{
-    fn from(error: Error) -> Self {
-        Err(E::from(error))
-    }
 }
 
 /* --------------------------------------------------------------------------------------- Tests */
