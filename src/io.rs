@@ -116,7 +116,8 @@ use std::cmp::Ordering;
 use std::convert::TryInto;
 use std::fmt;
 use std::io::SeekFrom;
-use std::num::{NonZeroU64, NonZeroUsize, TryFromIntError};
+use std::num::{NonZeroU64, TryFromIntError};
+use std::ops::Add;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -280,24 +281,11 @@ pub(crate) struct Header {
 }
 
 impl Header {
-    /// Total length of the file header in bytes. Includes the [magic bytes][1] and [version number][2].
-    ///
-    /// [1]: MAGIC
-    /// [2]: VERSION
-    pub const SIZE: NonZeroUsize = {
-        let size = size_of_val(&MAGIC) + size_of_val(&VERSION) + size_of::<Header>();
-        // SAFETY: Const fn can panic at compile time. Value is guaranteed at runtime.
-        NonZeroUsize::new(size).expect("Header size is zero")
-    };
-
     /// todo → const doc comment
-    pub const SECTOR: Sector = {
-        let offset = { size_of_val(&MAGIC) + size_of_val(&VERSION) } as u64;
-        let length = Self::SIZE.get() as u64;
-        Sector {
-            offset: NonZeroU64::new(offset).expect("Header offset is zero"),
-            length: NonZeroU64::new(length).expect("Header length is zero"),
-        }
+    pub const TAIL: Sector = {
+        let offset = size_of_val(&MAGIC) + size_of_val(&VERSION);
+        let length = size_of::<NonZeroU64>();
+        Sector::new(offset, length)
     };
 
     /// Create a new [clem](crate) file [`Header`] pointing to the provided manifest [`Sector`].
@@ -324,7 +312,7 @@ impl Header {
     where
         F: AsyncRead + Unpin + ?Sized,
     {
-        let mut buf = [0u8; Self::SIZE.get()];
+        let mut buf = [0u8; HEADER];
         file.read_exact(&mut buf).await?;
         Header::deserialize(&buf)
     }
@@ -405,7 +393,7 @@ impl Deserialize for Header {
     type Error = Error;
 
     fn deserialize(src: &[u8]) -> Result<Self, Self::Error> {
-        let buf: [u8; Self::SIZE.get()] = match src {
+        let buf: [u8; HEADER] = match src {
             s if !s.starts_with(&MAGIC) => Err(Error::Magic),
             s if s[4] != VERSION => Err(Error::Version(s[4])),
             s => s.try_into().map_err(Error::Slice),
@@ -463,7 +451,7 @@ impl File {
         let path = path.as_ref().to_path_buf();
         let manifest = Manifest::default();
         let sector = Sector {
-            offset: Header::SECTOR.offset, // Manifest directly after header (no segments)
+            offset: { HEADER as u64 }.try_into()?, // Manifest directly after header (no segments)
             length: manifest.size()?,
         };
         let header = Header::new(sector);
