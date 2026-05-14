@@ -181,7 +181,7 @@ pub const HEADER: usize = size_of_val(&MAGIC) + size_of_val(&VERSION) + size_of:
 unsafe fn mmap(file: &fs::File, tail: NonZeroU64) -> Result<Mmap, Error> {
     let offset: u64 = HEADER.try_into()?;
     let length: usize = { tail.get() - offset }.try_into()?;
-    // SAFETY: Undefined behaviour if mapped file is modified (refer to function documentation).
+    // SAFETY: Undefined behaviour if mapped file is modified (refer to mmap documentation).
     unsafe { MmapOptions::new().offset(offset).len(length).map(file).map_err(Error::Io) }
 }
 
@@ -466,10 +466,10 @@ impl File {
         file.write_all(&header.serialize()?).await?;
         file.write_all(&manifest.serialize()?).await?;
         file.flush().await?;
-        // SAFETY: Undefined behaviour if mapped file is modified (refer to function documentation).
         let mmap = unsafe { mmap(&file, 0)? }.into();
         let writer = Writer { file, header, manifest }.into();
         Ok(Self { writer, mmap, path })
+        // SAFETY: Undefined behaviour if mapped file is modified (refer to mmap documentation).
     }
 
     /// Open an existing [clem](crate) file with read and write permissions at the specified
@@ -504,8 +504,8 @@ impl File {
             .open(&path)
             .await?;
         let header = Header::from_file(&mut file).await?;
-        // SAFETY: Undefined behaviour if mapped file is modified (refer to function documentation).
         let mmap = unsafe { mmap(&file, header.tail.get() as usize)? }.into();
+        // SAFETY: Undefined behaviour if mapped file is modified (refer to mmap documentation).
         let manifest = Manifest::from_file(&mut file, header.manifest).await?;
         let writer = Writer { file, header, manifest }.into();
         Ok(Self { writer, mmap, path })
