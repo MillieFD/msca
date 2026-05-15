@@ -192,7 +192,8 @@ impl Write for Manifest {
             true => pending.header.tail.checked_add(pending.size.get()),
             false => pending.header.manifest.next(),
         }
-        .ok_or(number::Error::Zero)?;
+        .ok_or(number::Error::Zero)?
+        .get();
         Ok(Sector { offset, length: self.size()? })
     }
 }

@@ -158,7 +158,7 @@ unsafe fn mmap(file: &fs::File, tail: NonZeroU64) -> Result<Mmap, Error> {
 pub struct Sector {
     /// Byte offset to the start of the sector.
     #[n(0)]
-    pub offset: NonZeroU64,
+    pub offset: u64,
     /// Total length of the sector in bytes.
     #[n(1)]
     pub length: NonZeroU64,
@@ -167,7 +167,7 @@ pub struct Sector {
 impl Sector {
     pub fn new<A, B>(offset: A, length: B) -> Result<Self, Error>
     where
-        A: TryInto<NonZeroU64>,
+        A: TryInto<u64>,
         B: TryInto<NonZeroU64>,
         Error: From<A::Error> + From<B::Error>,
     {
@@ -185,14 +185,12 @@ impl Sector {
     where
         F: AsyncSeek + Unpin + ?Sized,
     {
-        let offset = self.offset.get();
-        stream.seek(SeekFrom::Start(offset)).await.map_err(Error::from)
+        stream.seek(SeekFrom::Start(self.offset)).await.map_err(Error::from)
     }
 
     /// Returns the offset immediately following [`self`](Sector), or [`None`] on `u64` overflow.
     pub const fn next(&self) -> Option<NonZeroU64> {
-        let length = self.length.get();
-        self.offset.checked_add(length)
+        self.length.checked_add(self.offset)
     }
 }
 
@@ -216,7 +214,7 @@ impl Serialize for Sector {
     type Buffer = [u8; size_of::<Self>()];
 
     fn serialize_into(&self, buf: &mut [u8]) {
-        buf[..size_of::<NonZeroU64>()].copy_from_slice(self.offset.get().to_be_bytes().as_ref());
+        buf[..size_of::<NonZeroU64>()].copy_from_slice(self.offset.to_be_bytes().as_ref());
         buf[size_of::<NonZeroU64>()..].copy_from_slice(self.length.get().to_be_bytes().as_ref());
     }
 
@@ -246,11 +244,14 @@ pub(crate) struct Header {
 }
 
 impl Header {
-    /// todo → const doc comment
-    pub const TAIL: Sector = {
-        let offset = size_of_val(&MAGIC) + size_of_val(&VERSION);
-        let length = size_of::<NonZeroU64>();
-        Sector::new(offset, length)
+    /// [`Sector`] containing the mutable region of the file [`Header`]. Excludes the immutable
+    /// [magic bytes][1] and [version number][2].
+    ///
+    /// [1]: MAGIC
+    /// [2]: VERSION
+    const SECTOR: Sector = Sector {
+        offset: { size_of_val(&MAGIC) + size_of_val(&VERSION) } as u64,
+        length: NonZeroU64::new(size_of::<Self>() as u64).expect("Length is zero"),
     };
 
     /// Create a new [clem](crate) file [`Header`] pointing to the provided manifest [`Sector`].
@@ -261,8 +262,11 @@ impl Header {
     /// ```
     ///
     /// The `tail` and `manifest.offset` pointers are guaranteed to align exactly.
-    fn new(manifest: Sector) -> Self {
-        Self { tail: manifest.offset, manifest }
+    fn new(manifest: Sector) -> Result<Self, Error> {
+        Ok(Self {
+            tail: manifest.offset.try_into()?,
+            manifest,
+        })
     }
 
     /// [`Deserialize`] the file [`Header`] using the provided file [`Reader`](AsyncRead).
@@ -308,7 +312,7 @@ impl Deserialize for Header {
             s => s.try_into().map_err(Error::Slice),
         }?;
         let tail = NonZeroU64::deserialize(&buf[5..13])?;
-        let offset = NonZeroU64::deserialize(&buf[13..21])?;
+        let offset = u64::deserialize(&buf[13..21])?;
         let length = NonZeroU64::deserialize(&buf[21..29])?;
         let manifest = Sector { offset, length };
         Ok(Self { tail, manifest })
@@ -318,9 +322,16 @@ impl Deserialize for Header {
 /// An exclusive owned file handle for an open [`clem`](crate) dataset.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug)]
-pub(crate) struct File {
-    pub writer: RwLock<Writer>,
+pub struct File {
+    /// todo → field doc comment
+    pub file: fs::File,
+    /// todo → field doc comment
+    pub header: Header,
+    /// todo → field doc comment
+    pub manifest: Manifest,
+    /// todo → field doc comment
     pub mmap: Arc<Mmap>,
+    /// todo → field doc comment
     pub path: PathBuf,
 }
 
@@ -360,10 +371,10 @@ impl File {
         let path = path.as_ref().to_path_buf();
         let manifest = Manifest::default();
         let sector = Sector {
-            offset: { HEADER as u64 }.try_into()?, // Manifest directly after header (no segments)
+            offset: HEADER as u64, // Manifest directly after header (no segments)
             length: manifest.size()?,
         };
-        let header = Header::new(sector);
+        let header = Header::new(sector)?;
         let mut file = OpenOptions::new()
             .read(true)
             .write(true)
@@ -550,6 +561,14 @@ impl Deserialize for NonZeroU64 {
     type Error = Error;
 
     fn deserialize(src: &[u8]) -> Result<Self, Self::Error> {
+        u64::deserialize(src)?.try_into().map_err(Into::into)
+    }
+}
+
+impl Deserialize for u64 {
+    type Error = Error;
+
+    fn deserialize(src: &[u8]) -> Result<Self, Self::Error> {
         let buf = src
             .get(0..size_of::<Self>())
             .ok_or(Error::Truncated {
@@ -557,7 +576,7 @@ impl Deserialize for NonZeroU64 {
                 actual: src.len(),
             })?
             .try_into()?;
-        u64::from_le_bytes(buf).try_into().map_err(Error::from)
+        Ok(u64::from_le_bytes(buf))
     }
 }
 
@@ -606,7 +625,7 @@ impl<S: Segment> Write for S {
 
     fn sector(&self, header: &Header) -> Result<Sector, number::Error> {
         Ok(Sector {
-            offset: header.tail,
+            offset: header.tail.get(),
             length: self.size()?,
         })
     }
