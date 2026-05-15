@@ -281,62 +281,6 @@ impl Header {
         file.read_exact(&mut buf).await?;
         Header::deserialize(&buf)
     }
-
-    /// Returns a suitable [`Sector`] to write the specified [`Segment`]. This function is purely
-    /// predictive; no file IO is executed.
-    ///
-    /// New segments are appended from the [`tail`](NonZeroU64) position, overwriting the previous
-    /// manifest and any empty regions if present.
-    ///
-    /// ```text
-    /// [Header] [Segment 0] ... [Segment N] [New Segment] ... [New Manifest]
-    ///                                tail ↑                 ↑ manifest.offset
-    /// ```
-    ///
-    /// Refer to the [write-cycle](self) documentation for more details.
-    pub(crate) fn segment<S: Segment>(&self, src: &S) -> Result<Sector, number::Error> {
-        Ok(Sector { offset: self.tail, length: src.size()? })
-    }
-
-    /// Returns a suitable [`Sector`] to write the updated [`Manifest`].
-    ///
-    /// 1. Reserves space for the incoming [`Segment`]
-    /// 2. Does not overwrite the existing manifest
-    ///
-    /// This function is purely predictive; no file IO is executed.
-    ///
-    /// ```text
-    /// [Header] [Segment 0] ... [Segment N] [New Segment] ... [New Manifest]
-    ///                                tail ↑                 ↑ manifest.offset
-    /// ```
-    ///
-    /// Refer to the [write-cycle](self) documentation for more details.
-    ///
-    /// ### Errors
-    ///
-    /// Returns [`Error::Zero`] if a `u64` overflow occurs while calculating [`size`](NonZeroU64)
-    /// or [`offset`](NonZeroU64) for the relevant file regions.
-    async fn manifest<S: Segment>(&self, manifest: &Manifest, seg: &S) -> Result<Sector, Error> {
-        let length = seg.size()?;
-        let offset = match manifest.size()? < length {
-            true => self.tail.checked_add(length.get()),
-            false => self.manifest.next(),
-        }
-        .ok_or(Error::Zero)?;
-        Ok(Sector { offset, length })
-    }
-
-    /// todo → fn doc comment
-    async fn write<F>(&self, file: &mut F) -> Result<(), Error>
-    where
-        F: AsyncSeek + AsyncWrite + Unpin + ?Sized,
-    {
-        Self::SECTOR.seek_to_start(file).await?;
-        file.write_all(&self.serialize()?).await.map_err(Error::from)
-    }
-
-    /// todo → fn doc comment
-    fn update(&mut self) {}
 }
 
 impl Serialize for Header {
