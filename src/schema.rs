@@ -77,7 +77,7 @@ use minicbor::{CborLen, Decode, Encode};
 
 use self::number::Number;
 use crate::accumulate::{Accumulate, Flatten, OptBitVec, OptInSitu, OptSeq, Seq};
-use crate::io::File;
+use crate::io::{File, Write};
 use crate::manifest;
 
 /// Shorthand [`OccupiedEntry`] for a [`Column`] that already exists in the [`Schema`].
@@ -157,7 +157,7 @@ impl Schema {
     /// Returns an immutable reference to the inserted or existing [`manifest::Schema`] on success.
     pub fn finish(self, file: &mut File) -> Result<&manifest::Schema, Error> {
         let columns = self.columns.keys().cloned().map(Schema::map).collect();
-        let sector = file.header.segment(&self)?;
+        let sector = self.sector(&file.header)?;
         let schema = manifest::Schema { columns, sector };
         match file.manifest.schemas.entry(self.name) {
             Entry::Vacant(entry) => Ok(&*entry.insert(schema)),
