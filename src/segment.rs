@@ -37,12 +37,14 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //! This module performs **only** in-memory ⇄ byte-buffer transformations. File I/O is the
 //! responsibility of the [`crate::io`] module.
 
-use crate::schema::{Schema, number};
-use crate::{Serialize, accumulate};
-use minicbor::{CborLen, Decode, Encode};
 use std::convert::Infallible;
 use std::fmt::{Display, Formatter};
 use std::num::NonZeroU64;
+
+use minicbor::{CborLen, Decode, Encode};
+
+use crate::Serialize;
+use crate::schema::{Schema, number};
 
 /* ------------------------------------------------------------------------------ Public Exports */
 
