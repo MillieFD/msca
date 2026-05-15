@@ -169,8 +169,12 @@ pub(crate) struct Pending<'a> {
 impl Write for Manifest {
     type Ctx<'a> = Pending<'a>;
 
-    /// Returns a suitable [`Sector`] to write [`self`](Manifest), reserving space for the
-    /// [`Pending`] segment without overwriting the existing manifest.
+    /// Returns a suitable [`Sector`] to write the updated [`Manifest`].
+    ///
+    /// 1. Reserves space for the incoming [`Segment`]
+    /// 2. Does not overwrite the existing manifest
+    ///
+    /// This function is purely predictive; no file IO is executed.
     ///
     /// ```text
     /// [Header] [Segment 0] ... [Segment N] [New Segment] ... [New Manifest]
