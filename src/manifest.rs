@@ -139,6 +139,60 @@ impl Manifest {
     }
 }
 
+/// [`Write`] [`Context`](Write::Ctx) for the [`Manifest`]; carries the file [`Header`] and
+/// [`size`][1] of the incoming [`Segment`][2].
+///
+/// The new manifest is written prior to the incoming segment at an offset that preserves sufficient
+/// space without overwriting the existing on-disk manifest.
+///
+/// ```text
+///                                      Incoming Segment Sector
+///                                     ├───────────────────────┤
+/// [Header] [Segment 0] ... [Segment N] ... [Prev Manifest] ... [New Manifest]
+///                                tail ↑   ↑ manifest.offset
+/// ```
+///
+/// Refer to the [write-cycle](io) documentation for more details.
+///
+/// [1]: crate::segment::Segment::size
+/// [2]: crate::segment::Segment
+pub(crate) struct Pending<'a> {
+    /// File [`Header`] reference used to read the current `tail` and `manifest` sectors.
+    pub header: &'a Header,
+    /// Total [`size`][1] of the incoming [`Segment`][2] in bytes.
+    ///
+    /// [1]: crate::segment::Segment::size
+    /// [2]: crate::segment::Segment
+    pub size: NonZeroU64,
+}
+
+impl Write for Manifest {
+    type Ctx<'a> = Pending<'a>;
+
+    /// Returns a suitable [`Sector`] to write [`self`](Manifest), reserving space for the
+    /// [`Pending`] segment without overwriting the existing manifest.
+    ///
+    /// ```text
+    /// [Header] [Segment 0] ... [Segment N] [New Segment] ... [New Manifest]
+    ///                                tail ↑                 ↑ manifest.offset
+    /// ```
+    ///
+    /// Refer to the [write-cycle](io) documentation for more details.
+    ///
+    /// ### Errors
+    ///
+    /// Returns [`Error::Zero`](number::Error::Zero) if a `u64` overflow occurs while calculating
+    /// [`size`](NonZeroU64) or [`offset`](NonZeroU64) for the relevant file regions.
+    fn sector(&self, pending: Pending) -> Result<Sector, number::Error> {
+        let offset = match self.size()? < pending.size {
+            true => pending.header.tail.checked_add(pending.size.get()),
+            false => pending.header.manifest.next(),
+        }
+        .ok_or(number::Error::Zero)?;
+        Ok(Sector { offset, length: self.size()? })
+    }
+}
+
 impl Serialize for Manifest {
     type Buffer = Vec<u8>;
 
