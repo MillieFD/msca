@@ -411,23 +411,10 @@ impl File {
             .open(&path)
             .await?;
         let header = Header::from_file(&mut file).await?;
-        let mmap = unsafe { mmap(&file, header.tail.get() as usize)? }.into();
         // SAFETY: Undefined behaviour if mapped file is modified (refer to mmap documentation).
+        let mmap = unsafe { mmap(&file, header.tail)? }.into();
         let manifest = Manifest::from_file(&mut file, header.manifest).await?;
-        let writer = Writer { file, header, manifest }.into();
-        Ok(Self { writer, mmap, path })
-    }
-}
-
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Debug)]
-pub(crate) struct Writer {
-    pub file: fs::File,
-    pub header: Header,
-    pub manifest: Manifest,
-}
-
-impl Writer {
+        Ok(Self { file, header, manifest, mmap, path })
     }
 
     /// Returns a suitable [`Sector`] to write the updated [`Manifest`].
