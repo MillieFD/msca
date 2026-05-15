@@ -374,7 +374,7 @@ impl File {
         file.write_all(&header.serialize()?).await?;
         file.write_all(&manifest.serialize()?).await?;
         file.flush().await?;
-        // SAFETY: Undefined behaviour if mapped file is modified (refer to mmap documentation).
+        // SAFETY: Undefined behaviour if mapped region is modified (refer to mmap documentation).
         let mmap = unsafe { mmap(&file, header.tail)? }.into();
         Ok(Self { file, header, manifest, mmap, path })
     }
@@ -411,7 +411,7 @@ impl File {
             .open(&path)
             .await?;
         let header = Header::from_file(&mut file).await?;
-        // SAFETY: Undefined behaviour if mapped file is modified (refer to mmap documentation).
+        // SAFETY: Undefined behaviour if mapped region is modified (refer to mmap documentation).
         let mmap = unsafe { mmap(&file, header.tail)? }.into();
         let manifest = Manifest::from_file(&mut file, header.manifest).await?;
         Ok(Self { file, header, manifest, mmap, path })
