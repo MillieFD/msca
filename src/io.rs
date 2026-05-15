@@ -374,10 +374,9 @@ impl File {
         file.write_all(&header.serialize()?).await?;
         file.write_all(&manifest.serialize()?).await?;
         file.flush().await?;
-        let mmap = unsafe { mmap(&file, 0)? }.into();
-        let writer = Writer { file, header, manifest }.into();
-        Ok(Self { writer, mmap, path })
         // SAFETY: Undefined behaviour if mapped file is modified (refer to mmap documentation).
+        let mmap = unsafe { mmap(&file, header.tail)? }.into();
+        Ok(Self { file, header, manifest, mmap, path })
     }
 
     /// Open an existing [clem](crate) file with read and write permissions at the specified
