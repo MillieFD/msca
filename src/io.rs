@@ -90,7 +90,7 @@ use minicbor::{CborLen, Decode, Encode};
 use smol::fs::{self, OpenOptions};
 use smol::io::{AsyncRead, AsyncReadExt, AsyncSeek, AsyncSeekExt, AsyncWrite, AsyncWriteExt};
 
-use crate::manifest::Manifest;
+use crate::manifest::{Manifest, Pending};
 use crate::segment::Segment;
 use crate::{Serialize, number};
 
