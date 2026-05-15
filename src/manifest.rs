@@ -64,6 +64,7 @@ use std::num::NonZeroU64;
 use minicbor::{CborLen, Decode, Encode};
 use smol::io::{AsyncRead, AsyncReadExt};
 
+use crate::io::{Header, Write};
 use crate::{Deserialize, Sector, Serialize, io, number};
 
 /* ------------------------------------------------------------------------------ Public Exports */
