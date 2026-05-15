@@ -417,32 +417,25 @@ impl File {
         Ok(Self { file, header, manifest, mmap, path })
     }
 
-    /// Returns a suitable [`Sector`] to write the updated [`Manifest`].
+    /// Appends a new [`Segment`] to the file according to the [write-cycle](self).
     ///
-    /// 1. Reserves space for the incoming [`Segment`]
-    /// 2. Does not overwrite the existing manifest.
-    ///
-    /// This function is purely predictive; no file IO is executed.
-    ///
-    /// ```text
-    /// [Header] [Segment 0] ... [Segment N] [New Segment] ... [New Manifest]
-    ///                                tail ↑                 ↑ manifest.offset
-    /// ```
-    ///
-    /// Refer to the [module documentation](self) documentation for more details.
-    ///
-    /// ### Errors
-    ///
-    /// Returns [`Error::Zero`](number::Error::Zero) if a `u64` overflow occurs while calculating
-    /// [`size`](NonZeroU64) or [`offset`](NonZeroU64) for the relevant file regions.
-    pub async fn manifest<S: Segment>(&self, seg: &S) -> Result<Sector, number::Error> {
-        let length = seg.size()?;
-        let offset = match self.manifest.size()? < length {
-            true => self.header.tail.checked_add(length.get()),
-            false => self.header.manifest.next(),
-        }
-        .ok_or(number::Error::Zero)?;
-        Ok(Sector { offset, length })
+    /// Returns a read-only [`Mmap`] covering the immutable segment region.
+    async fn write<S: Segment>(&mut self, seg: S) -> Result<Mmap, Error> {
+        // Phase 1: Append the new manifest
+        let pending = Pending { header: &self.header, size: seg.size()? };
+        self.header.manifest = self.manifest.write_to_file(&mut self.file, pending).await?;
+        // Phase 2: Overwrite the file header manifest sector
+        self.header.write_to_file(&mut self.file, ()).await?;
+        // Phase 3: Append the new segment
+        self.header.tail = seg
+            .write_to_file(&mut self.file, &self.header)
+            .await?
+            .next()
+            .ok_or(number::Error::Zero)?;
+        // Phase 4: Overwrite the file header tail pointer
+        self.header.write_to_file(&mut self.file, ()).await?;
+        // SAFETY: Undefined behaviour if mapped region is modified (refer to mmap documentation).
+        unsafe { mmap(&self.file, self.header.tail) }
     }
 }
 
