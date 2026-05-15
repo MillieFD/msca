@@ -26,8 +26,8 @@ use bitvec::field::BitField;
 use bitvec::vec::BitVec;
 use minicbor::{CborLen, Decode, Encode};
 
-use crate::schema::Unfold;
 use crate::schema::number::Error;
+use crate::schema::Unfold;
 
 /* --------------------------------------------------------------------------- Data Accumulators */
 

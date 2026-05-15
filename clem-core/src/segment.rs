@@ -43,8 +43,8 @@ use std::num::NonZeroU64;
 
 use minicbor::{CborLen, Decode, Encode};
 
+use crate::schema::{number, Schema};
 use crate::Serialize;
-use crate::schema::{Schema, number};
 
 /* ------------------------------------------------------------------------------ Public Exports */
 

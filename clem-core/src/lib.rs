@@ -20,7 +20,7 @@ mod segment;
 
 /* ----------------------------------------------------------------------------- Private Imports */
 
-use std::num::{NonZeroU8, NonZeroU16, NonZeroU32, NonZeroU64, NonZeroU128};
+use std::num::{NonZeroU128, NonZeroU16, NonZeroU32, NonZeroU64, NonZeroU8};
 
 use self::accumulate::Serialize;
 use self::io::Deserialize;

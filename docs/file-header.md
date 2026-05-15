@@ -28,6 +28,7 @@ Implementers must reject any file with an unrecognised version number.
 [Header] [Segment 0] ... [Segment N] ... [Manifest] [Metadata]
                                tail ↑   ↑ manifest.offset
 ```
+
 The [`tail`][1] field records the byte offset immediately following the final committed segment.
 New segments are always appended from `tail`, not from EOF. An empty region may exist between
 `tail` and the start of the manifest when appending segments that are shorter than the combined

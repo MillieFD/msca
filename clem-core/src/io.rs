@@ -92,7 +92,7 @@ use smol::io::{AsyncRead, AsyncReadExt, AsyncSeek, AsyncSeekExt, AsyncWrite, Asy
 
 use crate::manifest::{Manifest, Pending};
 use crate::segment::Segment;
-use crate::{Serialize, number};
+use crate::{number, Serialize};
 
 /* ------------------------------------------------------------------------------ Public Exports */
 
