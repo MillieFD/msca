@@ -80,12 +80,6 @@ use crate::accumulate::{Accumulate, Flatten, OptBitVec, OptInSitu, OptSeq, Seq};
 use crate::io::{File, Write};
 use crate::manifest;
 
-/// Shorthand [`OccupiedEntry`] for a [`Column`] that already exists in the [`Schema`].
-type Occupied<'a> = OccupiedEntry<'a, String, Column>;
-
-/// Shorthand [`VacantEntry`] for a [`Column`] that does not yet exist in the [`Schema`].
-type Vacant<'a> = VacantEntry<'a, String, Column>;
-
 /* ------------------------------------------------------------------------------ Public Exports */
 
 /// A minimal schema **builder** wrapping a [`BTreeMap`] of [`Column`] descriptors keyed by name.
