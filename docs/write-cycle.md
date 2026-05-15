@@ -6,7 +6,7 @@ previous manifest is never overwritten before a new manifest pointer is committe
 
 Appending a new segment to the file – regardless of type – requires four phases:
 
-**Phase 1:** Write the new manifest at EOF.
+**Phase 1:** Write the new manifest
 
 The `Dataset` contains a `RwLock<Manifest>` field which is lazily initialised from disk on first access by:
 
@@ -39,7 +39,7 @@ be overwritten in the next write-cycle as the `tail` remains unmoved.
                                tail ↑   ↑ manifest.offset
 ```
 
-**Phase 2:** Update the file header manifest sector.
+**Phase 2:** Update the file header manifest sector
 
 The manifest `offset` and `length` fields in the file header are overwritten to point to the new manifest. The newly
 authoritative manifest references a (currently unwritten) segment after the `tail` pointer. A crash in phase 2 can
@@ -52,7 +52,7 @@ therefore be recovered by ignoring any manifest segments with offsets past the `
                                tail ↑                                       ↑ manifest.offset
 ```
 
-**Phase 3:** Write the incoming segment.
+**Phase 3:** Write the incoming segment
 
 The incoming segment is written starting from `tail` and overwriting the old manifest and any empty regions if present.
 Crash detection and recovery are identical to phase 2.
@@ -62,7 +62,7 @@ Crash detection and recovery are identical to phase 2.
                                tail ↑                 ↑ manifest.offset
 ```
 
-**Phase 4:** Update the file header tail pointer.
+**Phase 4:** Update the file header tail pointer
 
 The `tail` field is advanced to `tail + s`, pointing immediately after the end of the newly written segment. The
 write-cycle is complete with `manifest.offset <= tail` and the manifest correctly indexing all committed segments.
