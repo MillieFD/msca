@@ -3,15 +3,16 @@ unstable_features = true
 
 # See a full list of keys and their definitions at https://rust-lang.github.io/rustfmt
 
+chain_width = 100
 comment_width = 100
 condense_wildcard_suffixes = true
 format_code_in_doc_comments = true
 format_strings = true
+group_imports = "StdExternalCrate"
 hex_literal_case = "Upper"
 imports_granularity = "Module"
 imports_layout = "HorizontalVertical"
 newline_style = "Unix"
 normalize_doc_attributes = true
-reorder_impl_items = true
+struct_lit_width = 40
 style_edition = "2024"
-wrap_comments = true
