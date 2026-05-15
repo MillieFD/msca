@@ -17,7 +17,7 @@ The exiting in-memory manifest is updated to include the incoming segment. The n
 are written to a postition relative to `tail` depending on `s` and `m`:
 
 - `s > m` → The new segment is larger than the combined existing manifest and metadata. The new manifest is written
-  starting `s` bytes after `tail` to reserve the exact disk space required by the incomming segment. This introduces a
+  starting `s` bytes after `tail` to reserve the exact disk space required by the incoming segment. This introduces a
   transient empty region between the previous EOF and the new manifest offset.
 
 - `s == m` → The new segment exactly fills the space occupied by the old manifest and metadata. The new manifest is
