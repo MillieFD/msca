@@ -238,7 +238,7 @@ impl Deserialize for Manifest {
 /// on-disk data segments contain the columnar buffers.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode, CborLen)]
-pub(crate) struct Schema {
+pub struct Schema {
     /// Location of the schema segment including header.
     #[n(0)]
     pub sector: Sector,
