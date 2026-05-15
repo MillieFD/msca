@@ -24,7 +24,7 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //! Manifest
 //! ├─ metadata (optional)
 //! ├─ dictionaries: BTreeMap (optional)
-//! └─ schemas: BTreeMap
+//! ├─ schemas: BTreeMap
 //! ├─ <schema-name>
 //! │  ├─ sector: Sector
 //! │  └─ columns: BTreeMap
