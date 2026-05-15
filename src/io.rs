@@ -638,6 +638,57 @@ impl Deserialize for NonZeroU64 {
     }
 }
 
+/* ---------------------------------------------------------------------- Write Trait Definition */
+
+/// A **data type** that is written to the [clem](crate) file at a specific [location](Sector).
+pub(crate) trait Write: Serialize {
+    /// Additional context required to determine the target [`Sector`].
+    type Ctx<'a>;
+
+    /// Returns a suitable [`Sector`] to write [`Self`].
+    ///
+    /// This function is purely predictive; no file IO is executed. Implementing types can leverage
+    /// the associated [`Context`](Self::Ctx) type for dynamic sector identification at runtime.
+    ///
+    /// Refer to the [write-cycle](self) documentation for more details regarding the [clem](crate)
+    /// file layout.
+    fn sector(&self, ctx: Self::Ctx<'_>) -> Result<Sector, number::Error>;
+
+    /// Write [`Self`] to the file at the [`Sector`](Self::sector) computed from [`Ctx`](Self::Ctx).
+    ///
+    /// Returns the written [`Sector`] for subsequent function chaining.
+    async fn write_to_file<F>(&self, file: &mut F, ctx: Self::Ctx<'_>) -> Result<Sector, Error>
+    where
+        F: AsyncSeek + AsyncWrite + Unpin + ?Sized,
+    {
+        let sector = self.sector(ctx)?;
+        sector.seek_to_start(file).await?;
+        file.write_all(self.serialize()?.as_ref()).await?;
+        Ok(sector)
+    }
+}
+
+/* ------------------------------------------------------------------ Write Trait Implementation */
+
+impl Write for Header {
+    type Ctx<'a> = (); // No context required. Header sector is known at compile time.
+
+    fn sector(&self, _: ()) -> Result<Sector, number::Error> {
+        Ok(Header::SECTOR)
+    }
+}
+
+impl<S: Segment> Write for S {
+    type Ctx<'a> = &'a Header;
+
+    fn sector(&self, header: &Header) -> Result<Sector, number::Error> {
+        Ok(Sector {
+            offset: header.tail,
+            length: self.size()?,
+        })
+    }
+}
+
 /* --------------------------------------------------------------------------------------- Tests */
 
 #[cfg(test)]
