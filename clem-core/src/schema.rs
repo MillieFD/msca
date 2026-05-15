@@ -68,7 +68,7 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //! each `clem` file requires at least **one** schema segment. Multimodality and schema evolution
 //! are achieved by appending additional schema segments.
 
-use std::collections::btree_map::{BTreeMap, Entry, OccupiedEntry, VacantEntry};
+use std::collections::btree_map::{BTreeMap, Entry};
 use std::fmt::{Display, Formatter};
 use std::num;
 
