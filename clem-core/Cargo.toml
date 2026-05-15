@@ -1,0 +1,36 @@
+[package]
+name = "clem-core"
+version = "0.1.0"
+edition = "2024"
+description = "Core library for the clem storage engine."
+license = "BSD-3-Clause"
+authors = ["Amelia Fraser-Dale"]
+repository = "https://github.com/MillieFD/clem"
+
+[dependencies]
+smol = "2.0"
+memmap2 = "0.9"
+bitvec = "1.0"
+
+[dependencies.minicbor]
+version = "2.2"
+features = ["derive", "std"]
+
+[dependencies.serde]
+version = "1.0"
+features = ["derive"]
+optional = true
+
+[dependencies.log]
+version = "0.4"
+optional = true
+
+[dependencies.toml] # TODO Allow any format for metadata. Remove TOML dependency.
+version = "1.1"
+optional = true
+
+[features]
+default = []
+log = ["dep:log"] # TODO Implement logging.
+metadata = ["dep:toml"]
+serde = ["dep:serde"]

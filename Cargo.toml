@@ -15,29 +15,15 @@ unwrap_used = "deny"
 
 # See a full list of keys and their definitions at https://rust-lang.github.io/rust-clippy/stable/index.html
 
+[workspace]
+members = ["clem-core", "clem-derive"]
+
 [dependencies]
-smol = "2.0"
-memmap2 = "0.9"
-bitvec = "1.0"
-
-[dependencies.minicbor]
-version = "2.2"
-features = ["derive", "std"]
-
-[dependencies.serde]
-version = "1.0"
-features = ["derive"]
-optional = true
-
-[dependencies.log]
-version = "0.4"
-optional = true
-
-[dependencies.toml]
-version = "1.1"
-optional = true
+clem-core = { path = "clem-core" }
+clem-derive = { path = "clem-derive" }
 
 [features]
 default = []
-metadata = ["dep:toml"]
-serde = ["dep:serde"]
+log = ["clem-core/log"] # TODO Implement logging.
+metadata = ["clem-core/metadata"]
+serde = ["clem-core/serde"]

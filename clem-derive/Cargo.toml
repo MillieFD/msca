@@ -1,0 +1,16 @@
+[package]
+name = "clem-derive"
+version = "0.1.0"
+edition = "2024"
+description = "Derive macros for the clem storage engine."
+license = "BSD-3-Clause"
+authors = ["Amelia Fraser-Dale"]
+repository = "https://github.com/MillieFD/clem"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+syn = { version = "2", features = ["full"] }
+quote = "1"
+proc-macro2 = "1"

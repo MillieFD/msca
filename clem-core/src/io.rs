@@ -72,8 +72,8 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //! [1]: crate::segment::Variant
 //! [2]: std::collections::BTreeMap
 
-#![doc = include_str!("../docs/write-cycle.md")]
-#![doc = include_str!("../docs/read-cycle.md")]
+#![doc = include_str!("../../docs/write-cycle.md")]
+#![doc = include_str!("../../docs/read-cycle.md")]
 
 use std::array::TryFromSliceError;
 use std::cmp::Ordering;
