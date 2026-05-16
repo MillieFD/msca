@@ -107,7 +107,7 @@ where
         debug_assert!(size_of::<Option<T>>() > size_of::<T>(), "Use OptInSitu");
         Self {
             mask: BitVec::new(),
-            data: T::RawAcc::new(),
+            data: T::RawAcc::default(),
         }
     }
 }
@@ -179,7 +179,7 @@ impl<T: Unfold> Default for Seq<T> {
     fn default() -> Self {
         Self {
             offsets: Vec::new(),
-            data: T::RawAcc::new(),
+            data: T::RawAcc::default(),
         }
     }
 }
@@ -222,7 +222,7 @@ impl<T: Unfold> Default for OptSeq<T> {
     fn default() -> Self {
         Self {
             offsets: Vec::new(),
-            data: T::RawAcc::new(),
+            data: T::RawAcc::default(),
         }
     }
 }
@@ -241,16 +241,12 @@ pub trait Accumulate {
     /// The input type accepted by [`Self::push`].
     type Item;
 
-    /// Create a new empty instance of [`Self`].
-    #[rustfmt::skip] // Single line where clause improves readability
-    fn new() -> Self where Self: Sized;
-
     /// Returns a new empty instance of [`Self`] boxed as a trait object.
     fn boxed() -> Box<Self>
     where
-        Self: Sized,
+        Self: Sized + Default,
     {
-        Box::new(Self::new())
+        Box::new(Self::default())
     }
 
     /// Append a single value of `T` to [`Self`].
@@ -270,13 +266,6 @@ pub trait Accumulate {
 impl Accumulate for BitVec {
     type Item = bool;
 
-    fn new() -> Self
-    where
-        Self: Sized,
-    {
-        BitVec::new()
-    }
-
     fn push(&mut self, value: Self::Item) {
         BitVec::push(self, value);
     }
@@ -293,13 +282,6 @@ impl Accumulate for BitVec {
 impl<T> Accumulate for Vec<T> {
     type Item = T;
 
-    fn new() -> Self
-    where
-        Self: Sized,
-    {
-        Vec::new()
-    }
-
     fn push(&mut self, value: Self::Item) {
         Vec::push(self, value);
     }
@@ -315,14 +297,6 @@ impl<T> Accumulate for Vec<T> {
 
 impl<T> Accumulate for OptInSitu<T> {
     type Item = Option<T>;
-
-    fn new() -> Self
-    where
-        Self: Sized,
-    {
-        debug_assert_eq!(size_of::<Option<T>>(), size_of::<T>(), "Use OptBitVec");
-        Self { data: Vec::new() }
-    }
 
     fn push(&mut self, value: Self::Item) {
         self.data.push(value);
@@ -342,17 +316,6 @@ where
     T: Unfold + Default,
 {
     type Item = Option<T>;
-
-    fn new() -> Self
-    where
-        Self: Sized,
-    {
-        debug_assert!(size_of::<Option<T>>() > size_of::<T>(), "Use OptInSitu");
-        Self {
-            mask: BitVec::new(),
-            data: T::RawAcc::new(),
-        }
-    }
 
     fn push(&mut self, value: Self::Item) {
         self.mask.push(value.is_some());
@@ -374,16 +337,6 @@ where
     T: Unfold,
 {
     type Item = Vec<T>;
-
-    fn new() -> Self
-    where
-        Self: Sized,
-    {
-        Self {
-            offsets: Vec::new(),
-            data: T::RawAcc::new(),
-        }
-    }
 
     fn push(&mut self, value: Self::Item) {
         // 1. Calculate offset
@@ -409,16 +362,6 @@ where
     T: Unfold,
 {
     type Item = Option<Vec<T>>;
-
-    fn new() -> Self
-    where
-        Self: Sized,
-    {
-        Self {
-            offsets: Vec::new(),
-            data: T::RawAcc::new(),
-        }
-    }
 
     fn push(&mut self, value: Self::Item) {
         let prev = self.offsets.last().copied().flatten().unwrap_or(NonZeroU64::MIN);
@@ -447,13 +390,6 @@ where
     A: Accumulate<Item = Option<B>>,
 {
     type Item = Option<Option<B>>;
-
-    fn new() -> Self
-    where
-        Self: Sized,
-    {
-        Self(A::new())
-    }
 
     fn push(&mut self, value: Self::Item) {
         self.0.push(value.flatten());

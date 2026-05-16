@@ -524,10 +524,10 @@ where
 // TODO [2] link to procedural macro user guide
 pub(crate) trait Unfold: Sized {
     /// The [accumulator](Accumulate) type used to ingest unwrapped values of [`Self`].
-    type RawAcc: Accumulate<Item = Self> + 'static;
+    type RawAcc: Accumulate<Item = Self> + Default + 'static;
 
     /// The [accumulator](Accumulate) type used to ingest [optional](Option) values of [`Self`].
-    type OptAcc: Accumulate<Item = Option<Self>> + 'static;
+    type OptAcc: Accumulate<Item = Option<Self>> + Default + 'static;
 
     /// Delegates to [`unfold`](Unfolder::unfold) on the provided [`Unfolder`].
     fn with_unfolder<U>() -> Type
