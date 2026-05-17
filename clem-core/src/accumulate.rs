@@ -25,9 +25,12 @@ use std::num::*;
 use bitvec::field::BitField;
 use bitvec::vec::BitVec;
 use minicbor::{CborLen, Decode, Encode};
+use static_assertions::assert_eq_size;
 
 use crate::schema::number::Error;
 use crate::schema::Unfold;
+
+assert_eq_size!(char, u32);
 
 /* --------------------------------------------------------------------------- Data Accumulators */
 
@@ -60,6 +63,9 @@ pub struct OptInSitu<T> {
 
 impl<T> Default for OptInSitu<T> {
     fn default() -> Self {
+        // NOTE: cannot be a static assertion because `T` is a generic parameter; the niche
+        // invariant must be verified per monomorphisation, and `static_assertions` macros
+        // operate at module scope on concrete types.
         debug_assert_eq!(size_of::<Option<T>>(), size_of::<T>(), "Use OptBitVec");
         Self { data: Vec::new() }
     }
@@ -435,7 +441,6 @@ impl Serialize for char {
     type Buffer = [u8; size_of::<Self>()];
 
     fn serialize_into(&self, buf: &mut [u8]) {
-        debug_assert_eq!(size_of::<Self>(), size_of::<u32>(), "char is not 4 bytes");
         u32::from(*self).serialize_into(buf);
     }
 
@@ -884,6 +889,8 @@ where
         let size = self.size()?.get().try_into()?;
         let mut buf = Vec::with_capacity(size);
         self.serialize_into(&mut buf);
+        // NOTE: cannot be a static assertion; `buf.len()` and `size` are both runtime values
+        // derived from the serialised content.
         debug_assert_eq!(buf.len(), size, "actual size ≠ predicted size");
         Ok(buf)
     }
@@ -909,6 +916,8 @@ impl Serialize for BitVec {
         let size = self.size()?.get().try_into()?;
         let mut buf = Vec::with_capacity(size);
         self.serialize_into(&mut buf);
+        // NOTE: cannot be a static assertion; `buf.len()` and `size` are both runtime values
+        // derived from the serialised content.
         debug_assert_eq!(buf.len(), size, "actual size ≠ predicted size");
         Ok(buf)
     }
@@ -955,6 +964,8 @@ where
         let size = self.size()?.get().try_into()?;
         let mut buf = Vec::with_capacity(size);
         self.serialize_into(&mut buf);
+        // NOTE: cannot be a static assertion; `buf.len()` and `size` are both runtime values
+        // derived from the serialised content.
         debug_assert_eq!(buf.len(), size, "actual size ≠ predicted size");
         Ok(buf)
     }
@@ -982,6 +993,8 @@ where
         let size = self.size()?.get().try_into()?;
         let mut buf = Vec::with_capacity(size);
         self.serialize_into(&mut buf);
+        // NOTE: cannot be a static assertion; `buf.len()` and `size` are both runtime values
+        // derived from the serialised content.
         debug_assert_eq!(buf.len(), size, "actual size ≠ predicted size");
         Ok(buf)
     }
@@ -1009,6 +1022,8 @@ where
         let size = self.size()?.get().try_into()?;
         let mut buf = Vec::with_capacity(size);
         self.serialize_into(&mut buf);
+        // NOTE: cannot be a static assertion; `buf.len()` and `size` are both runtime values
+        // derived from the serialised content.
         debug_assert_eq!(buf.len(), size, "actual size ≠ predicted size");
         Ok(buf)
     }

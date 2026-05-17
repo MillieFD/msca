@@ -11,6 +11,7 @@ repository = "https://github.com/MillieFD/clem"
 smol = "2.0"
 memmap2 = "0.9"
 bitvec = "1.0"
+static_assertions = "1.1"
 
 [dependencies.minicbor]
 version = "2.2"
