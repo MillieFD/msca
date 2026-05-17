@@ -117,7 +117,7 @@ where
 /// ### Data Layout
 ///
 /// It is not possible to predetermine the disk space required by each instance of an unsized type;
-/// there is no guarantee that two [`Vec<T>`] contain the same number of elements. [`Clem`](crate)
+/// there is no guarantee that two [`Vec<T>`] contain the same number of elements. [Clem](crate)
 /// therefore unfolds unsized types into:
 ///
 /// 1. Columnar `offsets` bufffer describing boundaries.
