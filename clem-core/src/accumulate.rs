@@ -220,9 +220,9 @@ pub trait Accumulate {
     type Item;
 
     /// Returns a new empty instance of [`Self`] boxed as a trait object.
-    fn boxed() -> Box<Self>
+    fn boxed() -> Box<dyn Accumulate<Item = Self::Item>>
     where
-        Self: Sized + Default,
+        Self: 'static + Sized + Default,
     {
         Box::new(Self::default())
     }
