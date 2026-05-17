@@ -83,8 +83,8 @@ impl<T> Default for OptInSitu<T> {
 /// buffer for supported niche types; no validity mask required. Implementors are advised to use
 /// niche-optimised types when possible to improve storage efficiency and random read performance.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub(crate) struct OptBitVec<T: Unfold + Default> {
+#[derive(Debug, Default, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
     /// Validity mask where `true → `[`Some`] and `false → `[`None`].
     #[cfg_attr(
         feature = "serde",
@@ -97,19 +97,6 @@ pub(crate) struct OptBitVec<T: Unfold + Default> {
         serde(default, skip_serializing_if = "Accumulate::is_empty")
     )]
     pub data: T::RawAcc,
-}
-
-impl<T> Default for OptBitVec<T>
-where
-    T: Unfold + Default,
-{
-    fn default() -> Self {
-        debug_assert!(size_of::<Option<T>>() > size_of::<T>(), "Use OptInSitu");
-        Self {
-            mask: BitVec::new(),
-            data: T::RawAcc::default(),
-        }
-    }
 }
 
 /// Data accumulator for [unsized][1] values.
@@ -157,8 +144,8 @@ where
 ///
 /// [1]: https://doc.rust-lang.org/reference/dynamically-sized-types.html
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub(crate) struct Seq<T: Unfold> {
+#[derive(Debug, Default, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
     /// Cumulative end offsets. `offsets[i]` marks the inclusive end of element `i` and the
     /// exclusive start of element `i + 1`.
     #[cfg_attr(
@@ -173,15 +160,6 @@ pub(crate) struct Seq<T: Unfold> {
         serde(default, skip_serializing_if = "Accumulate::is_empty")
     )]
     pub data: T::RawAcc,
-}
-
-impl<T: Unfold> Default for Seq<T> {
-    fn default() -> Self {
-        Self {
-            offsets: Vec::new(),
-            data: T::RawAcc::default(),
-        }
-    }
 }
 
 /// Data accumulator for [optional](Option) [unsized][1] values.
@@ -202,8 +180,8 @@ impl<T: Unfold> Default for Seq<T> {
 ///
 /// [1]: https://doc.rust-lang.org/reference/dynamically-sized-types.html
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub(crate) struct OptSeq<T: Unfold> {
+#[derive(Debug, Default, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
     /// Cumulative end offsets per row; [`None`] marks a null row (no data appended).
     #[cfg_attr(
         feature = "serde",
@@ -216,15 +194,6 @@ pub(crate) struct OptSeq<T: Unfold> {
         serde(default, skip_serializing_if = "Accumulate::is_empty")
     )]
     pub data: T::RawAcc,
-}
-
-impl<T: Unfold> Default for OptSeq<T> {
-    fn default() -> Self {
-        Self {
-            offsets: Vec::new(),
-            data: T::RawAcc::default(),
-        }
-    }
 }
 
 /// Stateless type-level wrapper that flattens nested types on [`push`](Accumulate::push). All
