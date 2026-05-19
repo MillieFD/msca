@@ -523,10 +523,12 @@ where
 #[doc(hidden)]
 pub trait Unfold: Sized {
     /// The [accumulator](Accumulate) type used to ingest unwrapped values of [`Self`].
-    type RawAcc: Accumulate<Item = Self> + Default + 'static;
+    // NOTE: Buffer must be growable; the compiler cannot predict the number of accumulated elements
+    type RawAcc: Accumulate<Item = Self> + Serialize<Buffer = Vec<u8>> + Default + 'static;
 
     /// The [accumulator](Accumulate) type used to ingest [optional](Option) values of [`Self`].
-    type OptAcc: Accumulate<Item = Option<Self>> + Default + 'static;
+    // NOTE: Buffer must be growable; the compiler cannot predict the number of accumulated elements
+    type OptAcc: Accumulate<Item = Option<Self>> + Serialize<Buffer = Vec<u8>> + Default + 'static;
 
     /// Delegates to [`unfold`](Unfolder::unfold) on the provided [`Unfolder`].
     fn with_unfolder<U>() -> Type
