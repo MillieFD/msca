@@ -280,6 +280,12 @@ pub(crate) struct Column {
     pub buffers: Vec<Buffer>,
 }
 
+impl From<Type> for Column {
+    fn from(ty: Type) -> Self {
+        Column { ty, buffers: Vec::new() }
+    }
+}
+
 /// A minimal columnar buffer **descriptor** that specifies:
 ///
 /// 1. [`Sector`] where the buffer is located on disk.
