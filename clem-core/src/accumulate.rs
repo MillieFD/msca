@@ -90,7 +90,8 @@ impl<T> Default for OptInSitu<T> {
 /// niche-optimised types when possible to improve storage efficiency and random read performance.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Default, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub(crate) struct OptBitVec<T>
+#[doc(hidden)]
+pub struct OptBitVec<T>
 where
     T: Unfold + Default,
 {
@@ -154,7 +155,8 @@ where
 /// [1]: https://doc.rust-lang.org/reference/dynamically-sized-types.html
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Default, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub(crate) struct Seq<T>
+#[doc(hidden)]
+pub struct Seq<T>
 where
     T: Unfold,
 {
@@ -193,7 +195,8 @@ where
 /// [1]: https://doc.rust-lang.org/reference/dynamically-sized-types.html
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Default, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub(crate) struct OptSeq<T>
+#[doc(hidden)]
+pub struct OptSeq<T>
 where
     T: Unfold,
 {
@@ -215,7 +218,8 @@ where
 /// storage lives in the inner accumulator.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Default, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode, CborLen)]
-pub(crate) struct Flatten<T>(#[n(0)] pub T);
+#[doc(hidden)]
+pub struct Flatten<T>(#[n(0)] pub T);
 
 /* ----------------------------------------------------------------- Accumulate Trait Definition */
 
@@ -410,7 +414,8 @@ impl<T> Buffer for T where T: AsRef<[u8]> + AsMut<[u8]> {}
 
 /// A **type** that can be serialized into a canonical [`clem`](crate) binary representation for
 /// on-disk storage.
-pub(crate) trait Serialize {
+#[doc(hidden)]
+pub trait Serialize {
     /// The [`Buffer`] type returned by [`Self::serialize`].
     ///
     /// Fixed-size types can specify an appropriate array to leverage stack allocation. Unsized
