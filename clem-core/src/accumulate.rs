@@ -21,6 +21,7 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //! handling in-memory value accumulation.
 
 use std::num::*;
+use std::ops::Sub;
 
 use bitvec::field::BitField;
 use bitvec::vec::BitVec;
@@ -927,10 +928,13 @@ where
 
     fn size(&self) -> Result<NonZeroU64, Error> {
         // Recursively sum the sizes of all elements.
-        self.iter().try_fold(NonZeroU64::MIN, |total, element| {
-            let size = element.size()?.get();
-            total.checked_add(size).ok_or(Error::Zero)
-        })
+        self.iter()
+            .try_fold(NonZeroU64::MIN, |total, element| {
+                let size = element.size()?.get();
+                total.checked_add(size).ok_or(Error::Zero)
+            })?
+            .checked_add(8) // Add NonZeroU64 length prefix
+            .ok_or(Error::Zero)
     }
 
         self.iter().for_each(|v| v.serialize_into(buf))
