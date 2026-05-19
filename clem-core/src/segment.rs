@@ -90,9 +90,9 @@ impl Serialize for Header {
 
     fn serialize_into(&self, buf: &mut Self::Buffer) {
         // SAFETY: Header::Buffer size is Σ of fixed-size fields; guaranteed to fit all field bytes.
-        let one = buf.split_first_chunk_mut().expect("Buffer length < size_of::<u8>");
+        let one = buf.split_first_chunk_mut().expect("Buffer < u8::size");
         self.variant.serialize_into(one.0);
-        let two = one.1.split_first_chunk_mut().expect("Buffer length < size_of::<NonZeroU64>");
+        let two = one.1.split_first_chunk_mut().expect("Buffer < NonZeroU64::size");
         self.length.serialize_into(two.0);
     }
 
