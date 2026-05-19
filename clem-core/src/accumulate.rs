@@ -951,15 +951,19 @@ impl Serialize for BitVec {
 
     fn size(&self) -> Result<NonZeroU64, Error> {
         // Each byte encodes 8 bits; round up (↑) BitVec::len to the nearest whole byte.
-        let size: u64 = { (self.len() + 7) / 8 }.try_into()?;
-        size.try_into().map_err(Error::from)
+        let payload: u64 = self.len().div_ceil(8).try_into()?;
+        // Add NonZeroU64 length prefix
+        payload.checked_add(8).and_then(NonZeroU64::new).ok_or(Error::Zero)
     }
 
+    fn serialize_into(&self, buf: &mut Self::Buffer) {
+        // SAFETY: Self::size returns Error if BitVec::len overflows u64 (not expected)
+        let size = self.size().expect("u64 overflow in BitVec::size").get().sub(8).to_le_bytes();
+        buf.extend_from_slice(&size);
         // Intermediate chucks contain 8 bits in Lsb0 order. The final chunk may contain ≤ 8 bits.
         // BitVec::load_le packs each chunk into one u8 in LE order, padding with zeros if the final
         // chunk is shorter than 8 bits. The resulting bytes are copied into the provided buffer.
         self.chunks(8).zip(buf).for_each(|(bits, byte)| *byte = bits.load_le::<u8>());
-    fn serialize_into(&self, buf: &mut Self::Buffer) {
     }
 
     fn serialize(&self) -> Result<Self::Buffer, Error> {
