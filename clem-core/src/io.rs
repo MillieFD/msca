@@ -291,8 +291,9 @@ impl Serialize for Header {
     type Buffer = [u8; size_of::<Self>()];
 
     fn serialize_into(&self, buf: &mut [u8]) {
-        self.tail.serialize_into(buf);
-        self.manifest.serialize_into(buf);
+        let tail = size_of::<NonZeroU64>();
+        self.tail.serialize_into(&mut buf[..tail]);
+        self.manifest.serialize_into(&mut buf[tail..]);
     }
 
     fn serialize(&self) -> Result<Self::Buffer, number::Error> {
