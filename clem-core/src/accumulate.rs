@@ -937,8 +937,11 @@ where
             .ok_or(Error::Zero)
     }
 
-        self.iter().for_each(|v| v.serialize_into(buf))
     fn serialize_into(&self, buf: &mut Self::Buffer) {
+        // SAFETY: Self::size returns Error if Σ overflows u64 (not expected in production)
+        let size = self.size().expect("sum overflowed u64 in Vec::size").get().sub(8).to_le_bytes();
+        buf.extend_from_slice(&size);
+        // TODO → Serialise elements into buffer
     }
 
     fn serialize(&self) -> Result<Self::Buffer, Error> {
