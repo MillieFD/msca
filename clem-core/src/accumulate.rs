@@ -269,9 +269,13 @@ impl Accumulate for BitVec {
     fn is_empty(&self) -> bool {
         BitVec::is_empty(self)
     }
+
+    fn count(&self) -> u64 {
+        BitVec::len(self) as u64
+    }
 }
 
-impl<T> Accumulate for Vec<T> {
+impl<T: Serialize> Accumulate for Vec<T> {
     type Item = T;
 
     fn push(&mut self, value: Self::Item) {
@@ -285,9 +289,16 @@ impl<T> Accumulate for Vec<T> {
     fn is_empty(&self) -> bool {
         Vec::is_empty(self)
     }
+
+    fn count(&self) -> u64 {
+        Vec::len(self) as u64
+    }
 }
 
-impl<T> Accumulate for OptInSitu<T> {
+impl<T> Accumulate for OptInSitu<T>
+where
+    Option<T>: Serialize,
+{
     type Item = Option<T>;
 
     fn push(&mut self, value: Self::Item) {
@@ -300,6 +311,10 @@ impl<T> Accumulate for OptInSitu<T> {
 
     fn is_empty(&self) -> bool {
         self.data.is_empty()
+    }
+
+    fn count(&self) -> u64 {
+        self.data.count()
     }
 }
 
@@ -321,6 +336,10 @@ where
 
     fn is_empty(&self) -> bool {
         self.mask.is_empty() && self.data.is_empty()
+    }
+
+    fn count(&self) -> u64 {
+        self.mask.len() as u64
     }
 }
 
@@ -346,6 +365,10 @@ where
 
     fn is_empty(&self) -> bool {
         self.offsets.is_empty() && self.data.is_empty()
+    }
+
+    fn count(&self) -> u64 {
+        self.offsets.len() as u64
     }
 }
 
@@ -375,6 +398,10 @@ where
     fn is_empty(&self) -> bool {
         self.offsets.is_empty() && self.data.is_empty()
     }
+
+    fn count(&self) -> u64 {
+        self.offsets.len() as u64
+    }
 }
 
 impl<A, B> Accumulate for Flatten<A>
@@ -393,6 +420,10 @@ where
 
     fn is_empty(&self) -> bool {
         self.0.is_empty()
+    }
+
+    fn count(&self) -> u64 {
+        self.0.count()
     }
 }
 
