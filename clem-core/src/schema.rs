@@ -14,10 +14,10 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //!
 //! ### Unfolding Arbitrary Types
 //!
-//! `clem` understands **platform-agnostic** primitive types such as `u32` or `f64` out of the box.
-//! Platform-dependent types such as `usize` are deliberately omitted to ensure file portability.
-//! Arbitrary user-defined algebraic data types (structs and enums) are [unfolded](Unfold) into
-//! their primitive [components](Type).
+//! [`clem`](crate) understands **platform-agnostic** primitive types such as `u32` or `f64` out of
+//! the box. Platform-dependent types such as `usize` are deliberately omitted to ensure file
+//! portability. Arbitrary user-defined algebraic data types such as structs and enums are
+//! [unfolded](Unfold) into their primitive [components](Type).
 //!
 //! - **Leaf nodes** map to contiguous columnar data buffers by name.
 //! - **Internal nodes** exist purely for navigation and reconstruction.
