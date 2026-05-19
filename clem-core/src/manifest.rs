@@ -65,6 +65,7 @@ use minicbor::{CborLen, Decode, Encode};
 use smol::io::{AsyncRead, AsyncReadExt};
 
 use crate::io::{Header, Write};
+use crate::schema::Type;
 use crate::{io, number, Deserialize, Sector, Serialize};
 
 /* ------------------------------------------------------------------------------ Public Exports */
@@ -267,10 +268,13 @@ pub struct Schema {
 ///
 /// [`Vec`] order in-memory is **not** guaranteed to reflect [`Sector`] order on-disk.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Debug, Default, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode, CborLen)]
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode, CborLen)]
 pub(crate) struct Column {
+    /// The [`Type`] of values contained within this column.
+    #[n(0)]
+    ty: Type,
     /// List of [`Buffer`] descriptors for this column across all data segments.
-    #[cbor(n(0), skip_if = "Vec::is_empty")]
+    #[cbor(n(1), skip_if = "Vec::is_empty")]
     #[cfg_attr(
         feature = "serde",
         serde(default, skip_serializing_if = "Vec::is_empty")
