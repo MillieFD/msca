@@ -72,7 +72,7 @@ struct Header {
 mod variant {
     //! This module defines the segment [`Variant`] identifier and associated parsing [`Error`].
     //!
-    //! A [`clem`](crate) file is partitioned into self-describing **segments** which are immutable
+    //! A [clem](crate) file is partitioned into self-describing **segments** which are immutable
     //! once written. Each segment begins with a single [`Variant`] byte to identify the segment
     //! type and payload structure. Readers dispatch on the variant byte to specific decoders.
 
