@@ -191,6 +191,7 @@ mod variant {
 
 /// A self-describing on-disk **segment** prefixed by a [`Variant`] discriminant and an LE [`u64`]
 /// size field, followed by a variant-specific payload. See the [module level documentation](self).
+#[deprecated(note = "Segment trait is currently unneeded and available for repurposing.")]
 pub trait Segment: Serialize {
     /// On-disk variant identifier for [`Self`]. Stored in the first byte of the segment header.
     const VARIANT: Variant;
