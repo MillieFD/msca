@@ -83,7 +83,6 @@ use std::io::SeekFrom;
 use std::num::{NonZeroU64, TryFromIntError};
 use std::ops::Add;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 
 use memmap2::{Mmap, MmapOptions};
 use minicbor::{CborLen, Decode, Encode};
@@ -332,8 +331,6 @@ pub struct File {
     /// todo → field doc comment
     pub manifest: Manifest,
     /// todo → field doc comment
-    pub mmap: Arc<Mmap>,
-    /// todo → field doc comment
     pub path: PathBuf,
 }
 
@@ -388,8 +385,9 @@ impl File {
         file.write_all(&manifest.serialize()?).await?;
         file.flush().await?;
         // SAFETY: Undefined behaviour if mapped region is modified (refer to mmap documentation).
-        let mmap = unsafe { mmap(&file, header.tail)? }.into();
-        Ok(Self { file, header, manifest, mmap, path })
+        // TODO → Move mmap initialisation to calling dataset
+        let mmap = unsafe { mmap(&file, header.tail)? };
+        Ok(Self { file, header, manifest, path })
     }
 
     /// Open an existing [clem](crate) file with read and write permissions at the specified
@@ -425,9 +423,10 @@ impl File {
             .await?;
         let header = Header::from_file(&mut file).await?;
         // SAFETY: Undefined behaviour if mapped region is modified (refer to mmap documentation).
-        let mmap = unsafe { mmap(&file, header.tail)? }.into();
+        // TODO → Move mmap initialisation to calling dataset
+        let mmap = unsafe { mmap(&file, header.tail)? };
         let manifest = Manifest::from_file(&mut file, header.manifest).await?;
-        Ok(Self { file, header, manifest, mmap, path })
+        Ok(Self { file, header, manifest, path })
     }
 
     /// Append a new [`Segment`] to the file according to the [write-cycle](self).
