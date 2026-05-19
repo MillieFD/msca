@@ -489,8 +489,8 @@ pub trait Serialize {
         size.try_into().map_err(Error::from)
     }
 
-    /// Serialize `self` and append the encoded bytes to the provided existent [`Buffer`].
-    fn serialize_into(&self, buf: &mut [u8]);
+    /// Serialize `self` into the provided [`Buffer`].
+    fn serialize_into(&self, buf: &mut Self::Buffer);
 
     /// Serialize `self` and return the encoded bytes in a new [`Buffer`].
     fn serialize(&self) -> Result<Self::Buffer, Error>;
