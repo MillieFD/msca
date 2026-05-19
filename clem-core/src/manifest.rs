@@ -208,9 +208,9 @@ impl Serialize for Manifest {
         size.try_into().map_err(number::Error::Convert)
     }
 
-    fn serialize_into(&self, buf: &mut [u8]) {
+    fn serialize_into(&self, buf: &mut Self::Buffer) {
         // SAFETY: minicbor::encode is infallible when writing to Vec<u8>
-        minicbor::encode(self, buf).expect("Failed to encode manifest as CBOR");
+        minicbor::encode(self, buf).expect("Infallible manifest CBOR encode failed");
     }
 
     fn serialize(&self) -> Result<Self::Buffer, number::Error> {
@@ -270,7 +270,7 @@ pub struct Schema {
 pub(crate) struct Column {
     /// The [`Type`] of values contained within this column.
     #[n(0)]
-    ty: Type,
+    pub ty: Type,
     /// List of [`Buffer`] descriptors for this column across all data segments.
     #[cbor(n(1), skip_if = "Vec::is_empty")]
     #[cfg_attr(
