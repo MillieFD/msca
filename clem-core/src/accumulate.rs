@@ -440,7 +440,7 @@ pub(crate) trait Serialize {
 impl Serialize for char {
     type Buffer = [u8; size_of::<Self>()];
 
-    fn serialize_into(&self, buf: &mut [u8]) {
+    fn serialize_into(&self, buf: &mut Self::Buffer) {
         static_assertions::assert_eq_size!(char, u32);
         u32::from(*self).serialize_into(buf);
     }
@@ -453,7 +453,7 @@ impl Serialize for char {
 impl Serialize for u8 {
     type Buffer = [u8; size_of::<Self>()];
 
-    fn serialize_into(&self, buf: &mut [u8]) {
+    fn serialize_into(&self, buf: &mut Self::Buffer) {
         buf[0] = *self;
     }
 
@@ -465,9 +465,8 @@ impl Serialize for u8 {
 impl Serialize for u16 {
     type Buffer = [u8; size_of::<Self>()];
 
-    fn serialize_into(&self, buf: &mut [u8]) {
-        let bytes = self.to_le_bytes();
-        buf.copy_from_slice(&bytes);
+    fn serialize_into(&self, buf: &mut Self::Buffer) {
+        *buf = self.to_le_bytes();
     }
 
     fn serialize(&self) -> Result<Self::Buffer, Error> {
@@ -478,9 +477,8 @@ impl Serialize for u16 {
 impl Serialize for u32 {
     type Buffer = [u8; size_of::<Self>()];
 
-    fn serialize_into(&self, buf: &mut [u8]) {
-        let bytes = self.to_le_bytes();
-        buf.copy_from_slice(&bytes);
+    fn serialize_into(&self, buf: &mut Self::Buffer) {
+        *buf = self.to_le_bytes();
     }
 
     fn serialize(&self) -> Result<Self::Buffer, Error> {
@@ -491,9 +489,8 @@ impl Serialize for u32 {
 impl Serialize for u64 {
     type Buffer = [u8; size_of::<Self>()];
 
-    fn serialize_into(&self, buf: &mut [u8]) {
-        let bytes = self.to_le_bytes();
-        buf.copy_from_slice(&bytes);
+    fn serialize_into(&self, buf: &mut Self::Buffer) {
+        *buf = self.to_le_bytes();
     }
 
     fn serialize(&self) -> Result<Self::Buffer, Error> {
@@ -504,9 +501,8 @@ impl Serialize for u64 {
 impl Serialize for u128 {
     type Buffer = [u8; size_of::<Self>()];
 
-    fn serialize_into(&self, buf: &mut [u8]) {
-        let bytes = self.to_le_bytes();
-        buf.copy_from_slice(&bytes);
+    fn serialize_into(&self, buf: &mut Self::Buffer) {
+        *buf = self.to_le_bytes();
     }
 
     fn serialize(&self) -> Result<Self::Buffer, Error> {
@@ -517,7 +513,7 @@ impl Serialize for u128 {
 impl Serialize for NonZeroU8 {
     type Buffer = [u8; size_of::<Self>()];
 
-    fn serialize_into(&self, buf: &mut [u8]) {
+    fn serialize_into(&self, buf: &mut Self::Buffer) {
         self.get().serialize_into(buf);
     }
 
@@ -529,7 +525,7 @@ impl Serialize for NonZeroU8 {
 impl Serialize for NonZeroU16 {
     type Buffer = [u8; size_of::<Self>()];
 
-    fn serialize_into(&self, buf: &mut [u8]) {
+    fn serialize_into(&self, buf: &mut Self::Buffer) {
         self.get().serialize_into(buf);
     }
 
@@ -541,7 +537,7 @@ impl Serialize for NonZeroU16 {
 impl Serialize for NonZeroU32 {
     type Buffer = [u8; size_of::<Self>()];
 
-    fn serialize_into(&self, buf: &mut [u8]) {
+    fn serialize_into(&self, buf: &mut Self::Buffer) {
         self.get().serialize_into(buf);
     }
 
@@ -553,7 +549,7 @@ impl Serialize for NonZeroU32 {
 impl Serialize for NonZeroU64 {
     type Buffer = [u8; size_of::<Self>()];
 
-    fn serialize_into(&self, buf: &mut [u8]) {
+    fn serialize_into(&self, buf: &mut Self::Buffer) {
         self.get().serialize_into(buf);
     }
 
@@ -565,7 +561,7 @@ impl Serialize for NonZeroU64 {
 impl Serialize for NonZeroU128 {
     type Buffer = [u8; size_of::<Self>()];
 
-    fn serialize_into(&self, buf: &mut [u8]) {
+    fn serialize_into(&self, buf: &mut Self::Buffer) {
         self.get().serialize_into(buf);
     }
 
@@ -577,9 +573,8 @@ impl Serialize for NonZeroU128 {
 impl Serialize for i8 {
     type Buffer = [u8; size_of::<Self>()];
 
-    fn serialize_into(&self, buf: &mut [u8]) {
-        let bytes = self.to_le_bytes();
-        buf.copy_from_slice(&bytes);
+    fn serialize_into(&self, buf: &mut Self::Buffer) {
+        *buf = self.to_le_bytes();
     }
 
     fn serialize(&self) -> Result<Self::Buffer, Error> {
@@ -590,9 +585,8 @@ impl Serialize for i8 {
 impl Serialize for i16 {
     type Buffer = [u8; size_of::<Self>()];
 
-    fn serialize_into(&self, buf: &mut [u8]) {
-        let bytes = self.to_le_bytes();
-        buf.copy_from_slice(&bytes);
+    fn serialize_into(&self, buf: &mut Self::Buffer) {
+        *buf = self.to_le_bytes();
     }
 
     fn serialize(&self) -> Result<Self::Buffer, Error> {
@@ -603,9 +597,8 @@ impl Serialize for i16 {
 impl Serialize for i32 {
     type Buffer = [u8; size_of::<Self>()];
 
-    fn serialize_into(&self, buf: &mut [u8]) {
-        let bytes = self.to_le_bytes();
-        buf.copy_from_slice(&bytes);
+    fn serialize_into(&self, buf: &mut Self::Buffer) {
+        *buf = self.to_le_bytes();
     }
 
     fn serialize(&self) -> Result<Self::Buffer, Error> {
@@ -616,9 +609,8 @@ impl Serialize for i32 {
 impl Serialize for i64 {
     type Buffer = [u8; size_of::<Self>()];
 
-    fn serialize_into(&self, buf: &mut [u8]) {
-        let bytes = self.to_le_bytes();
-        buf.copy_from_slice(&bytes);
+    fn serialize_into(&self, buf: &mut Self::Buffer) {
+        *buf = self.to_le_bytes();
     }
 
     fn serialize(&self) -> Result<Self::Buffer, Error> {
@@ -629,9 +621,8 @@ impl Serialize for i64 {
 impl Serialize for i128 {
     type Buffer = [u8; size_of::<Self>()];
 
-    fn serialize_into(&self, buf: &mut [u8]) {
-        let bytes = self.to_le_bytes();
-        buf.copy_from_slice(&bytes);
+    fn serialize_into(&self, buf: &mut Self::Buffer) {
+        *buf = self.to_le_bytes();
     }
 
     fn serialize(&self) -> Result<Self::Buffer, Error> {
@@ -642,7 +633,7 @@ impl Serialize for i128 {
 impl Serialize for NonZeroI8 {
     type Buffer = [u8; size_of::<Self>()];
 
-    fn serialize_into(&self, buf: &mut [u8]) {
+    fn serialize_into(&self, buf: &mut Self::Buffer) {
         self.get().serialize_into(buf);
     }
 
@@ -654,7 +645,7 @@ impl Serialize for NonZeroI8 {
 impl Serialize for NonZeroI16 {
     type Buffer = [u8; size_of::<Self>()];
 
-    fn serialize_into(&self, buf: &mut [u8]) {
+    fn serialize_into(&self, buf: &mut Self::Buffer) {
         self.get().serialize_into(buf);
     }
 
@@ -666,7 +657,7 @@ impl Serialize for NonZeroI16 {
 impl Serialize for NonZeroI32 {
     type Buffer = [u8; size_of::<Self>()];
 
-    fn serialize_into(&self, buf: &mut [u8]) {
+    fn serialize_into(&self, buf: &mut Self::Buffer) {
         self.get().serialize_into(buf);
     }
 
@@ -678,7 +669,7 @@ impl Serialize for NonZeroI32 {
 impl Serialize for NonZeroI64 {
     type Buffer = [u8; size_of::<Self>()];
 
-    fn serialize_into(&self, buf: &mut [u8]) {
+    fn serialize_into(&self, buf: &mut Self::Buffer) {
         self.get().serialize_into(buf);
     }
 
@@ -690,7 +681,7 @@ impl Serialize for NonZeroI64 {
 impl Serialize for NonZeroI128 {
     type Buffer = [u8; size_of::<Self>()];
 
-    fn serialize_into(&self, buf: &mut [u8]) {
+    fn serialize_into(&self, buf: &mut Self::Buffer) {
         self.get().serialize_into(buf);
     }
 
@@ -702,9 +693,8 @@ impl Serialize for NonZeroI128 {
 impl Serialize for f32 {
     type Buffer = [u8; size_of::<Self>()];
 
-    fn serialize_into(&self, buf: &mut [u8]) {
-        let bytes = self.to_le_bytes();
-        buf.copy_from_slice(&bytes);
+    fn serialize_into(&self, buf: &mut Self::Buffer) {
+        *buf = self.to_le_bytes();
     }
 
     fn serialize(&self) -> Result<Self::Buffer, Error> {
@@ -715,9 +705,8 @@ impl Serialize for f32 {
 impl Serialize for f64 {
     type Buffer = [u8; size_of::<Self>()];
 
-    fn serialize_into(&self, buf: &mut [u8]) {
-        let bytes = self.to_le_bytes();
-        buf.copy_from_slice(&bytes);
+    fn serialize_into(&self, buf: &mut Self::Buffer) {
+        *buf = self.to_le_bytes();
     }
 
     fn serialize(&self) -> Result<Self::Buffer, Error> {
@@ -728,7 +717,7 @@ impl Serialize for f64 {
 impl Serialize for Option<char> {
     type Buffer = [u8; size_of::<Self>()];
 
-    fn serialize_into(&self, buf: &mut [u8]) {
+    fn serialize_into(&self, buf: &mut Self::Buffer) {
         // None writes u32::MAX (outside the valid scalar range).
         self.map_or(u32::MAX, u32::from).serialize_into(buf);
     }
@@ -741,7 +730,7 @@ impl Serialize for Option<char> {
 impl Serialize for Option<NonZeroU8> {
     type Buffer = [u8; size_of::<Self>()];
 
-    fn serialize_into(&self, buf: &mut [u8]) {
+    fn serialize_into(&self, buf: &mut Self::Buffer) {
         // None writes u8::MIN (outside the valid non-zero range).
         self.map_or(u8::MIN, NonZeroU8::get).serialize_into(buf)
     }
@@ -754,7 +743,7 @@ impl Serialize for Option<NonZeroU8> {
 impl Serialize for Option<NonZeroU16> {
     type Buffer = [u8; size_of::<Self>()];
 
-    fn serialize_into(&self, buf: &mut [u8]) {
+    fn serialize_into(&self, buf: &mut Self::Buffer) {
         // None writes u16::MIN (outside the valid non-zero range).
         self.map_or(u16::MIN, NonZeroU16::get).serialize_into(buf)
     }
@@ -767,7 +756,7 @@ impl Serialize for Option<NonZeroU16> {
 impl Serialize for Option<NonZeroU32> {
     type Buffer = [u8; size_of::<Self>()];
 
-    fn serialize_into(&self, buf: &mut [u8]) {
+    fn serialize_into(&self, buf: &mut Self::Buffer) {
         // None writes u32::MIN (outside the valid non-zero range).
         self.map_or(u32::MIN, NonZeroU32::get).serialize_into(buf)
     }
@@ -780,7 +769,7 @@ impl Serialize for Option<NonZeroU32> {
 impl Serialize for Option<NonZeroU64> {
     type Buffer = [u8; size_of::<Self>()];
 
-    fn serialize_into(&self, buf: &mut [u8]) {
+    fn serialize_into(&self, buf: &mut Self::Buffer) {
         // None writes u64::MIN (outside the valid non-zero range).
         self.map_or(u64::MIN, NonZeroU64::get).serialize_into(buf)
     }
@@ -793,7 +782,7 @@ impl Serialize for Option<NonZeroU64> {
 impl Serialize for Option<NonZeroU128> {
     type Buffer = [u8; size_of::<Self>()];
 
-    fn serialize_into(&self, buf: &mut [u8]) {
+    fn serialize_into(&self, buf: &mut Self::Buffer) {
         // None writes u128::MIN (outside the valid non-zero range).
         self.map_or(u128::MIN, NonZeroU128::get).serialize_into(buf)
     }
@@ -806,7 +795,7 @@ impl Serialize for Option<NonZeroU128> {
 impl Serialize for Option<NonZeroI8> {
     type Buffer = [u8; size_of::<Self>()];
 
-    fn serialize_into(&self, buf: &mut [u8]) {
+    fn serialize_into(&self, buf: &mut Self::Buffer) {
         // None writes 0i8 (outside the valid non-zero range).
         self.map_or(0i8, NonZeroI8::get).serialize_into(buf)
     }
@@ -819,7 +808,7 @@ impl Serialize for Option<NonZeroI8> {
 impl Serialize for Option<NonZeroI16> {
     type Buffer = [u8; size_of::<Self>()];
 
-    fn serialize_into(&self, buf: &mut [u8]) {
+    fn serialize_into(&self, buf: &mut Self::Buffer) {
         // None writes 0i16 (outside the valid non-zero range).
         self.map_or(0i16, NonZeroI16::get).serialize_into(buf)
     }
@@ -832,7 +821,7 @@ impl Serialize for Option<NonZeroI16> {
 impl Serialize for Option<NonZeroI32> {
     type Buffer = [u8; size_of::<Self>()];
 
-    fn serialize_into(&self, buf: &mut [u8]) {
+    fn serialize_into(&self, buf: &mut Self::Buffer) {
         // None writes 0i32 (outside the valid non-zero range).
         self.map_or(0i32, NonZeroI32::get).serialize_into(buf)
     }
@@ -845,7 +834,7 @@ impl Serialize for Option<NonZeroI32> {
 impl Serialize for Option<NonZeroI64> {
     type Buffer = [u8; size_of::<Self>()];
 
-    fn serialize_into(&self, buf: &mut [u8]) {
+    fn serialize_into(&self, buf: &mut Self::Buffer) {
         // None writes 0i64 (outside the valid non-zero range).
         self.map_or(0i64, NonZeroI64::get).serialize_into(buf)
     }
@@ -858,7 +847,7 @@ impl Serialize for Option<NonZeroI64> {
 impl Serialize for Option<NonZeroI128> {
     type Buffer = [u8; size_of::<Self>()];
 
-    fn serialize_into(&self, buf: &mut [u8]) {
+    fn serialize_into(&self, buf: &mut Self::Buffer) {
         // None writes 0i128 (outside the valid non-zero range).
         self.map_or(0i128, NonZeroI128::get).serialize_into(buf)
     }
@@ -882,8 +871,8 @@ where
         })
     }
 
-    fn serialize_into(&self, buf: &mut [u8]) {
         self.iter().for_each(|v| v.serialize_into(buf))
+    fn serialize_into(&self, buf: &mut Self::Buffer) {
     }
 
     fn serialize(&self) -> Result<Self::Buffer, Error> {
@@ -905,11 +894,11 @@ impl Serialize for BitVec {
         size.try_into().map_err(Error::from)
     }
 
-    fn serialize_into(&self, buf: &mut [u8]) {
         // Intermediate chucks contain 8 bits in Lsb0 order. The final chunk may contain ≤ 8 bits.
         // BitVec::load_le packs each chunk into one u8 in LE order, padding with zeros if the final
         // chunk is shorter than 8 bits. The resulting bytes are copied into the provided buffer.
         self.chunks(8).zip(buf).for_each(|(bits, byte)| *byte = bits.load_le::<u8>());
+    fn serialize_into(&self, buf: &mut Self::Buffer) {
     }
 
     fn serialize(&self) -> Result<Self::Buffer, Error> {
@@ -932,7 +921,7 @@ where
         self.data.size()
     }
 
-    fn serialize_into(&self, buf: &mut [u8]) {
+    fn serialize_into(&self, buf: &mut Self::Buffer) {
         self.data.serialize_into(buf)
     }
 
@@ -954,7 +943,7 @@ where
         mask.checked_add(data).ok_or(Error::Zero)
     }
 
-    fn serialize_into(&self, buf: &mut [u8]) {
+    fn serialize_into(&self, buf: &mut Self::Buffer) {
         self.mask.serialize_into(buf);
         self.data.serialize_into(buf);
     }
@@ -982,7 +971,7 @@ where
         offsets.checked_add(data).ok_or(Error::Zero)
     }
 
-    fn serialize_into(&self, buf: &mut [u8]) {
+    fn serialize_into(&self, buf: &mut Self::Buffer) {
         self.offsets.serialize_into(buf);
         self.data.serialize_into(buf);
     }
@@ -1010,7 +999,7 @@ where
         offsets.checked_add(data).ok_or(Error::Zero)
     }
 
-    fn serialize_into(&self, buf: &mut [u8]) {
+    fn serialize_into(&self, buf: &mut Self::Buffer) {
         self.offsets.serialize_into(buf);
         self.data.serialize_into(buf);
     }
@@ -1035,7 +1024,7 @@ where
         self.0.size() // Transparent wrapper
     }
 
-    fn serialize_into(&self, buf: &mut [u8]) {
+    fn serialize_into(&self, buf: &mut Self::Buffer) {
         self.0.serialize_into(buf); // Transparent wrapper
     }
 
