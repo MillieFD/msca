@@ -436,6 +436,27 @@ where
     }
 }
 
+/// Blanket [`Accumulate`] implementation for the type-erased [`Accumulator`] trait object.
+impl<I> Accumulate for Box<dyn Accumulate<Item = I, Buffer = Vec<u8>>> {
+    type Item = I;
+
+    fn push(&mut self, value: Self::Item) {
+        (**self).push(value)
+    }
+
+    fn discard(&mut self) {
+        (**self).discard()
+    }
+
+    fn is_empty(&self) -> bool {
+        (**self).is_empty()
+    }
+
+    fn count(&self) -> u64 {
+        (**self).count()
+    }
+}
+
 /* ------------------------------------------------------------------ Serialize Trait Definition */
 
 /// A **buffer** that can hold the serialized byte representation of a value.
