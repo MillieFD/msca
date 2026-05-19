@@ -14,9 +14,9 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //!
 //! ### Segment Composition
 //!
-//! A [`clem`](crate) file is partitioned into self-describing **segments** which are immutable
-//! once written. Each segment begins with a minimal header consisting of a [`variant: u8`](Variant)
-//! identifier and [`length: NonZeroU64`](NonZeroU64).
+//! A [clem](crate) file is partitioned into self-describing **segments** which are immutable once
+//! written. Each segment begins with a minimal header, consisting of a [`variant: u8`](Variant)
+//! identifier and [`length: NonZeroU64`](NonZeroU64), followed by a variant-specific payload.
 //!
 //! - [`Schema`] segments describe the structure of encoded data.
 //! - [`Data`] segments carry columnar buffers for a specified schema instance.
@@ -34,8 +34,10 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //!
 //! ### Module Boundary
 //!
-//! This module performs **only** in-memory ⇄ byte-buffer transformations. File I/O is the
-//! responsibility of the [`crate::io`] module.
+//! This module performs in-memory ⇄ byte-buffer transformations **only**. See the
+//! [IO module](crate::io) for interaction with the underlying [`File`][1].
+//!
+//! [1]: crate::io::File
 
 use std::convert::Infallible;
 use std::fmt::{Display, Formatter};
