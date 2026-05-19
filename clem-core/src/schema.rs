@@ -439,6 +439,16 @@ pub mod number {
             Self::Convert(e)
         }
     }
+
+    //noinspection DuplicatedCode → Conversion is implemented for error types in different modules.
+    impl<T, E> From<Error> for Result<T, E>
+    where
+        E: From<Error>,
+    {
+        fn from(error: Error) -> Self {
+            Err(E::from(error))
+        }
+    }
 }
 
 /* ------------------------------------------------------------------------------ Specific Error */
