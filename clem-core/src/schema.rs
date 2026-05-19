@@ -151,8 +151,8 @@ impl Schema {
     ///
     /// Returns an immutable reference to the inserted or existing [`manifest::Schema`] on success.
     pub fn finish(self, file: &mut File) -> Result<&manifest::Schema, Error> {
-        let columns = self.columns.keys().cloned().map(Schema::map).collect();
         let sector = self.sector(&file.header)?;
+        let columns = self.columns.into_iter().map(Schema::map).collect();
         let schema = manifest::Schema { columns, sector };
         match file.manifest.schemas.entry(self.name) {
             Entry::Vacant(entry) => Ok(&*entry.insert(schema)),
