@@ -257,12 +257,12 @@ impl Serialize for Schema {
         size.try_into().map_err(number::Error::Convert)
     }
 
-    fn serialize_into(&self, buf: &mut [u8]) {
-        // SAFETY: panic if usize overflows u64 in Self::size (not expected in production)
+    fn serialize_into(&self, buf: &mut Self::Buffer) {
+        // SAFETY: Self::size returns Error if usize overflows u64 (not expected in production)
         // TODO → Negate safety concern by checking schema size < u64::MAX at compile time
         let size = self.size().expect("usize overflowed u64 in Schema::size").get().to_le_bytes();
-        buf[0] = Variant::Schema as u8;
-        buf[1..size_of::<Header>()].copy_from_slice(&size);
+        buf.push(Variant::Schema as u8);
+        buf.extend_from_slice(&size);
         // SAFETY: minicbor::encode is infallible when writing to Vec<u8>
         minicbor::encode(self, &mut buf[size_of::<Header>()..]).expect("Infallible encode failed");
     }
