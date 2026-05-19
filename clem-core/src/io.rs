@@ -477,7 +477,7 @@ pub enum Error {
     /// File magic bytes did not match the expected `clem` signature.
     Magic,
     /// Underlying [`Error`](number::Error) from a numerical operation or conversion.
-    Numeric(number::Error),
+    Number(number::Error),
     /// Underlying [`TryFromSliceError`] while parsing a slice into a fixed-size array.
     Slice(TryFromSliceError),
     /// A read operation attempted to access bytes beyond the end of the input slice.
@@ -497,7 +497,7 @@ impl fmt::Display for Error {
             Self::Decode(e) => write!(f, "CBOR decode error → {e}"),
             Self::Io(e) => write!(f, "File IO error → {e}"),
             Self::Magic => f.write_str("File is not a valid clem dataset"),
-            Self::Numeric(e) => write!(f, "Numeric error → {e}"),
+            Self::Number(e) => write!(f, "Number error → {e}"),
             Self::Slice(e) => write!(f, "Try from slice error → {e}"),
             Self::Truncated { .. } => write!(f, "Read was truncated → {self:?}"),
             Self::Version(v) => write!(f, "Unrecognised clem version → {v}"),
@@ -533,7 +533,7 @@ impl From<minicbor::decode::Error> for Error {
 
 impl From<number::Error> for Error {
     fn from(e: number::Error) -> Self {
-        Self::Numeric(e)
+        Self::Number(e)
     }
 }
 
