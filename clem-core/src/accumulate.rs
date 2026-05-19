@@ -1062,17 +1062,21 @@ where
 impl<T> Serialize for OptSeq<T>
 where
     T: Unfold,
-    T::RawAcc: Serialize,
+    T::RawAcc: Serialize<Buffer = Vec<u8>>,
 {
     type Buffer = Vec<u8>;
 
     fn size(&self) -> Result<NonZeroU64, Error> {
         let offsets = self.offsets.size()?;
         let data = self.data.size()?.get();
-        offsets.checked_add(data).ok_or(Error::Zero)
+        // 8 byte NonZeroU64 length prefix
+        offsets.checked_add(data).ok_or(Error::Zero)?.checked_add(8).ok_or(Error::Zero)
     }
 
     fn serialize_into(&self, buf: &mut Self::Buffer) {
+        // SAFETY: Self::size returns Error if Σ overflows u64 (not expected in production)
+        let size = self.size().expect("u64 overflow in OptSeq::size").get().sub(8).to_le_bytes();
+        buf.extend_from_slice(&size);
         self.offsets.serialize_into(buf);
         self.data.serialize_into(buf);
     }
