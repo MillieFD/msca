@@ -91,8 +91,7 @@ use smol::fs::{self, OpenOptions};
 use smol::io::{AsyncRead, AsyncReadExt, AsyncSeek, AsyncSeekExt, AsyncWrite, AsyncWriteExt};
 
 use crate::manifest::{Manifest, Pending};
-use crate::segment::Segment;
-use crate::{number, Serialize};
+use crate::{number, schema, Serialize};
 
 /* ------------------------------------------------------------------------------ Public Exports */
 
@@ -213,7 +212,7 @@ impl Ord for Sector {
 impl Serialize for Sector {
     type Buffer = [u8; size_of::<Self>()];
 
-    fn serialize_into(&self, buf: &mut [u8]) {
+    fn serialize_into(&self, buf: &mut Self::Buffer) {
         buf[..size_of::<NonZeroU64>()].copy_from_slice(self.offset.to_be_bytes().as_ref());
         buf[size_of::<NonZeroU64>()..].copy_from_slice(self.length.get().to_be_bytes().as_ref());
     }
