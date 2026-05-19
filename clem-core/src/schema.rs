@@ -867,26 +867,22 @@ impl Unfolder<f64> for Schema {
     }
 }
 
-// impl<T: Unfold> Unfolder<Option<T>> for Schema
-// where
-//     Schema: Unfolder<T, Ok = Type>,
-// {
-//     type Ok = Type;
-//     type Error = Infallible;
-//
-//     fn unfold(&mut self) -> Result<Self::Ok, Self::Error> {
-//         Type::option(T::with_unfolder(self)?).into()
-//     }
-// }
+impl<T> Unfolder<Option<T>> for Schema
+where
+    T: Unfold,
+    Schema: Unfolder<T>,
+{
+    fn unfold() -> Type {
+        Type::option(Self::unfold())
+    }
+}
 
-// impl<T: Unfold> Unfolder<Vec<T>> for Schema
-// where
-//     Schema: Unfolder<T, Ok = Type>,
-// {
-//     type Ok = Type;
-//     type Error = Infallible;
-//
-//     fn unfold(&mut self) -> Result<Self::Ok, Self::Error> {
-//         Type::sequence(T::with_unfolder(self)?).into()
-//     }
-// }
+impl<T> Unfolder<Vec<T>> for Schema
+where
+    T: Unfold,
+    Schema: Unfolder<T>,
+{
+    fn unfold() -> Type {
+        Type::sequence(Self::unfold())
+    }
+}
