@@ -69,15 +69,23 @@ struct Header {
     length: NonZeroU64,
 }
 
+impl Header {
+    /// Packed [size](size_of) of the segment [`Header`] in bytes.
+    ///
+    /// The rust compiler may add padding bytes to the **in-memory** header struct to improve field
+    /// alignment and access efficiency. However, the **on-disk** segment header requires a strict
+    /// compact layout without padding to minimise storage overhead.
+    const SIZE: usize = size_of::<u8>() + size_of::<NonZeroU64>();
+}
+
 impl Serialize for Header {
-    type Buffer = [u8; size_of::<u8>() + size_of::<NonZeroU64>()];
+    type Buffer = [u8; Self::SIZE];
 
     fn size(&self) -> Result<NonZeroU64, number::Error>
     where
         Self: Sized,
     {
-        let size: u64 = { size_of::<u8>() + size_of::<NonZeroU64>() }.try_into()?;
-        size.try_into().map_err(number::Error::Convert)
+        { Self::SIZE as u64 }.try_into().map_err(number::Error::Convert)
     }
 
     fn serialize_into(&self, buf: &mut Self::Buffer) {
@@ -89,7 +97,7 @@ impl Serialize for Header {
     }
 
     fn serialize(&self) -> Result<Self::Buffer, number::Error> {
-        let mut buf = [0u8; size_of::<u8>() + size_of::<NonZeroU64>()];
+        let mut buf = [0u8; Self::SIZE];
         self.serialize_into(&mut buf);
         Ok(buf)
     }
@@ -245,7 +253,7 @@ impl Serialize for Schema {
     type Buffer = Vec<u8>;
 
     fn size(&self) -> Result<NonZeroU64, number::Error> {
-        let size: u64 = { size_of::<Header>() + minicbor::len(self) }.try_into()?;
+        let size: u64 = { Header::SIZE + minicbor::len(self) }.try_into()?;
         size.try_into().map_err(number::Error::Convert)
     }
 
