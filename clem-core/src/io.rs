@@ -290,10 +290,12 @@ impl Header {
 impl Serialize for Header {
     type Buffer = [u8; size_of::<Self>()];
 
-    fn serialize_into(&self, buf: &mut [u8]) {
-        let tail = size_of::<NonZeroU64>();
-        self.tail.serialize_into(&mut buf[..tail]);
-        self.manifest.serialize_into(&mut buf[tail..]);
+    fn serialize_into(&self, buf: &mut Self::Buffer) {
+        // SAFETY: Header::Buffer size is Σ of fixed-size fields; guaranteed to fit all field bytes.
+        let one = buf.split_first_chunk_mut().expect("Buffer < NonZeroU64::size");
+        self.tail.serialize_into(one.0);
+        let two = one.1.split_first_chunk_mut().expect("Buffer < Sector::size");
+        self.manifest.serialize_into(two.0);
     }
 
     fn serialize(&self) -> Result<Self::Buffer, number::Error> {
