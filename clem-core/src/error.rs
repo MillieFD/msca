@@ -95,19 +95,6 @@ impl From<std::num::TryFromIntError> for Error {
     }
 }
 
-impl<E> From<minicbor::encode::Error<E>> for Error
-where
-    Error: for<'a> From<&'a E>,
-    E: Into<Error> + fmt::Display,
-{
-    fn from(error: minicbor::encode::Error<E>) -> Self {
-        match error.as_write() {
-            Some(e) => e.into(),
-            None => Self::Encode(error.to_string()),
-        }
-    }
-}
-
 impl From<minicbor::decode::Error> for Error {
     fn from(error: minicbor::decode::Error) -> Self {
         Self::Decode(error)
