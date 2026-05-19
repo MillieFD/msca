@@ -277,7 +277,7 @@ impl From<Infallible> for Error {
     }
 }
 
-//noinspection DuplicatedCode → Conversion is implemented for error types across different modules.
+//noinspection DuplicatedCode → Conversion is implemented for error types in different modules.
 impl<T, E> From<Error> for Result<T, E>
 where
     E: From<Error>,
@@ -286,3 +286,8 @@ where
         Err(E::from(error))
     }
 }
+
+/* --------------------------------------------------------------------------------------- Tests */
+
+#[cfg(test)]
+mod tests {}
