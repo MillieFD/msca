@@ -227,10 +227,6 @@ impl Serialize for Schema {
     }
 }
 
-impl Segment for Schema {
-    const VARIANT: Variant = Variant::Schema;
-}
-
 /* --------------------------------------------------------------------------- Alignment Helpers */
 
 /// Round `n` up to the next multiple of eight; the unit of [critical-field alignment](self).
