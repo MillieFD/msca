@@ -69,6 +69,32 @@ struct Header {
     length: NonZeroU64,
 }
 
+impl Serialize for Header {
+    type Buffer = [u8; size_of::<u8>() + size_of::<NonZeroU64>()];
+
+    fn size(&self) -> Result<NonZeroU64, number::Error>
+    where
+        Self: Sized,
+    {
+        let size: u64 = { size_of::<u8>() + size_of::<NonZeroU64>() }.try_into()?;
+        size.try_into().map_err(number::Error::Convert)
+    }
+
+    fn serialize_into(&self, buf: &mut Self::Buffer) {
+        // SAFETY: Header::Buffer size is Σ of fixed-size fields; guaranteed to fit all field bytes.
+        let one = buf.split_first_chunk_mut().expect("Buffer length < size_of::<u8>");
+        self.variant.serialize_into(one.0);
+        let two = one.1.split_first_chunk_mut().expect("Buffer length < size_of::<NonZeroU64>");
+        self.length.serialize_into(two.0);
+    }
+
+    fn serialize(&self) -> Result<Self::Buffer, number::Error> {
+        let mut buf = [0u8; size_of::<u8>() + size_of::<NonZeroU64>()];
+        self.serialize_into(&mut buf);
+        Ok(buf)
+    }
+}
+
 mod variant {
     //! This module defines the segment [`Variant`] identifier and associated parsing [`Error`].
     //!
