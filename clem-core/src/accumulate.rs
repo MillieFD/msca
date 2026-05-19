@@ -223,30 +223,34 @@ pub struct Flatten<T>(#[n(0)] pub T);
 
 /* ----------------------------------------------------------------- Accumulate Trait Definition */
 
-/// An in-memory **data accumulator** that can ingest values of the specified [`type`](Self::Item)
-/// and encode into an optimised on-disk format.
-pub trait Accumulate {
+/// An in-memory **data accumulator** that ingests values of the specified [`type`](Self::Item) and
+/// encodes into an optimised on-disk format.
+pub trait Accumulate: Serialize {
     /// The input type accepted by [`Self::push`].
     type Item;
 
     /// Returns a new empty instance of [`Self`] boxed as a trait object.
-    fn boxed() -> Box<dyn Accumulate<Item = Self::Item>>
+    // NOTE: Buffer must be a growable Vec; compiler cannot predict the number of accumulated items
+    fn boxed() -> Box<dyn Accumulate<Item = Self::Item, Buffer = Vec<u8>>>
     where
-        Self: Default + 'static,
+        Self: Default + Serialize<Buffer = Vec<u8>> + 'static,
     {
         Box::new(Self::default())
     }
 
-    /// Append a single value of `T` to [`Self`].
+    /// Append an [`Item`](Self::Item) to the [accumulator](Self)
     fn push(&mut self, value: Self::Item);
 
-    /// Reinitialise [`Self`] without writing to disk. All accumulated data is permanently lost.
+    /// Reinitialise the [accumulator](Self) without writing to disk. All data is permanently lost.
     ///
     /// Note that this method may not affect the allocated capacity of the underlying storage.
     fn discard(&mut self);
 
-    /// Returns `true` if the accumulator contains no values.
+    /// Returns `true` if the [accumulator](Self) contains no values.
     fn is_empty(&self) -> bool;
+
+    /// Returns the number of accumulated rows.
+    fn count(&self) -> u64;
 }
 
 /* ------------------------------------------------------------- Accumulate Trait Implementation */
