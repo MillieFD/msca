@@ -430,10 +430,13 @@ impl File {
         Ok(Self { file, header, manifest, mmap, path })
     }
 
-    /// Appends a new [`Segment`] to the file according to the [write-cycle](self).
+    /// Append a new [`Segment`] to the file according to the [write-cycle](self).
     ///
     /// Returns a read-only [`Mmap`] covering the immutable segment region.
-    async fn write<S: Segment>(&mut self, seg: S) -> Result<Mmap, Error> {
+    pub(crate) async fn write<S>(&mut self, seg: S) -> Result<Mmap, Error>
+    where
+        S: for<'a> Write<Ctx<'a> = &'a Header>,
+    {
         // Phase 1: Append the new manifest
         let pending = Pending { header: &self.header, size: seg.size()? };
         self.header.manifest = self.manifest.write_to_file(&mut self.file, pending).await?;
