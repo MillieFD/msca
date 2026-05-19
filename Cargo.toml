@@ -18,9 +18,14 @@ unwrap_used = "deny"
 [workspace]
 members = ["clem-core", "clem-derive"]
 
-[dependencies]
-clem-core = { path = "clem-core" }
-clem-derive = { path = "clem-derive" }
+[dependencies.clem-derive]
+path = "clem-derive"
+
+[dependencies.clem-core]
+path = "clem-core"
+
+[dev-dependencies]
+smol = "2.0"
 
 [features]
 default = []

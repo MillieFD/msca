@@ -176,6 +176,7 @@ version = "0.1.0"
 dependencies = [
  "clem-core",
  "clem-derive",
+ "smol",
 ]
 
 [[package]]
