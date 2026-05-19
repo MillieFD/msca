@@ -467,7 +467,7 @@ pub enum Error {
         name: String,
     },
     /// Underlying [`Error`](number::Error) from a numerical operation or conversion.
-    Numeric(number::Error),
+    Number(number::Error),
     /// The requested type is not supported by this version of [`clem`](crate).
     ///
     /// Some types are deliberately omitted. Please read the [type documentation](Type) for more
@@ -480,7 +480,7 @@ impl Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Collision { name } => write!(f, "Name collision → {name}"),
-            Self::Numeric(e) => write!(f, "Numeric error → {e}"),
+            Self::Number(e) => write!(f, "Number error → {e}"),
             Self::Unsupported(msg) => write!(f, "Unsupported type → {msg}"),
         }
     }
@@ -490,7 +490,7 @@ impl std::error::Error for Error {}
 
 impl From<number::Error> for Error {
     fn from(e: number::Error) -> Self {
-        Self::Numeric(e)
+        Self::Number(e)
     }
 }
 
