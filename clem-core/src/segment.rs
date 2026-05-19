@@ -259,7 +259,6 @@ impl Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Variant(error) => write!(f, "Segment variant ID error → {error}"),
-            other => write!(f, "Unexpected segment error → {other:?}"),
         }
     }
 }
