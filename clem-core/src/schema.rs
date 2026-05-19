@@ -124,9 +124,10 @@ impl Schema {
 
     /// Add a [`Column`] to [`self`](Schema) with the specified `name` and [`type`](A).
     ///
-    /// Returns an empty [`Accumulator`](acc) for in-memory data accumulation. This design ensures
+    /// Returns an empty [`Accumulator`] for **in-memory** data ingestion. This design ensures
     /// schema verification is performed exactly once.
-    pub(crate) fn column<A, B>(&mut self, name: B) -> Result<Box<dyn Accumulate<Item = A>>, Error>
+    #[doc(hidden)]
+    pub fn column<A, B>(&mut self, name: B) -> Result<Accumulator<A>, Error>
     where
         A: Unfold,
         Schema: Unfolder<A>,
