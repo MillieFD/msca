@@ -223,8 +223,7 @@ impl Serialize for Schema {
         let size = self.size()?.get().try_into()?;
         let mut buf = Vec::with_capacity(size);
         self.serialize_into(&mut buf);
-        // NOTE: cannot be a static assertion; `buf.len()` and `size` are both runtime values
-        // derived from the serialised content.
+        // NOTE: cannot use static assertion as size is dependent on runtime data accumulation.
         debug_assert_eq!(buf.len(), size, "actual size ≠ predicted size");
         Ok(buf)
     }
