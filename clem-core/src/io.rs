@@ -621,12 +621,12 @@ impl Write for Header {
     }
 }
 
-impl<S: Segment> Write for S {
+impl Write for schema::Schema {
     type Ctx<'a> = &'a Header;
 
-    fn sector(&self, header: &Header) -> Result<Sector, number::Error> {
+    fn sector(&self, ctx: &Header) -> Result<Sector, number::Error> {
         Ok(Sector {
-            offset: header.tail.get(),
+            offset: ctx.tail.get(),
             length: self.size()?,
         })
     }
