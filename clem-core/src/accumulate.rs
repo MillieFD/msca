@@ -953,7 +953,7 @@ impl Serialize for BitVec {
     fn size(&self) -> Result<NonZeroU64, Error> {
         // Each byte encodes 8 bits; round up (↑) BitVec::len to the nearest whole byte.
         let payload: u64 = self.len().div_ceil(8).try_into()?;
-        // Add NonZeroU64 length prefix
+        // 8 byte NonZeroU64 length prefix
         payload.checked_add(8).and_then(NonZeroU64::new).ok_or(Error::Zero)
     }
 
