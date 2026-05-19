@@ -522,7 +522,8 @@ where
 /// integration with on-disk storage.
 // TODO [1] link to procedural macro documentation
 // TODO [2] link to procedural macro user guide
-pub(crate) trait Unfold: Sized {
+#[doc(hidden)]
+pub trait Unfold: Sized {
     /// The [accumulator](Accumulate) type used to ingest unwrapped values of [`Self`].
     type RawAcc: Accumulate<Item = Self> + Default + 'static;
 
