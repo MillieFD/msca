@@ -10,6 +10,9 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 
 use std::fmt;
 
+use crate::schema::number;
+use crate::{io, schema, segment};
+
 /* ------------------------------------------------------------------------------ Public Exports */
 
 /// Errors returned by [`clem`](crate).
@@ -26,25 +29,19 @@ use std::fmt;
 #[derive(Debug)]
 #[non_exhaustive] // To accommodate potential future error cases.
 pub enum Error {
-    /// Underlying [`std::num::TryFromIntError`] from a checked conversion between two types.
-    Convert(std::num::TryFromIntError),
-    /// CBOR decoding failure for a manifest or schema payload.
-    Decode(minicbor::decode::Error),
-    /// CBOR encoding failure for a manifest or schema payload.
-    Encode(String),
-    /// Underlying [`std::io::Error`] from the file backing the [`Dataset`].
-    Io(std::io::Error),
-    /// File magic bytes did not match the expected `clem` signature.
-    Magic,
-    /// Underlying [`segment::Error`][1] while encoding a [`Segment`][2]
-    ///
-    /// [1]: crate::segment::Error
-    /// [2]: crate::segment::Segment
-    Segment(crate::segment::Error),
+    /// Underlying [`io::Error`] from the [clem](crate) [file](io::File).
+    Io(io::Error),
+    /// Underlying [`number::Error`] from a numerical operation or conversion.
+    Number(number::Error),
+    /// Underlying [`schema::Error`] from schema composition.
+    Schema(schema::Error),
+    /// Underlying [`segment::Error`] while encoding a `Segment`
+    Segment(segment::Error),
+    /// Underlying [`std::array::TryFromSliceError`] while parsing a slice into a fixed-size
+    /// array.
+    Slice(std::array::TryFromSliceError),
     /// Underlying [`std::str::Utf8Error`] while attempting to interpret `[u8]` as a [`String`].
     Utf8(std::str::Utf8Error),
-    /// File version is not recognised by this build of [`clem`](crate).
-    Version(u8),
 }
 
 /* ----------------------------------------------------------------------- Trait Implementations */
@@ -52,14 +49,12 @@ pub enum Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Convert(e) => write!(f, "Integer type conversion error → {e}"),
-            Self::Decode(e) => write!(f, "CBOR decode error → {e}"),
-            Self::Encode(msg) => write!(f, "CBOR encode error → {msg}"),
             Self::Io(e) => write!(f, "File IO error → {e}"),
-            Self::Magic => f.write_str("File is not a valid clem dataset"),
+            Self::Number(e) => write!(f, "Number error → {e}"),
+            Self::Schema(e) => write!(f, "Schema error → {e}"),
             Self::Segment(e) => write!(f, "Segment error → {e}"),
+            Self::Slice(e) => write!(f, "Try from slice error → {e}"),
             Self::Utf8(e) => write!(f, "UTF8 from u8 error → {e}"),
-            Self::Version(v) => write!(f, "Unrecognised clem version → {v}"),
         }
     }
 }
@@ -67,19 +62,20 @@ impl fmt::Display for Error {
 impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
-            Self::Convert(e) => Some(e),
-            Self::Decode(e) => Some(e),
             Self::Io(e) => Some(e),
+            Self::Number(e) => Some(e),
+            Self::Schema(e) => Some(e),
             Self::Segment(e) => Some(e),
+            Self::Slice(e) => Some(e),
             Self::Utf8(e) => Some(e),
-            _ => None, // Some variants do not wrap an inner error source
+            other => None, // Some variants do not wrap an inner error source
         }
     }
 }
 
 impl From<std::io::Error> for Error {
     fn from(error: std::io::Error) -> Self {
-        Self::Io(error)
+        io::Error::from(error).into()
     }
 }
 
@@ -91,13 +87,13 @@ impl From<std::str::Utf8Error> for Error {
 
 impl From<std::num::TryFromIntError> for Error {
     fn from(error: std::num::TryFromIntError) -> Self {
-        Self::Convert(error)
+        number::Error::from(error).into()
     }
 }
 
-impl From<minicbor::decode::Error> for Error {
-    fn from(error: minicbor::decode::Error) -> Self {
-        Self::Decode(error)
+impl From<std::array::TryFromSliceError> for Error {
+    fn from(error: std::array::TryFromSliceError) -> Self {
+        Self::Slice(error)
     }
 }
 
@@ -107,8 +103,36 @@ impl From<std::convert::Infallible> for Error {
     }
 }
 
-impl From<crate::segment::Error> for Error {
-    fn from(error: crate::segment::Error) -> Self {
+impl From<minicbor::decode::Error> for Error {
+    fn from(error: minicbor::decode::Error) -> Self {
+        io::Error::from(error).into()
+    }
+}
+
+impl From<io::Error> for Error {
+    fn from(error: io::Error) -> Self {
+        match error {
+            io::Error::Number(e) => Self::Number(e),
+            io::Error::Slice(e) => Self::Slice(e),
+            other => Self::Io(other), // Some variants do not map to specific error types
+        }
+    }
+}
+
+impl From<number::Error> for Error {
+    fn from(error: number::Error) -> Self {
+        Self::Number(error)
+    }
+}
+
+impl From<schema::Error> for Error {
+    fn from(error: schema::Error) -> Self {
+        Self::Schema(error)
+    }
+}
+
+impl From<segment::Error> for Error {
+    fn from(error: segment::Error) -> Self {
         Self::Segment(error)
     }
 }
