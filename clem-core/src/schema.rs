@@ -161,12 +161,9 @@ impl Schema {
         }
     }
 
-    /// Map the provided [`Key`](String) to a generated [`Default`] value of [`T`]
-    pub(crate) fn map<T>(key: String) -> (String, T)
-    where
-        T: Default,
-    {
-        (key, T::default())
+    /// Map the provided [`Key`](String) to a new empty [`manifest::Column`]
+    pub(crate) fn map(pair: (String, Column)) -> (String, manifest::Column) {
+        (pair.0, pair.1.ty.into())
     }
 }
 
