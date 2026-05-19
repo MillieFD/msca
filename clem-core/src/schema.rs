@@ -76,9 +76,9 @@ use bitvec::vec::BitVec;
 use minicbor::{CborLen, Decode, Encode};
 
 use self::number::Number;
-use crate::accumulate::{Accumulate, Flatten, OptBitVec, OptInSitu, OptSeq, Seq};
+use crate::accumulate::{Accumulate, Accumulator, Flatten, OptBitVec, OptInSitu, OptSeq, Seq};
 use crate::io::{File, Write};
-use crate::manifest;
+use crate::{manifest, Serialize};
 
 /* ------------------------------------------------------------------------------ Public Exports */
 
