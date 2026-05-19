@@ -1111,6 +1111,26 @@ where
     }
 }
 
+/// Blanket [`Serialize`] implementation for the type-erased [`Accumulator`] trait object.
+impl<I> Serialize for Accumulator<I> {
+    type Buffer = Vec<u8>;
+
+    fn size(&self) -> Result<NonZeroU64, Error> {
+        #[cfg(debug_assertions)]
+        unimplemented!("Serialize::size cannot be invoked on a trait object");
+        #[cfg(not(debug_assertions))]
+        Error::Zero.into()
+    }
+
+    fn serialize_into(&self, buf: &mut Self::Buffer) {
+        (**self).serialize_into(buf)
+    }
+
+    fn serialize(&self) -> Result<Self::Buffer, Error> {
+        (**self).serialize()
+    }
+}
+
 /* --------------------------------------------------------------------------------------- Tests */
 
 #[cfg(test)]
