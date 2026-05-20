@@ -97,7 +97,7 @@ impl Serialize for Header {
     }
 
     fn serialize(&self) -> Result<Self::Buffer, number::Error> {
-        let buf = [0u8; Self::SIZE];
+        let buf = [u8::MIN; Self::SIZE];
         self.serialize_into(buf)
     }
 }
@@ -167,7 +167,7 @@ mod variant {
         }
 
         fn serialize(&self) -> Result<Self::Buffer, number::Error> {
-            let buf = [0u8; size_of::<u8>()];
+            let buf = [u8::MIN; size_of::<u8>()];
             self.serialize_into(buf)
         }
     }
