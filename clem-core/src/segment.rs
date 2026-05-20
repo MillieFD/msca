@@ -45,6 +45,7 @@ use std::num::NonZeroU64;
 
 use minicbor::{CborLen, Decode, Encode};
 
+use crate::accumulate::Buffer;
 use crate::schema::{number, Schema};
 use crate::Serialize;
 
@@ -88,18 +89,16 @@ impl Serialize for Header {
         { Self::SIZE as u64 }.try_into().map_err(number::Error::Convert)
     }
 
-    fn serialize_into(&self, buf: &mut Self::Buffer) {
-        // SAFETY: Header::Buffer size is Σ of fixed-size fields; guaranteed to fit all field bytes.
-        let one = buf.split_first_chunk_mut().expect("Buffer < u8::size");
-        self.variant.serialize_into(one.0);
-        let two = one.1.split_first_chunk_mut().expect("Buffer < NonZeroU64::size");
-        self.length.serialize_into(two.0);
+    fn serialize_into(&self, mut buf: Self::Buffer) -> Result<Self::Buffer, number::Error> {
+        // SAFETY: Header::Buffer size is Σ of fixed-size fields; guaranteed to fit all data.
+        buf[..size_of::<u8>()].copy_from_slice(&self.variant.serialize()?);
+        buf[size_of::<u8>()..].copy_from_slice(&self.length.serialize()?);
+        Ok(buf)
     }
 
     fn serialize(&self) -> Result<Self::Buffer, number::Error> {
-        let mut buf = [0u8; Self::SIZE];
-        self.serialize_into(&mut buf);
-        Ok(buf)
+        let buf = [0u8; Self::SIZE];
+        self.serialize_into(buf)
     }
 }
 
@@ -163,14 +162,13 @@ mod variant {
     impl Serialize for Variant {
         type Buffer = [u8; size_of::<u8>()];
 
-        fn serialize_into(&self, buf: &mut Self::Buffer) {
-            { *self as u8 }.serialize_into(buf);
+        fn serialize_into(&self, buf: Self::Buffer) -> Result<Self::Buffer, number::Error> {
+            { *self as u8 }.serialize_into(buf)
         }
 
         fn serialize(&self) -> Result<Self::Buffer, number::Error> {
-            let mut buf = [0u8; size_of::<u8>()];
-            self.serialize_into(&mut buf);
-            Ok(buf)
+            let buf = [0u8; size_of::<u8>()];
+            self.serialize_into(buf)
         }
     }
 
@@ -257,20 +255,19 @@ impl Serialize for Schema {
         size.try_into().map_err(number::Error::Convert)
     }
 
-    fn serialize_into(&self, buf: &mut Self::Buffer) {
-        // SAFETY: Self::size returns Error if usize overflows u64 (not expected in production)
-        // TODO → Negate safety concern by checking schema size < u64::MAX at compile time
-        let size = self.size().expect("usize overflowed u64 in Schema::size").get().to_le_bytes();
+    fn serialize_into(&self, mut buf: Self::Buffer) -> Result<Self::Buffer, number::Error> {
+        // NOTE: Self::size returns Error if usize overflows u64 (not expected in production)
+        let size = self.size()?.get().to_le_bytes();
         buf.push(Variant::Schema as u8);
         buf.extend_from_slice(&size);
         // SAFETY: minicbor::encode is infallible when writing to Vec<u8>
-        minicbor::encode(self, &mut buf[size_of::<Header>()..]).expect("Infallible encode failed");
+        minicbor::encode(self, &mut buf).expect("Infallible encode failed");
+        Ok(buf)
     }
 
     fn serialize(&self) -> Result<Self::Buffer, number::Error> {
         let size = self.size()?.get().try_into()?;
-        let mut buf = Vec::with_capacity(size);
-        self.serialize_into(&mut buf);
+        let buf = Vec::with_capacity(size).serialize_push(self)?;
         // NOTE: cannot use static assertion as size is dependent on runtime data accumulation.
         debug_assert_eq!(buf.len(), size, "actual size ≠ predicted size");
         Ok(buf)
