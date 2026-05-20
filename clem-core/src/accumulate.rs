@@ -438,27 +438,6 @@ where
     }
 }
 
-/// Blanket [`Accumulate`] implementation for the type-erased [`Accumulator`] trait object.
-impl<I> Accumulate for Box<dyn Accumulate<Item = I, Buffer = Vec<u8>>> {
-    type Item = I;
-
-    fn push(&mut self, value: Self::Item) {
-        (**self).push(value)
-    }
-
-    fn discard(&mut self) {
-        (**self).discard()
-    }
-
-    fn is_empty(&self) -> bool {
-        (**self).is_empty()
-    }
-
-    fn count(&self) -> u64 {
-        (**self).count()
-    }
-}
-
 /* ------------------------------------------------------------------ Serialize Trait Definition */
 
 /// A **buffer** that can hold the serialized byte representation of a value.
@@ -1168,30 +1147,6 @@ where
 
     fn extend(&self, sink: Vec<u8>) -> Result<Vec<u8>, Error> {
         self.0.extend(sink) // Transparent wrapper
-    }
-}
-
-/// Blanket [`Serialize`] implementation for the type-erased [`Accumulator`] trait object.
-impl<I> Serialize for Accumulator<I> {
-    type Buffer = Vec<u8>;
-
-    fn size(&self) -> Result<NonZeroU64, Error> {
-        #[cfg(debug_assertions)]
-        unimplemented!("Serialize::size cannot be invoked on a trait object");
-        #[cfg(not(debug_assertions))]
-        Error::Zero.into()
-    }
-
-    fn serialize_into(&self, buf: Self::Buffer) -> Result<Self::Buffer, Error> {
-        (**self).serialize_into(buf)
-    }
-
-    fn serialize(&self) -> Result<Self::Buffer, Error> {
-        (**self).serialize()
-    }
-
-    fn extend(&self, sink: Vec<u8>) -> Result<Vec<u8>, Error> {
-        (**self).extend(sink)
     }
 }
 
