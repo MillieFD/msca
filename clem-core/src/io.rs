@@ -172,15 +172,15 @@ impl Ord for Sector {
 impl Serialize for Sector {
     type Buffer = [u8; size_of::<Self>()];
 
-    fn serialize_into(&self, buf: &mut Self::Buffer) {
+    fn serialize_into(&self, mut buf: Self::Buffer) -> Result<Self::Buffer, number::Error> {
         buf[..size_of::<NonZeroU64>()].copy_from_slice(self.offset.to_be_bytes().as_ref());
         buf[size_of::<NonZeroU64>()..].copy_from_slice(self.length.get().to_be_bytes().as_ref());
+        Ok(buf)
     }
 
     fn serialize(&self) -> Result<Self::Buffer, number::Error> {
-        let mut buf = [u8::MIN; size_of::<Self>()];
-        self.serialize_into(&mut buf);
-        Ok(buf)
+        let buf = [u8::MIN; size_of::<Self>()];
+        self.serialize_into(buf)
     }
 }
 
@@ -249,18 +249,15 @@ impl Header {
 impl Serialize for Header {
     type Buffer = [u8; size_of::<Self>()];
 
-    fn serialize_into(&self, buf: &mut Self::Buffer) {
-        // SAFETY: Header::Buffer size is Σ of fixed-size fields; guaranteed to fit all field bytes.
-        let one = buf.split_first_chunk_mut().expect("Buffer < NonZeroU64::size");
-        self.tail.serialize_into(one.0);
-        let two = one.1.split_first_chunk_mut().expect("Buffer < Sector::size");
-        self.manifest.serialize_into(two.0);
+    fn serialize_into(&self, mut buf: Self::Buffer) -> Result<Self::Buffer, number::Error> {
+        const TAIL: usize = size_of::<NonZeroU64>();
+        buf[..TAIL].copy_from_slice(&self.tail.serialize()?);
+        buf[TAIL..].copy_from_slice(&self.manifest.serialize()?);
+        Ok(buf)
     }
 
     fn serialize(&self) -> Result<Self::Buffer, number::Error> {
-        let mut buf = [0u8; size_of::<Self>()];
-        self.serialize_into(&mut buf);
-        Ok(buf)
+        self.serialize_into([0u8; size_of::<Self>()])
     }
 }
 
