@@ -108,45 +108,6 @@ const VERSION: u8 = 1;
 /// [2]: VERSION
 pub const HEADER: usize = size_of_val(&MAGIC) + size_of_val(&VERSION) + size_of::<Header>();
 
-/// Creates a read-only [memory map](Mmap) backed by the specified [clem](crate) file.
-///
-/// ### Errors
-///
-/// [`Error::Zero`] if the [`Header`](HEADER) size exceeds [`u64::MAX`].
-// todo → Static assert HEADER size as u64, remove try_into runtime checks, use faster unchecked fn.
-///
-/// [`Error::Io`] if the underlying system call fails. This can occur for a variety of reasons,
-/// such as the file is no longer accessible, or the platform does not support memory mapping.
-///
-/// ### Safety
-///
-/// This function is marked as [unsafe][1] because of the potential for undefined behaviour if the
-/// underlying file region is subsequently modified, in or out of process. Implementers are strongly
-/// advised to take appropriate precautions and ensure the mapped region is not accessed or modified
-/// concurrently in a way that causes undefined behaviour.
-///
-/// [`Segments`](Segment) are immutable once written. The [`Mmap`] is tightly scoped to reduce the
-/// risk of undefined behaviour:
-///
-/// - [`offset`](MmapOptions::offset) excludes the mutable [`Header`]
-/// - [`length`](MmapOptions::len) excludes the mutable [`Manifest`]
-/// - Only the immutable segment region is mapped
-///
-/// Appending a new segment updates the [`Arc`]`<`[`Mmap`](Mmap)`>` after the [write-cycle](self) is
-/// complete. New readers must await a [read lock](RwLock) on the [file state](File) before cloning
-/// the [`Arc`]. Existing mmaps are released only when their reference count drops to zero.
-/// In-flight reader mmaps remain valid (existing segments unaltered).
-///
-/// Refer to the [memmap](memmap2) crate for more details.
-///
-/// [1]: https://doc.rust-lang.org/book/ch20-01-unsafe-rust.html
-unsafe fn mmap(file: &fs::File, tail: NonZeroU64) -> Result<Mmap, Error> {
-    let offset: u64 = HEADER.try_into()?;
-    let length: usize = { tail.get() - offset }.try_into()?;
-    // SAFETY: Undefined behaviour if mapped file is modified (refer to mmap documentation).
-    unsafe { MmapOptions::new().offset(offset).len(length).map(file).map_err(Error::Io) }
-}
-
 /// A contiguous byte region within the [`clem`](crate) file.
 ///
 /// Implementers must [`Copy`] into an owned type when mutability is required e.g. for downstream
@@ -384,9 +345,6 @@ impl File {
         file.write_all(&header.serialize()?).await?;
         file.write_all(&manifest.serialize()?).await?;
         file.flush().await?;
-        // SAFETY: Undefined behaviour if mapped region is modified (refer to mmap documentation).
-        // TODO → Move mmap initialisation to calling dataset
-        let mmap = unsafe { mmap(&file, header.tail)? };
         Ok(Self { file, header, manifest, path })
     }
 
@@ -422,16 +380,55 @@ impl File {
             .open(&path)
             .await?;
         let header = Header::from_file(&mut file).await?;
-        // SAFETY: Undefined behaviour if mapped region is modified (refer to mmap documentation).
-        // TODO → Move mmap initialisation to calling dataset
-        let mmap = unsafe { mmap(&file, header.tail)? };
         let manifest = Manifest::from_file(&mut file, header.manifest).await?;
         Ok(Self { file, header, manifest, path })
+    }
+
+    /// Create a read-only [memory map](Mmap) backed by the [clem](crate) file.
+    ///
+    /// ### Errors
+    ///
+    /// [`Error::Zero`] if the [`Header`](HEADER) size exceeds [`u64::MAX`].
+    // todo → Static assert HEADER size as u64, remove try_into runtime checks, use faster unchecked fn.
+    ///
+    /// [`Error::Io`] if the underlying system call fails. This can occur for a variety of reasons,
+    /// such as the file is no longer accessible, or the platform does not support memory mapping.
+    ///
+    /// ### Safety
+    ///
+    /// This function is marked as [unsafe][1] because of the potential for undefined behaviour if
+    /// the underlying file region is subsequently modified, in or out of process. Implementers are
+    /// strongly advised to take appropriate precautions and ensure the mapped region is not
+    /// accessed or modified concurrently in a way that causes undefined behaviour.
+    ///
+    /// [`Segments`](Segment) are immutable once written. The [`Mmap`] is tightly scoped to reduce
+    /// the risk of undefined behaviour:
+    ///
+    /// - [`offset`](MmapOptions::offset) excludes the mutable [`Header`]
+    /// - [`length`](MmapOptions::len) excludes the mutable [`Manifest`]
+    /// - Only the immutable segment region is mapped
+    ///
+    /// The [`Arc`][2]`<`[`Mmap`](Mmap)`>` is updated after each [write-cycle](self) to include the
+    /// newly appended segment. New readers must await a [read lock](RwLock) on the [dataset][3]
+    /// before cloning the [`Arc`]. Existing mmaps are released only when their reference count
+    /// drops to zero. In-flight reader mmaps remain valid because existing segments are unaltered.
+    ///
+    /// Refer to the [memmap](memmap2) crate for more details.
+    ///
+    /// [1]: https://doc.rust-lang.org/book/ch20-01-unsafe-rust.html
+    /// [2]: std::sync::Arc
+    /// [3]: crate::dataset::Dataset
+    unsafe fn mmap(&self, tail: NonZeroU64) -> Result<Mmap, Error> {
+        let offset: u64 = HEADER.try_into()?;
+        let length: usize = { tail.get() - offset }.try_into()?;
+        // SAFETY: Undefined behaviour if mapped region is modified (refer to mmap documentation)
+        unsafe { MmapOptions::new().offset(offset).len(length).map(&self.file).map_err(Error::Io) }
     }
 
     /// Append a new [`Segment`] to the file according to the [write-cycle](self).
     ///
     /// Returns a read-only [`Mmap`] covering the immutable segment region.
+    // TODO → Add error list & mmap safety section to fn doc comment
     pub(crate) async fn write<S>(&mut self, seg: S) -> Result<Mmap, Error>
     where
         S: for<'a> Write<Ctx<'a> = &'a Header>,
@@ -449,8 +446,8 @@ impl File {
             .ok_or(number::Error::Zero)?;
         // Phase 4: Overwrite the file header tail pointer
         self.header.write_to_file(&mut self.file, ()).await?;
-        // SAFETY: Undefined behaviour if mapped region is modified (refer to mmap documentation).
-        unsafe { mmap(&self.file, self.header.tail) }
+        // SAFETY: Undefined behaviour if mapped region is modified (refer to mmap documentation)
+        unsafe { self.mmap(self.header.tail) }
     }
 }
 
