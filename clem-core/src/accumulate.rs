@@ -496,6 +496,16 @@ pub trait Serialize {
 
     /// Serialize `self` and return the encoded bytes in a new [`Buffer`].
     fn serialize(&self) -> Result<Self::Buffer, Error>;
+
+    /// Serialize `self` into the provided [`Vec<u8>`] sink.
+    ///
+    /// This function provides a unified interface for serializing fixed-size (stack) and
+    /// dynamic-size (heap) types into a growable [`Buffer`].
+    fn extend(&self, mut sink: Vec<u8>) -> Result<Vec<u8>, Error> {
+        let bytes = self.serialize()?;
+        sink.extend_from_slice(bytes.as_ref());
+        Ok(sink)
+    }
 }
 
 /* -------------------------------------------------------------- Serialize Trait Implementation */
