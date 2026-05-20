@@ -336,6 +336,7 @@ pub mod number {
     //! [1]: https://rust-lang.github.io/rfcs/3453-f16-and-f128.html
 
     use minicbor::{CborLen, Decode, Encode};
+    use std::convert::Infallible;
     use std::fmt;
     use std::num::TryFromIntError;
 
@@ -437,6 +438,12 @@ pub mod number {
     impl From<TryFromIntError> for Error {
         fn from(e: TryFromIntError) -> Self {
             Self::Convert(e)
+        }
+    }
+
+    impl From<Infallible> for Error {
+        fn from(e: Infallible) -> Self {
+            match e {}
         }
     }
 
