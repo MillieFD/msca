@@ -208,15 +208,17 @@ impl Serialize for Manifest {
         size.try_into().map_err(number::Error::Convert)
     }
 
-    fn serialize_into(&self, buf: &mut Self::Buffer) {
+    fn serialize_into(&self, mut buf: Self::Buffer) -> Result<Self::Buffer, number::Error> {
         // SAFETY: minicbor::encode is infallible when writing to Vec<u8>
-        minicbor::encode(self, buf).expect("Infallible manifest CBOR encode failed");
+        minicbor::encode(self, &mut buf).expect("Infallible manifest CBOR encode failed");
+        Ok(buf)
     }
 
     fn serialize(&self) -> Result<Self::Buffer, number::Error> {
+        // NOTE: Scoped trait import avoids namespace conflict with Buffer struct (below)
+        use crate::accumulate::Buffer;
         let size = self.size()?.get().try_into()?;
-        let mut buf = Vec::with_capacity(size);
-        self.serialize_into(&mut buf);
+        let buf = Vec::with_capacity(size).serialize_push(self)?;
         // NOTE: cannot use static assertion as size is dependent on runtime data accumulation.
         debug_assert_eq!(buf.len(), size, "actual size ≠ predicted size");
         Ok(buf)
