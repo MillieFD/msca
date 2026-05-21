@@ -274,7 +274,7 @@ pub(crate) struct Buffer {
     pub max: Vec<u8>,
 }
 
-/// A minimal dictionary segment **descriptor** that specifies:
+/// A minimal dictionary **descriptor** that specifies:
 ///
 /// 1. [`Sector`] where the schema segment is located on disk.
 /// 2. [`BTreeMap`] of [`Column`] descriptors keyed by name.
