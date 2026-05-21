@@ -14,7 +14,7 @@ use std::collections::BTreeMap;
 use std::num::NonZeroU64;
 
 use minicbor::{CborLen, Decode, Encode};
-use smol::io::{AsyncRead, AsyncReadExt};
+use smol::io::{AsyncRead, AsyncReadExt, AsyncSeek};
 
 use crate::io::{Header, Write};
 use crate::schema::Type;
@@ -73,13 +73,12 @@ impl Manifest {
     /// [`Sector`].
     pub async fn from_file<F>(file: &mut F, sector: Sector) -> Result<Self, io::Error>
     where
-        F: AsyncRead + Unpin + ?Sized,
+        F: AsyncRead + AsyncSeek + Unpin + ?Sized,
     {
         let size = sector.length.get() as usize;
-        let mut buf = Vec::with_capacity(size);
+        let mut buf = vec![0u8; size];
+        sector.seek_to_start(file).await?;
         file.read_exact(&mut buf).await?;
-        // NOTE: cannot use static assertion as size is dependent on runtime data accumulation.
-        debug_assert_eq!(buf.len(), size, "actual size ≠ predicted size");
         Manifest::deserialize(&buf)
     }
 
