@@ -336,6 +336,8 @@ impl File {
             .truncate(false)
             .open(&path)
             .await?;
+        file.write_all(&MAGIC).await?;
+        file.write_all(&[VERSION]).await?;
         file.write_all(&header.serialize()?).await?;
         file.write_all(&manifest.serialize()?).await?;
         file.flush().await?;
