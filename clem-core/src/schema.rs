@@ -76,7 +76,7 @@ use bitvec::vec::BitVec;
 use minicbor::{CborLen, Decode, Encode};
 
 use self::number::Number;
-use crate::accumulate::{Accumulate, Accumulator, Flatten, OptBitVec, OptInSitu, OptSeq, Seq};
+use crate::accumulate::{Accumulate, BoxAcc, Flatten, OptBitVec, OptInSitu, OptSeq, Seq};
 use crate::io::{File, Write};
 use crate::{manifest, Serialize};
 
@@ -124,10 +124,10 @@ impl Schema {
 
     /// Add a [`Column`] to [`self`](Schema) with the specified `name` and [`type`](A).
     ///
-    /// Returns an empty [`Accumulator`] for **in-memory** data ingestion. This design ensures
+    /// Returns an empty [accumulator](BoxAcc) for **in-memory** data ingestion. This design ensures
     /// schema verification is performed exactly once.
     #[doc(hidden)]
-    pub fn column<A, B>(&mut self, name: B) -> Result<Accumulator<A>, Error>
+    pub fn column<A, B>(&mut self, name: B) -> Result<BoxAcc<A>, Error>
     where
         A: Unfold,
         Schema: Unfolder<A>,
@@ -153,10 +153,9 @@ impl Schema {
     pub fn finish(self, file: &mut File) -> Result<&manifest::Schema, Error> {
         let sector = self.sector(&file.header)?;
         let columns = self.columns.into_iter().map(Schema::map).collect();
-        let schema = manifest::Schema { columns, sector };
         match file.manifest.schemas.entry(self.name) {
-            Entry::Vacant(entry) => Ok(&*entry.insert(schema)),
-            Entry::Occupied(entry) if entry.get() == &schema => Ok(&*entry.into_mut()),
+            Entry::Vacant(entry) => Ok(&*entry.insert(manifest::Schema { columns, sector })),
+            Entry::Occupied(entry) if entry.get().columns == columns => Ok(&*entry.into_mut()),
             Entry::Occupied(entry) => Error::Collision { name: entry.key().clone() }.into(),
         }
     }
