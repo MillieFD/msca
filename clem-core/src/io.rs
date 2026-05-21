@@ -47,12 +47,9 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //!
 //! ### Manifest
 //!
-//! A [`Manifest`] footer lists file segments by type. Data segments are grouped by [`Schema`]
-//! alongside segment-level statistics e.g. min and max values. The manifest acts like the index of
-//! a book to enhance segment discovery and random access.
-//!
-//! The manifest is encoded as **CBOR** and written after the final data segment. A [`BTreeMap`][2]
-//! sorted in lexicographic order ensures the layout is deterministic regardless of insertion order.
+//! A self-describing **CBOR** file [`Manifest`] is included after the immutable segment region and
+//! lists all file segments by type. The manifest acts like the index of a book to enhance segment
+//! discovery and enable O(1) random access. Refer to the [manifest documentation][2] for details.
 //!
 //! ### Metadata
 //!
@@ -70,7 +67,7 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //! own metadata parsing and validation logic.
 //!
 //! [1]: crate::segment::Variant
-//! [2]: std::collections::BTreeMap
+//! [2]: crate::manifest
 
 #![doc = include_str!("../../docs/write-cycle.md")]
 #![doc = include_str!("../../docs/read-cycle.md")]
