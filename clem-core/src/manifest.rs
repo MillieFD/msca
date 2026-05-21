@@ -28,21 +28,21 @@ use crate::{io, number, Deserialize, Sector, Serialize};
 #[derive(Debug, Default, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode, CborLen)]
 #[cbor(tag(100))]
 pub(crate) struct Manifest {
-    /// Schema segments keyed by name.
+    /// [`Schema`] segments keyed by [`name`](String).
     #[cbor(n(0), skip_if = "BTreeMap::is_empty")]
     #[cfg_attr(
         feature = "serde",
         serde(default, skip_serializing_if = "BTreeMap::is_empty")
     )]
     pub schemas: BTreeMap<String, Schema>,
-    /// Dictionaries keyed by name. Entries are **not** duplicated in the generic `schemas` map.
+    /// [`Dictionary`] segments keyed by [`name`](String).
     #[cbor(n(1), skip_if = "BTreeMap::is_empty")]
     #[cfg_attr(
         feature = "serde",
         serde(default, skip_serializing_if = "BTreeMap::is_empty")
     )]
     pub dictionaries: BTreeMap<String, Dictionary>,
-    /// Indexes keyed by name. Entries are **not** duplicated in the generic `dictionaries` map.
+    /// [`Index`] segments keyed by [`name`](String).
     #[cbor(n(2), skip_if = "BTreeMap::is_empty")]
     #[cfg_attr(
         feature = "serde",
