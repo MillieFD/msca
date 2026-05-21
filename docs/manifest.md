@@ -21,7 +21,7 @@ manifest
 
 Schema lookup by name returns the corresponding schema descriptor which includes:
 
-1. `Sector` containing the entire schema segment
+1. `Sector` containing the on-disk schema segment
 2. `BTreeMap` storing column descriptors keyed by name and sorted by lexicographic order
 
 Column lookup by name returns the corresponding collection of contiguous buffers across all on-disk data segments. Each
