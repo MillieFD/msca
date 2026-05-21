@@ -170,8 +170,8 @@ impl Serialize for Sector {
     type Buffer = [u8; size_of::<Self>()];
 
     fn serialize_into(&self, mut buf: Self::Buffer) -> Result<Self::Buffer, number::Error> {
-        buf[..size_of::<NonZeroU64>()].copy_from_slice(self.offset.to_be_bytes().as_ref());
-        buf[size_of::<NonZeroU64>()..].copy_from_slice(self.length.get().to_be_bytes().as_ref());
+        buf[..size_of::<NonZeroU64>()].copy_from_slice(self.offset.to_le_bytes().as_ref());
+        buf[size_of::<NonZeroU64>()..].copy_from_slice(self.length.get().to_le_bytes().as_ref());
         Ok(buf)
     }
 
