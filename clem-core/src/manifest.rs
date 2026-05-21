@@ -197,7 +197,7 @@ impl Deserialize for Manifest {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode, CborLen)]
 pub struct Schema {
-    /// Location of the schema segment including header.
+    /// Location of the [`Schema`] segment.
     #[n(0)]
     pub sector: Sector,
     /// [`Column`] descriptors keyed by name.
@@ -252,7 +252,7 @@ impl From<Type> for Column {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode, CborLen)]
 pub(crate) struct Buffer {
-    /// Location of the schema segment including header.
+    /// Location of the [`Buffer`] on disk.
     #[n(0)]
     pub sector: Sector,
     /// Number of data entries.
@@ -276,8 +276,8 @@ pub(crate) struct Buffer {
 
 /// A minimal dictionary **descriptor** that specifies:
 ///
-/// 1. [`Sector`] where the schema segment is located on disk.
-/// 2. [`BTreeMap`] of [`Column`] descriptors keyed by name.
+/// 1. [`Sector`] of the corresponding [`Schema`] segment.
+/// 2. [`BTreeMap`] of [`Column`] descriptors keyed by [`name`](String).
 ///
 /// This type does **not** contain the actual schema definition or columnar data buffers; it is a
 /// lightweight descriptor for segment discovery and access without holding buffer contents in
@@ -286,10 +286,10 @@ pub(crate) struct Buffer {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode, CborLen)]
 pub(crate) struct Dictionary {
-    /// Location of the schema segment including header.
+    /// Location of the [`Schema`] segment.
     #[n(0)]
     pub schema: Sector,
-    /// Column descriptors keyed by name.
+    /// [`Column`] descriptors keyed by [`name`](String).
     #[cbor(n(1), skip_if = "BTreeMap::is_empty")]
     #[cfg_attr(
         feature = "serde",
@@ -299,12 +299,11 @@ pub(crate) struct Dictionary {
 }
 
 impl Dictionary {
-    /// Returns a reference to the "key" column descriptor for this dictionary.
+    /// Returns a reference to the [`key`](String) [`Column`] for this dictionary.
     pub fn key(&self) -> &Column {
-        // SAFETY: Dictionaries are guaranteed to contain a "key" column at the type tree root.
-        // 1. Serializer rejects incompatible type layouts during dictionary initialisation.
-        // 2. Deserializer compares the type tree root against the required { key: K, value: V }
-        //    layout. Only exact matches are deserialized into Dictionary instances.
+        // SAFETY: Dictionaries are guaranteed to contain a "key" column:
+        // 1. Serializer enforces a key-value layout during dictionary initialisation.
+        // 2. Deserializer rejects schemas that do not contain a "key" column.
         self.columns.get("key").expect("Dictionary does not contain a 'key' column")
     }
 }
