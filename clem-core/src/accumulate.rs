@@ -30,11 +30,10 @@ use minicbor::{CborLen, Decode, Encode};
 use crate::schema::number::Error;
 use crate::schema::{size_of_opt, Unfold};
 
-/// Shorthand [boxed](Box) [accumulator](Accumulate) trait object backed by a growable [buffer][1].
-///
-/// [1]: Serialize::Buffer
+/// Shorthand type-erased [boxed](Box) [`Accumulate`] trait object backed by a heap-allocated
+/// growable [`Buffer`](Serialize::Buffer).
 // NOTE: Buffer must be a growable Vec; compiler cannot predict the number of accumulated items
-pub type Accumulator<I> = Box<dyn Accumulate<Item = I, Buffer = Vec<u8>>>;
+pub type BoxAcc<I> = Box<dyn Accumulate<Item = I, Buffer = Vec<u8>>>;
 
 /* --------------------------------------------------------------------------- Data Accumulators */
 
