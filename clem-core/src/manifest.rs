@@ -8,7 +8,7 @@ Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the conditions of the LICENSE are met.
 */
 
-#![doc = include_str!("../../docs/manifest.md")]
+#![doc = include_str!("../../doc/manifest.md")]
 
 use std::collections::BTreeMap;
 use std::num::NonZeroU64;
