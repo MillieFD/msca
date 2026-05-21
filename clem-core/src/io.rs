@@ -86,6 +86,7 @@ use minicbor::{CborLen, Decode, Encode};
 use smol::fs::{self, OpenOptions};
 use smol::io::{AsyncRead, AsyncReadExt, AsyncSeek, AsyncSeekExt, AsyncWrite, AsyncWriteExt};
 
+use crate::accumulate::Accumulator;
 use crate::manifest::{Manifest, Pending};
 use crate::{number, schema, Serialize};
 
@@ -618,6 +619,17 @@ impl Write for Header {
 }
 
 impl Write for schema::Schema {
+    type Ctx<'a> = &'a Header;
+
+    fn sector(&self, ctx: &Header) -> Result<Sector, number::Error> {
+        Ok(Sector {
+            offset: ctx.tail.get(),
+            length: self.size()?,
+        })
+    }
+}
+
+impl<I> Write for Accumulator<I> {
     type Ctx<'a> = &'a Header;
 
     fn sector(&self, ctx: &Header) -> Result<Sector, number::Error> {
