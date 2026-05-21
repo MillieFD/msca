@@ -36,6 +36,7 @@ pub(crate) struct Manifest {
     )]
     pub schemas: BTreeMap<String, Schema>,
     /// [`Dictionary`] segments keyed by [`name`](String).
+    #[cfg(feature = "dictionary")]
     #[cbor(n(1), skip_if = "BTreeMap::is_empty")]
     #[cfg_attr(
         feature = "serde",
@@ -43,6 +44,7 @@ pub(crate) struct Manifest {
     )]
     pub dictionaries: BTreeMap<String, Dictionary>,
     /// [`Index`] segments keyed by [`name`](String).
+    #[cfg(feature = "index")]
     #[cbor(n(2), skip_if = "BTreeMap::is_empty")]
     #[cfg_attr(
         feature = "serde",
@@ -282,6 +284,7 @@ pub(crate) struct Buffer {
 /// lightweight descriptor for segment discovery and access without holding buffer contents in
 /// memory. An on-disk schema segment encodes the schema definition (column names and types) while
 /// on-disk data segments contain the columnar buffers.
+#[cfg(feature = "dictionary")]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode, CborLen)]
 pub(crate) struct Dictionary {
@@ -297,6 +300,7 @@ pub(crate) struct Dictionary {
     pub columns: BTreeMap<String, Column>,
 }
 
+#[cfg(feature = "dictionary")]
 impl Dictionary {
     /// Returns a reference to the [`key`](String) [`Column`] for this dictionary.
     pub fn key(&self) -> &Column {
@@ -316,6 +320,7 @@ impl Dictionary {
 /// index discovery and access without holding buffer contents in memory. An on-disk schema segment
 /// encodes the schema definition (column names and types) while on-disk data segments contain the
 /// columnar buffers.
+#[cfg(feature = "index")]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode, CborLen)]
 pub(crate) struct Index {

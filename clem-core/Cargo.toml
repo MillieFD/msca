@@ -32,6 +32,8 @@ optional = true
 
 [features]
 default = []
+dictionary = []
+index = ["dictionary"]
 log = ["dep:log"] # TODO Implement logging.
 metadata = ["dep:toml"]
 serde = ["dep:serde"]
