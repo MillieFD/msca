@@ -1168,13 +1168,15 @@ where
     type Buffer = Vec<u8>;
 
     fn size(&self) -> Result<NonZeroU64, Error> {
+        let prefix = size_of::<NonZeroU64>().try_into()?;
         // Recursively sum the sizes of all elements.
         self.iter()
-            .try_fold(NonZeroU64::MIN, |total, element| {
+            .try_fold(u64::MIN, |total, element| {
                 let size = element.size()?.get();
                 total.checked_add(size).ok_or(Error::Zero)
             })?
-            .checked_add(8) // Add NonZeroU64 length prefix
+            .checked_add(prefix) // Add length prefix
+            .and_then(NonZeroU64::new)
             .ok_or(Error::Zero)
     }
 
