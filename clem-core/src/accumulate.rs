@@ -27,13 +27,60 @@ use bitvec::field::BitField;
 use bitvec::vec::BitVec;
 use minicbor::{CborLen, Decode, Encode};
 
+use crate::io;
 use crate::schema::number::Error;
 use crate::schema::{size_of_opt, Unfold};
+use crate::segment::Variant;
 
-/// Shorthand type-erased [boxed](Box) [`Accumulate`] trait object backed by a heap-allocated
-/// growable [`Buffer`](Serialize::Buffer).
+/// Shorthand type-erased stack-allocated [pointer](Box) to an [`Accumulate`] trait object backed by
+/// a heap-allocated growable [`Buffer`](Serialize::Buffer).
 // NOTE: Buffer must be a growable Vec; compiler cannot predict the number of accumulated items
+// TODO → Impl Debug + Display + Clone (empty accumulator via Accumulate::boxed).
 pub type BoxAcc<I> = Box<dyn Accumulate<Item = I, Buffer = Vec<u8>>>;
+
+/// An **in-memory data accumulator** used to build data segments for the specified [`Schema`].
+///
+/// ### Segment Composition
+///
+/// Each [clem](crate) file is partitioned into self-describing segments which are immutable once
+/// written. Each segment begins with a minimal header consisting of a [`variant`](Variant) ID and
+/// [`length`](NonZeroU64).
+///
+/// - [`Schema`][1] segments describe the structure of encoded data.
+/// - [`Data`][2] segments carry columnar buffers for a specified schema instance.
+///
+/// Each data segment is associated with a **single** schema segment. This association is primarily
+/// included for data integrity and crash recovery; the optimised read path filters data segments by
+/// schema using the `manifest`.
+///
+/// ```text
+/// data-segment
+/// ├─ header
+/// │  ├─ variant: u8
+/// │  ├─ length: NonZeroU64
+/// │  ├─ schema: Sector
+/// │  └─ count: NonZeroU64
+/// ├─ buffer 0
+/// ⋮
+/// └─ buffer N
+/// ```
+///
+/// The [`Schema`][1] maps each **platform-agnostic** primitive [`Type`][3] to a contiguous buffer;
+/// providing essential context for buffer deserialization. Each `Accumulator` holds a [`Sector`][4]
+/// for the corresponding schema which is written to disk within each data segment header. All
+/// columns contain an equal number of rows indicated by `count` in the segment header.
+///
+/// [1]: crate::schema::Schema
+/// [2]: crate::Data
+/// [3]: crate::schema::Type
+/// [4]: crate::Sector
+pub struct Accumulator<I> {
+    /// Type-erased [`Accumulate`] trait object.
+    pub data: BoxAcc<I>,
+    /// [`Sector`](crate::Sector) of the corresponding [`Schema`](crate::Schema) segment describing
+    /// the structure of accumulated data.
+    pub schema: crate::Sector,
+}
 
 /* --------------------------------------------------------------------------- Data Accumulators */
 
