@@ -303,6 +303,26 @@ pub trait Accumulate: Serialize {
 
 /* ------------------------------------------------------------- Accumulate Trait Implementation */
 
+impl<I> Accumulate for Accumulator<I> {
+    type Item = I;
+
+    fn push(&mut self, value: Self::Item) {
+        self.data.push(value);
+    }
+
+    fn discard(&mut self) {
+        self.data.discard();
+    }
+
+    fn is_empty(&self) -> bool {
+        self.data.is_empty()
+    }
+
+    fn count(&self) -> u64 {
+        self.data.count()
+    }
+}
+
 impl Accumulate for BitVec {
     type Item = bool;
 
