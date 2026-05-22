@@ -170,6 +170,11 @@ impl Ord for Sector {
 impl Serialize for Sector {
     type Buffer = [u8; size_of::<Self>()];
 
+    fn size(&self) -> Result<NonZeroU64, number::Error> {
+        let size: u64 = size_of::<Self>().try_into()?;
+        size.try_into().map_err(number::Error::from)
+    }
+
     fn serialize_into(&self, mut buf: Self::Buffer) -> Result<Self::Buffer, number::Error> {
         buf[..size_of::<NonZeroU64>()].copy_from_slice(self.offset.to_le_bytes().as_ref());
         buf[size_of::<NonZeroU64>()..].copy_from_slice(self.length.get().to_le_bytes().as_ref());
@@ -246,6 +251,11 @@ impl Header {
 
 impl Serialize for Header {
     type Buffer = [u8; size_of::<Self>()];
+
+    fn size(&self) -> Result<NonZeroU64, number::Error> {
+        let size: u64 = size_of::<Self>().try_into()?;
+        size.try_into().map_err(number::Error::from)
+    }
 
     fn serialize_into(&self, mut buf: Self::Buffer) -> Result<Self::Buffer, number::Error> {
         const TAIL: usize = size_of::<NonZeroU64>();
