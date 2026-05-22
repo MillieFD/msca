@@ -27,7 +27,6 @@ use bitvec::field::BitField;
 use bitvec::vec::BitVec;
 use minicbor::{CborLen, Decode, Encode};
 
-use crate::io;
 use crate::schema::number::Error;
 use crate::schema::{size_of_opt, Unfold};
 use crate::segment::Variant;
@@ -82,6 +81,16 @@ pub struct Accumulator<I> {
     /// [`Sector`](crate::Sector) of the corresponding [`Schema`](crate::Schema) segment describing
     /// the structure of accumulated data.
     pub schema: crate::Sector,
+}
+
+impl<I> Accumulator<I> {
+    /// Total length of the data segment header in bytes.
+    ///
+    /// Refer to the [`Accumulator`] documentation for more details regarding header layout.
+    const HEADER: usize = size_of::<Variant>()
+        + size_of::<NonZeroU64>()
+        + size_of::<crate::Sector>()
+        + size_of::<NonZeroU64>();
 }
 
 /* --------------------------------------------------------------------------- Data Accumulators */
@@ -1376,7 +1385,7 @@ impl<I> Serialize for Accumulator<I> {
     type Buffer = Vec<u8>;
 
     fn size(&self) -> Result<NonZeroU64, Error> {
-        let header = io::HEADER.try_into()?;
+        let header = Self::HEADER.try_into()?;
         self.data.size()?.get().checked_add(header).and_then(NonZeroU64::new).ok_or(Error::Zero)
     }
 
