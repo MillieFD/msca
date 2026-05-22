@@ -109,10 +109,13 @@ mod variant {
     //! once written. Each segment begins with a single [`Variant`] byte to identify the segment
     //! type and payload structure. Readers dispatch on the variant byte to specific decoders.
 
+    use std::fmt::{Display, Formatter};
+    use std::num::NonZeroU64;
+
+    use minicbor::{CborLen, Decode, Encode};
+
     use crate::schema::number;
     use crate::Serialize;
-    use minicbor::{CborLen, Decode, Encode};
-    use std::fmt::{Display, Formatter};
 
     /* -------------------------------------------------------------------------- Public Exports */
 
@@ -161,6 +164,10 @@ mod variant {
 
     impl Serialize for Variant {
         type Buffer = [u8; size_of::<u8>()];
+
+        fn size(&self) -> Result<NonZeroU64, number::Error> {
+            { *self as u8 }.size()
+        }
 
         fn serialize_into(&self, buf: Self::Buffer) -> Result<Self::Buffer, number::Error> {
             { *self as u8 }.serialize_into(buf)
