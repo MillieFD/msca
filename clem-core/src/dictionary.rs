@@ -30,9 +30,9 @@ where
     I: Serialize,
 {
     /// Sorted [`items`](I) indexed by small unique [`keys`](K).
-    pub(crate) entries: BTreeMap<K, I>,
+    map: BTreeMap<K, I>,
     /// [`Sector`] of the bound dictionary schema segment.
-    pub(crate) schema: Sector,
+    schema: Sector,
 }
 
 impl<K, I> Dictionary<K, I>
@@ -50,7 +50,7 @@ where
     ///
     /// [1]: Self::checked_insert
     pub fn insert(&mut self, key: K, item: I) -> Option<I> {
-        self.entries.insert(key, item)
+        self.map.insert(key, item)
     }
 
     /// Insert a new entry into the [`Dictionary`].
@@ -61,7 +61,7 @@ where
     ///
     /// Use [`insert`](Self::insert) for cases where updating existing values in situ is desired.
     pub fn checked_insert(&mut self, key: K, value: I) -> Result<&I, Error> {
-        match self.entries.entry(key) {
+        match self.map.entry(key) {
             Entry::Vacant(entry) => Ok(&*entry.insert(value)),
             Entry::Occupied(entry) => Error::Collision.into(),
         }
@@ -69,18 +69,18 @@ where
 
     /// Returns the number of accumulated entries.
     pub fn count(&self) -> u64 {
-        self.entries.len() as u64
+        self.map.len() as u64
     }
 
     /// Returns `true` if the [`Dictionary`] contains no entries.
     pub fn is_empty(&self) -> bool {
-        self.entries.is_empty()
+        self.map.is_empty()
     }
 
     /// Reinitialise the [`Dictionary`] without writing to disk. All data is permanently lost.
     ///
     /// Note that this method may not affect the allocated capacity of the underlying storage.
     pub fn discard(&mut self) {
-        self.entries.clear();
+        self.map.clear();
     }
 }
