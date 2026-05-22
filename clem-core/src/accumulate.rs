@@ -57,7 +57,7 @@ pub type BoxAcc<I> = Box<dyn Accumulate<Item = I, Buffer = Vec<u8>>>;
 /// ├─ header
 /// │  ├─ variant: u8
 /// │  ├─ length: NonZeroU64
-/// │  ├─ schema: Sector
+/// │  ├─ schema: NonZeroU64
 /// │  └─ count: NonZeroU64
 /// ├─ buffer 0
 /// ⋮
@@ -89,7 +89,7 @@ impl<I> Accumulator<I> {
     /// Refer to the [`Accumulator`] documentation for more details regarding header layout.
     const HEADER: usize = size_of::<Variant>()
         + size_of::<NonZeroU64>()
-        + size_of::<crate::Sector>()
+        + size_of::<NonZeroU64>()
         + size_of::<NonZeroU64>();
 }
 
