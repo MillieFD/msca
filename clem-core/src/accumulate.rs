@@ -70,6 +70,8 @@ pub type BoxAcc<I> = Box<dyn Accumulate<Item = I, Buffer = Vec<u8>>>;
 /// for the corresponding schema which is written to disk within each data segment header. All
 /// columns contain an equal number of rows indicated by `count` in the segment header.
 ///
+/// Refer to the [schema module documentation](crate::schema) for more details.
+///
 /// [1]: crate::schema::Schema
 /// [2]: crate::Data
 /// [3]: crate::schema::Type
