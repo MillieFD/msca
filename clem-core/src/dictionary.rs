@@ -26,7 +26,7 @@ use crate::{schema, Sector};
 #[doc = include_str!("../../doc/dictionary.md")]
 pub struct Dictionary<K, I>
 where
-    K: Unfold + Ord,
+    K: Serialize + Unfold + Ord,
     I: Serialize,
 {
     /// Sorted [`items`](I) indexed by small unique [`keys`](K).
@@ -37,7 +37,7 @@ where
 
 impl<K, I> Dictionary<K, I>
 where
-    K: Unfold + Ord,
+    K: Serialize + Unfold + Ord,
     I: Serialize,
 {
     /// Insert a new entry pair into the [`Dictionary`].
