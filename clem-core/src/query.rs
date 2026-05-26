@@ -21,3 +21,6 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //!     .read()
 //!     .await?;
 //! ```
+
+#![doc = include_str!("../../doc/query-filters.md")]
+#![doc = include_str!("../../doc/query-joins.md")]
