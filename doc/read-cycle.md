@@ -8,7 +8,7 @@ The read cycle is built upon two complementary principles:
 
 Reading data from the file – across an arbitrary number of segments – requires up to three phases:
 
-**Phase 1: Manifest Resolution**
+##### Phase 1: Manifest Resolution
 
 The `Dataset` contains a `RwLock<Manifest>` field which is lazily initialised from disk on first access by:
 
@@ -19,7 +19,7 @@ The `Dataset` contains a `RwLock<Manifest>` field which is lazily initialised fr
 All `write` operations update the manifest in-memory before commiting to disk. All subsequent `read` operations acquire
 a shared read guard and return the manifest immediately without any file IO.
 
-**Phase 2: Segment Pruning**
+##### Phase 2: Segment Pruning
 
 The manifest exposes high-level statistics for each column involved in the predicate:
 
@@ -36,13 +36,13 @@ query.max < buffer.min  →  All values in segment are above the query range
 
 After pruning, the shared manifest read guard is released and the retained segments are passed to phase three.
 
-**Phase 3: Lazy Async Zero-Copy Batched Reads**
+##### Phase 3: Lazy Async Zero-Copy Batched Reads
 
 Candidate segments are packaged into a lazy async zero-copy reader that chains across sectors, presenting a flattened
 stream of deserialized rows to the caller. Internally, the reader is batched to reduce syscall overhead; returning one
 row each time `next` is called and only executing batched file IO when the internal buffer is exhausted.
 
-**Concurrency Model**
+##### Concurrency Model
 
 Segments are immutable once written, meaning readers do not require coordination after extracting their list of
 candidate segments in phase two. A concurrent writer appending a new segment must acquire an exclusive write-guard to
