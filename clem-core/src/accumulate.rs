@@ -28,7 +28,7 @@ use bitvec::vec::BitVec;
 use minicbor::{CborLen, Decode, Encode};
 
 use crate::schema::number::Error;
-use crate::schema::{size_of_opt, Unfold};
+use crate::schema::{self, size_of_opt, Unfold};
 use crate::segment::Variant;
 
 /// Shorthand type-erased stack-allocated [pointer](Box) to an [`Accumulate`] trait object backed by
@@ -71,9 +71,9 @@ pub type BoxAcc<I> = Box<dyn Accumulate<Item = I, Buffer = Vec<u8>>>;
 ///
 /// Refer to the [schema module documentation](crate::schema) for more details.
 ///
-/// [1]: crate::schema::Schema
+/// [1]: schema::Schema
 /// [2]: crate::Data
-/// [3]: crate::schema::Type
+/// [3]: schema::Type
 /// [4]: crate::Sector
 pub struct Accumulator<I> {
     /// Type-erased [`Accumulate`] trait object.
