@@ -92,7 +92,7 @@ impl<I> Accumulator<I> {
     /// Total length of the data segment header in bytes.
     ///
     /// Refer to the [`Accumulator`] documentation for more details regarding header layout.
-    const HEADER: usize = size_of::<Variant>()
+    pub(crate) const HEADER: usize = size_of::<Variant>()
         + size_of::<NonZeroU64>()
         + size_of::<NonZeroU64>()
         + size_of::<NonZeroU64>();
