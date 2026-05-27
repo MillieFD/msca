@@ -82,12 +82,16 @@ use crate::{manifest, Serialize};
 
 /* ------------------------------------------------------------------------------ Public Exports */
 
-/// A minimal schema **builder** wrapping a [`BTreeMap`] of [`Column`] descriptors keyed by name.
+/// A minimal schema **builder** wrapping a [`BTreeMap`] of [`Column`] descriptors keyed by
+/// [`name`](String).
 ///
 /// This type does **not** contain the actual schema definition or columnar data buffers; it is a
-/// lightweight descriptor for segment initialisation without holding buffer contents in memory. An
-/// on-disk schema segment encodes the schema definition (column names and types) while on-disk
-/// data segments contain the columnar buffers.
+/// lightweight descriptor for prototype segment initialisation without holding buffer contents in
+/// memory. An on-disk [`Schema`][1] segment encodes the schema definition (column names and types)
+/// while on-disk [`Data`][2] segments contain the columnar buffers.
+///
+/// [1]: manifest::Schema
+/// [2]: crate::Data
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode, CborLen)]
 // NOTE: schema::Schema (public builder) ≠ manifest::Schema (private descriptor).
