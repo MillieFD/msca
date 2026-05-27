@@ -334,10 +334,11 @@ pub mod number {
     //!
     //! [1]: https://rust-lang.github.io/rfcs/3453-f16-and-f128.html
 
-    use minicbor::{CborLen, Decode, Encode};
     use std::convert::Infallible;
     use std::fmt;
     use std::num::TryFromIntError;
+
+    use minicbor::{CborLen, Decode, Encode};
 
     /// Semantic classification of the numeric primitive type.
     #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
