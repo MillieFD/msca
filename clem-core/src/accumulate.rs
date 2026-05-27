@@ -310,6 +310,18 @@ pub trait Accumulate: Serialize {
 
     /// Returns the number of accumulated rows.
     fn count(&self) -> u64;
+
+    /// Returns the minimum accumulated value, or [`None`] if the [`Item`](Self::Item) is not
+    /// meaningfully [orderable](PartialOrd).
+    fn min(&self) -> Option<Self::Item> {
+        None
+    }
+
+    /// Returns the maximum accumulated value, or [`None`] if the [`Item`](Self::Item) is not
+    /// meaningfully [orderable](PartialOrd).
+    fn max(&self) -> Option<Self::Item> {
+        None
+    }
 }
 
 /* ------------------------------------------------------------- Accumulate Trait Implementation */
