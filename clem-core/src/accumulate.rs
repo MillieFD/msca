@@ -305,7 +305,7 @@ pub trait Accumulate: Serialize {
     /// Note that this method may not affect the allocated capacity of the underlying storage.
     fn discard(&mut self);
 
-    /// Returns `true` if the [accumulator](Self) contains no values.
+    /// Returns `true` if the [accumulator](Self) contains no data.
     fn is_empty(&self) -> bool;
 
     /// Returns the number of accumulated rows.
