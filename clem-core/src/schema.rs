@@ -166,8 +166,8 @@ impl Schema {
     }
 
     /// Map the provided [`Key`](String) to a new empty [`manifest::Column`]
-    pub(crate) fn map(pair: (String, Column)) -> (String, manifest::Column) {
-        (pair.0, pair.1.ty.into())
+    fn map(entry: (String, Column)) -> (String, manifest::Column) {
+        (entry.0, entry.1.ty.into())
     }
 }
 
