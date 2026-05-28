@@ -392,7 +392,7 @@ pub mod number {
     /// and `bytes` corresponds to a specific Rust numeric primitive type.
     #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
     #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode, CborLen)]
-    pub struct Number {
+    pub(crate) struct Number {
         /// Semantic classification of the numeric primitive type.
         #[n(0)]
         pub kind: Kind,
