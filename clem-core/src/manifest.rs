@@ -221,7 +221,7 @@ pub struct Schema {
 ///
 /// [`Vec`] order in-memory is **not** guaranteed to reflect [`Sector`] order on-disk.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode, CborLen)]
+#[derive(Debug, Clone, Eq, Ord, PartialOrd, Hash, Encode, Decode, CborLen)]
 pub(crate) struct Column {
     /// The [`Type`] of values contained within this column.
     #[n(0)]
@@ -233,6 +233,12 @@ pub(crate) struct Column {
         serde(default, skip_serializing_if = "Vec::is_empty")
     )]
     pub buffers: Vec<Buffer>,
+}
+
+impl PartialEq for Column {
+    fn eq(&self, other: &Self) -> bool {
+        self.ty == other.ty
+    }
 }
 
 impl From<Type> for Column {
