@@ -395,10 +395,10 @@ pub mod number {
     pub(crate) struct Number {
         /// Semantic classification of the numeric primitive type.
         #[n(0)]
-        pub kind: Kind,
+        pub(crate) kind: Kind,
         /// Number of bytes used to encode each value.
         #[n(1)]
-        pub size: u8,
+        pub(crate) size: u8,
     }
 
     impl fmt::Display for Number {
@@ -516,7 +516,7 @@ impl From<number::Error> for Error {
     }
 }
 
-//noinspection DuplicatedCode → Conversion is implemented for error types across different modules.
+//noinspection DuplicatedCode → Conversion is implemented for error types in different modules.
 impl<T, E> From<Error> for Result<T, E>
 where
     E: From<Error>,
