@@ -349,7 +349,7 @@ pub mod number {
     #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
     #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode, CborLen)]
     #[non_exhaustive] // To accommodate the potential stabilisation of additional numeric kinds.
-    pub enum Kind {
+    pub(crate) enum Kind {
         /* ---------------------------------------------------------------------------- Unsigned */
         /// Unsigned integer type.
         #[n(0)]
