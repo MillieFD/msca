@@ -180,7 +180,7 @@ impl Schema {
 /// or more on-disk data segments, each of which contains a buffer for this column.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode, CborLen)]
-pub(crate) struct Column {
+struct Column {
     /// The [`Type`] of values contained within this column.
     #[n(0)]
     ty: Type,
