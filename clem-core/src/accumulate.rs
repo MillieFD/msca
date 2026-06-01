@@ -349,6 +349,14 @@ impl<I> Accumulate for Accumulator<I> {
     fn count(&self) -> u64 {
         self.data.count()
     }
+
+    fn min(&self) -> Option<Self::Item> {
+        self.data.min()
+    }
+
+    fn max(&self) -> Option<Self::Item> {
+        self.data.max()
+    }
 }
 
 impl Accumulate for BitVec {
