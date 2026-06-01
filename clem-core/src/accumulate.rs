@@ -1352,8 +1352,8 @@ where
     fn size(&self) -> Result<NonZeroU64, Error> {
         let offsets = self.offsets.size()?;
         let data = self.data.size()?.get();
-        // 8 byte NonZeroU64 length prefix
-        offsets.checked_add(data).ok_or(Error::Zero)?.checked_add(8).ok_or(Error::Zero)
+        let prefix = size_of::<NonZeroU64>().try_into()?; // Length prefix
+        offsets.checked_add(data).ok_or(Error::Zero)?.checked_add(prefix).ok_or(Error::Zero)
     }
 
     fn serialize_into(&self, mut buf: Self::Buffer) -> Result<Self::Buffer, Error> {
