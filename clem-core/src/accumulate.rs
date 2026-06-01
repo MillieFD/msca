@@ -26,6 +26,7 @@ use std::ops::Sub;
 use bitvec::field::BitField;
 use bitvec::vec::BitVec;
 use minicbor::{CborLen, Decode, Encode};
+use static_assertions::const_assert;
 
 use crate::schema::number::Error;
 use crate::schema::{size_of_opt, Unfold};
@@ -376,6 +377,22 @@ impl Accumulate for BitVec {
 
     fn count(&self) -> u64 {
         BitVec::len(self) as u64
+    }
+
+    fn min(&self) -> Option<Self::Item> {
+        const_assert!(false < true);
+        match self.is_empty() {
+            true => None,
+            false => Some(self.iter().any(|b| *b)),
+        }
+    }
+
+    fn max(&self) -> Option<Self::Item> {
+        const_assert!(false < true);
+        match self.is_empty() {
+            true => None,
+            false => Some(self.iter().fold(false, |acc, bit| acc || *bit)),
+        }
     }
 }
 
