@@ -271,13 +271,21 @@ pub(crate) struct Buffer {
     ///
     /// Data is stored via an arbitrary-length [`Vec`] containing raw bytes encoded in
     /// platform-native endianness. Decode according to the [`Buffer`] type described by the schema.
-    #[n(2)]
+    #[cbor(n(2), skip_if = "Vec::is_empty")]
+    #[cfg_attr(
+        feature = "serde",
+        serde(default, skip_serializing_if = "Vec::is_empty")
+    )]
     pub min: Vec<u8>,
     /// Maximum value recorded in this buffer. Used for segment-level predicate pruning.
     ///
     /// Data is stored via an arbitrary-length [`Vec`] containing raw bytes encoded in
     /// platform-native endianness. Decode according to the [`Buffer`] type described by the schema.
-    #[n(3)]
+    #[cbor(n(3), skip_if = "Vec::is_empty")]
+    #[cfg_attr(
+        feature = "serde",
+        serde(default, skip_serializing_if = "Vec::is_empty")
+    )]
     pub max: Vec<u8>,
 }
 
