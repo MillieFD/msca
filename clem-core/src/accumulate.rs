@@ -28,7 +28,7 @@ use bitvec::vec::BitVec;
 use minicbor::{CborLen, Decode, Encode};
 
 use crate::schema::number::Error;
-use crate::schema::{self, size_of_opt, Unfold};
+use crate::schema::{size_of_opt, Unfold};
 use crate::segment::Variant;
 
 /// Shorthand type-erased stack-allocated [pointer](Box) to an [`Accumulate`] trait object backed by
