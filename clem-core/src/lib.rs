@@ -17,6 +17,7 @@ mod io;
 mod manifest;
 mod schema;
 mod segment;
+mod query;
 
 /* ----------------------------------------------------------------------------- Private Imports */
 
