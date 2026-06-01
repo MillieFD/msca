@@ -74,6 +74,7 @@ use std::num;
 
 use bitvec::vec::BitVec;
 use minicbor::{CborLen, Decode, Encode};
+use static_assertions::{assert_eq_size, const_assert_ne};
 
 use self::number::Number;
 use crate::accumulate::{Accumulate, BoxAcc, Flatten, OptBitVec, OptInSitu, OptSeq, Seq};
@@ -567,29 +568,29 @@ pub trait Unfold: Sized {
 #[rustfmt::skip] // Single line function improves readability
 pub(crate) const fn size_of_opt<T>() -> usize { size_of::<Option<T>>() }
 
-static_assertions::assert_eq_size!(char, Option<char>);
-static_assertions::const_assert_ne!(size_of::<u8>(), size_of_opt::<u8>());
-static_assertions::const_assert_ne!(size_of::<u16>(), size_of_opt::<u16>());
-static_assertions::const_assert_ne!(size_of::<u32>(), size_of_opt::<u32>());
-static_assertions::const_assert_ne!(size_of::<u64>(), size_of_opt::<u64>());
-static_assertions::const_assert_ne!(size_of::<u128>(), size_of_opt::<u128>());
-static_assertions::assert_eq_size!(num::NonZeroU8, Option<num::NonZeroU8>);
-static_assertions::assert_eq_size!(num::NonZeroU16, Option<num::NonZeroU16>);
-static_assertions::assert_eq_size!(num::NonZeroU32, Option<num::NonZeroU32>);
-static_assertions::assert_eq_size!(num::NonZeroU64, Option<num::NonZeroU64>);
-static_assertions::assert_eq_size!(num::NonZeroU128, Option<num::NonZeroU128>);
-static_assertions::const_assert_ne!(size_of::<i8>(), size_of_opt::<i8>());
-static_assertions::const_assert_ne!(size_of::<i16>(), size_of_opt::<i16>());
-static_assertions::const_assert_ne!(size_of::<i32>(), size_of_opt::<i32>());
-static_assertions::const_assert_ne!(size_of::<i64>(), size_of_opt::<i64>());
-static_assertions::const_assert_ne!(size_of::<i128>(), size_of_opt::<i128>());
-static_assertions::assert_eq_size!(num::NonZeroI8, Option<num::NonZeroI8>);
-static_assertions::assert_eq_size!(num::NonZeroI16, Option<num::NonZeroI16>);
-static_assertions::assert_eq_size!(num::NonZeroI32, Option<num::NonZeroI32>);
-static_assertions::assert_eq_size!(num::NonZeroI64, Option<num::NonZeroI64>);
-static_assertions::assert_eq_size!(num::NonZeroI128, Option<num::NonZeroI128>);
-static_assertions::const_assert_ne!(size_of::<f32>(), size_of_opt::<f32>());
-static_assertions::const_assert_ne!(size_of::<f64>(), size_of_opt::<f64>());
+assert_eq_size!(char, Option<char>);
+const_assert_ne!(size_of::<u8>(), size_of_opt::<u8>());
+const_assert_ne!(size_of::<u16>(), size_of_opt::<u16>());
+const_assert_ne!(size_of::<u32>(), size_of_opt::<u32>());
+const_assert_ne!(size_of::<u64>(), size_of_opt::<u64>());
+const_assert_ne!(size_of::<u128>(), size_of_opt::<u128>());
+assert_eq_size!(num::NonZeroU8, Option<num::NonZeroU8>);
+assert_eq_size!(num::NonZeroU16, Option<num::NonZeroU16>);
+assert_eq_size!(num::NonZeroU32, Option<num::NonZeroU32>);
+assert_eq_size!(num::NonZeroU64, Option<num::NonZeroU64>);
+assert_eq_size!(num::NonZeroU128, Option<num::NonZeroU128>);
+const_assert_ne!(size_of::<i8>(), size_of_opt::<i8>());
+const_assert_ne!(size_of::<i16>(), size_of_opt::<i16>());
+const_assert_ne!(size_of::<i32>(), size_of_opt::<i32>());
+const_assert_ne!(size_of::<i64>(), size_of_opt::<i64>());
+const_assert_ne!(size_of::<i128>(), size_of_opt::<i128>());
+assert_eq_size!(num::NonZeroI8, Option<num::NonZeroI8>);
+assert_eq_size!(num::NonZeroI16, Option<num::NonZeroI16>);
+assert_eq_size!(num::NonZeroI32, Option<num::NonZeroI32>);
+assert_eq_size!(num::NonZeroI64, Option<num::NonZeroI64>);
+assert_eq_size!(num::NonZeroI128, Option<num::NonZeroI128>);
+const_assert_ne!(size_of::<f32>(), size_of_opt::<f32>());
+const_assert_ne!(size_of::<f64>(), size_of_opt::<f64>());
 
 /* ----------------------------------------------------------------- Unfold Trait Implementation */
 
