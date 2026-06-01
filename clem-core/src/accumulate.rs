@@ -420,6 +420,14 @@ where
     fn count(&self) -> u64 {
         self.data.count()
     }
+
+    fn min(&self) -> Option<Self::Item> {
+        self.data.min()
+    }
+
+    fn max(&self) -> Option<Self::Item> {
+        self.data.max()
+    }
 }
 
 impl<T> Accumulate for OptBitVec<T>
