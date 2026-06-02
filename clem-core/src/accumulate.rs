@@ -1480,4 +1480,64 @@ impl<I> Serialize for Accumulator<I> {
 /* --------------------------------------------------------------------------------------- Tests */
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+    use super::*;
+
+    /// [`Accumulate::min`] and [`Accumulate::max`] return [`Some`] for populated [`Vec`].
+    #[test]
+    fn vec_min_max() {
+        let data: Vec<u32> = vec![1, 2, 3];
+        assert_eq!(Accumulate::min(&data), Some(1));
+        assert_eq!(Accumulate::max(&data), Some(3));
+    }
+
+    /// [`Accumulate::min`] and [`Accumulate::max`] return [`Some`] for empty [`Vec`].
+    #[test]
+    fn vec_min_max_empty() {
+        let data: Vec<u32> = Vec::new();
+        assert_eq!(Accumulate::min(&data), None);
+        assert_eq!(Accumulate::max(&data), None);
+    }
+
+    /// [`Accumulate::min`] and [`Accumulate::max`] ignore [`f64::NAN`] values in [`Vec`].
+    #[test]
+    fn vec_min_max_ignore_nan() {
+        let data = vec![1.0, 2.0, 3.0, f64::NAN];
+        assert_eq!(Accumulate::min(&data), Some(1.0));
+        assert_eq!(Accumulate::max(&data), Some(3.0));
+    }
+
+    /// [`Accumulate::min`] and [`Accumulate::max`] return [`Some`] for populated [`BitVec`].
+    #[test]
+    fn bit_vec_min_max() {
+        let data: BitVec = [true, false, true].into_iter().collect();
+        assert_eq!(Accumulate::min(&data), Some(false));
+        assert_eq!(Accumulate::max(&data), Some(true));
+    }
+
+    /// [`Accumulate::min`] returns `true` if all bits are `true`.
+    /// [`Accumulate::max`] returns `true` if any bit is `true`.
+    #[test]
+    fn bit_vec_min_max_true() {
+        let data: BitVec = [true, true, true].into_iter().collect();
+        assert_eq!(Accumulate::min(&data), Some(true));
+        assert_eq!(Accumulate::max(&data), Some(true));
+    }
+
+    /// [`Accumulate::min`] returns `false` if any bit is `false`.
+    /// [`Accumulate::max`] returns `false` if all bits are `false`.
+    #[test]
+    fn bit_vec_min_max_false() {
+        let data: BitVec = [false, false, false].into_iter().collect();
+        assert_eq!(Accumulate::min(&data), Some(false));
+        assert_eq!(Accumulate::max(&data), Some(false));
+    }
+
+    /// [`Accumulate::min`] and [`Accumulate::max`] return [`None`] for empty [`BitVec`].
+    #[test]
+    fn bit_vec_min_max_empty() {
+        let data: BitVec = BitVec::new();
+        assert_eq!(Accumulate::min(&data), None);
+        assert_eq!(Accumulate::max(&data), None);
+    }
+}
