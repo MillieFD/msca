@@ -396,11 +396,11 @@ impl Accumulate for BitVec {
     }
 }
 
-impl<T> Accumulate for Vec<T>
+impl<I> Accumulate for Vec<I>
 where
-    T: Serialize + Copy + PartialOrd,
+    I: Serialize + Copy + PartialOrd,
 {
-    type Item = T;
+    type Item = I;
 
     fn push(&mut self, value: Self::Item) {
         Vec::push(self, value);
