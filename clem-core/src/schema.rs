@@ -156,6 +156,7 @@ impl Schema {
     /// if the underlying definitions differ.
     ///
     /// Returns an immutable reference to the inserted or existing [`manifest::Schema`] on success.
+    // TODO → Impl Push<Schema> for Manifest. Then finish can delegate to file.manifest.push(self)
     pub fn finish(self, file: &mut File) -> Result<&manifest::Schema, Error> {
         let sector = self.sector(&file.header)?;
         let columns = self.columns.into_iter().map(Schema::map).collect();
