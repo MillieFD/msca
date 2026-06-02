@@ -650,6 +650,14 @@ impl<I> Write for Accumulator<I> {
     }
 }
 
+/* --------------------------------------------------------------------- Record Trait Definition */
+
+/// A **data source** that can be recorded to the [`Manifest`] before writing to disk.
+pub(crate) trait Ingest {
+    /// Add [`self`](Self) to the [`Manifest`] and return the corresponding [`Write`] sector.
+    fn ingest(&self, manifest: &mut Manifest) -> Result<Sector, Error>;
+}
+
 /* --------------------------------------------------------------------------------------- Tests */
 
 #[cfg(test)]
