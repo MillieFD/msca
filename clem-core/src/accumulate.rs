@@ -383,7 +383,7 @@ impl Accumulate for BitVec {
         const_assert!(false < true);
         match self.is_empty() {
             true => None,
-            false => Some(self.iter().any(|b| *b)),
+            false => Some(self.all()),
         }
     }
 
@@ -391,7 +391,7 @@ impl Accumulate for BitVec {
         const_assert!(false < true);
         match self.is_empty() {
             true => None,
-            false => Some(self.iter().fold(false, |acc, bit| acc || *bit)),
+            false => Some(self.any()),
         }
     }
 }
