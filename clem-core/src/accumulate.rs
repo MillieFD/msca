@@ -417,6 +417,20 @@ where
     fn count(&self) -> u64 {
         Vec::len(self) as u64
     }
+
+    fn min(&self) -> Option<Self::Item> {
+        self.iter().copied().reduce(|a, b| match a < b {
+            true => a,
+            false => b,
+        })
+    }
+
+    fn max(&self) -> Option<Self::Item> {
+        self.iter().copied().reduce(|a, b| match a > b {
+            true => a,
+            false => b,
+        })
+    }
 }
 
 impl<T> Accumulate for OptInSitu<T>
