@@ -259,7 +259,8 @@ impl From<Type> for Column {
 /// buffers distributed across one or more on-disk data segments.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode, CborLen)]
-pub(crate) struct Buffer {
+#[doc(hidden)] // Reachable through Accumulate::buffers for the #[derive(Data)] macro.
+pub struct Buffer {
     /// Location of the [`Buffer`] on disk.
     #[n(0)]
     pub sector: Sector,
