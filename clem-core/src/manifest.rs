@@ -149,7 +149,7 @@ impl Write for Manifest {
     /// Returns [`Error::Zero`](number::Error::Zero) if a `u64` overflow occurs while calculating
     /// [`size`](NonZeroU64) or [`offset`](NonZeroU64) for the relevant file regions.
     fn sector(&self, pending: Pending) -> Result<Sector, number::Error> {
-        let offset = match self.size()? < pending.size {
+        let offset = match pending.header.manifest.length < pending.size {
             true => pending.header.tail.checked_add(pending.size.get()),
             false => pending.header.manifest.next(),
         }
