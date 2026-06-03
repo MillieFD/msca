@@ -185,9 +185,7 @@ impl Serialize for Manifest {
 }
 
 impl Deserialize for Manifest {
-    type Error = io::Error;
-
-    fn deserialize(src: &[u8]) -> Result<Self, Self::Error> {
+    fn deserialize(src: &[u8]) -> Result<Self, io::Error> {
         minicbor::decode(src).map_err(io::Error::Decode)
     }
 }

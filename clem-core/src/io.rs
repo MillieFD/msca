@@ -280,9 +280,7 @@ impl Serialize for Header {
 }
 
 impl Deserialize for Header {
-    type Error = Error;
-
-    fn deserialize(src: &[u8]) -> Result<Self, Self::Error> {
+    fn deserialize(src: &[u8]) -> Result<Self, Error> {
         let buf: [u8; HEADER] = match src {
             s if !s.starts_with(&MAGIC) => Err(Error::Magic),
             s if s[4] != VERSION => Err(Error::Version(s[4])),
@@ -575,16 +573,13 @@ where
 
 /// A **type** that can be deserialized from a canonical [`clem`](crate) binary representation.
 pub trait Deserialize {
-    /// The error type returned by [`deserialize`](Self::deserialize) on failure.
-    type Error: From<TryFromSliceError> + From<Error>;
-
     /// Read [`N`] bytes from the provided slice into a fixed-size array for deserialization.
     ///
     /// ### Errors
     ///
     /// Returns [`Error::Truncated`] if the source contains fewer than [`N`] bytes.
     /// Returns [`Error::Slice`] if the slice cannot be coerced into a fixed-sized array.
-    fn take<const N: usize>(src: &[u8]) -> Result<[u8; N], Self::Error> {
+    fn take<const N: usize>(src: &[u8]) -> Result<[u8; N], Error> {
         src.get(..N)
             .ok_or(Error::Truncated { expected: N, actual: src.len() })?
             .try_into()
@@ -593,15 +588,13 @@ pub trait Deserialize {
 
     /// Deserialize `self` from the provided source byte slice.
     #[rustfmt::skip] // Single line where clause improves readability
-    fn deserialize(src: &[u8]) -> Result<Self, Self::Error> where Self: Sized;
+    fn deserialize(src: &[u8]) -> Result<Self, Error> where Self: Sized;
 }
 
 /* ------------------------------------------------------------ Deserialize Trait Implementation */
 
 impl Deserialize for u8 {
-    type Error = Error;
-
-    fn deserialize(src: &[u8]) -> Result<Self, Self::Error> {
+    fn deserialize(src: &[u8]) -> Result<Self, Error> {
         let buf = Self::take(src)?;
         let num = Self::from_le_bytes(buf);
         Ok(num)
@@ -609,9 +602,7 @@ impl Deserialize for u8 {
 }
 
 impl Deserialize for u16 {
-    type Error = Error;
-
-    fn deserialize(src: &[u8]) -> Result<Self, Self::Error> {
+    fn deserialize(src: &[u8]) -> Result<Self, Error> {
         let buf = Self::take(src)?;
         let num = Self::from_le_bytes(buf);
         Ok(num)
@@ -619,9 +610,7 @@ impl Deserialize for u16 {
 }
 
 impl Deserialize for u32 {
-    type Error = Error;
-
-    fn deserialize(src: &[u8]) -> Result<Self, Self::Error> {
+    fn deserialize(src: &[u8]) -> Result<Self, Error> {
         let buf = Self::take(src)?;
         let num = Self::from_le_bytes(buf);
         Ok(num)
@@ -629,9 +618,7 @@ impl Deserialize for u32 {
 }
 
 impl Deserialize for u64 {
-    type Error = Error;
-
-    fn deserialize(src: &[u8]) -> Result<Self, Self::Error> {
+    fn deserialize(src: &[u8]) -> Result<Self, Error> {
         let buf = Self::take(src)?;
         let num = Self::from_le_bytes(buf);
         Ok(num)
@@ -639,9 +626,7 @@ impl Deserialize for u64 {
 }
 
 impl Deserialize for u128 {
-    type Error = Error;
-
-    fn deserialize(src: &[u8]) -> Result<Self, Self::Error> {
+    fn deserialize(src: &[u8]) -> Result<Self, Error> {
         let buf = Self::take(src)?;
         let num = Self::from_le_bytes(buf);
         Ok(num)
@@ -649,41 +634,31 @@ impl Deserialize for u128 {
 }
 
 impl Deserialize for num::NonZeroU8 {
-    type Error = Error;
-
-    fn deserialize(src: &[u8]) -> Result<Self, Self::Error> {
+    fn deserialize(src: &[u8]) -> Result<Self, Error> {
         u8::deserialize(src)?.try_into().map_err(Into::into)
     }
 }
 
 impl Deserialize for num::NonZeroU16 {
-    type Error = Error;
-
-    fn deserialize(src: &[u8]) -> Result<Self, Self::Error> {
+    fn deserialize(src: &[u8]) -> Result<Self, Error> {
         u16::deserialize(src)?.try_into().map_err(Into::into)
     }
 }
 
 impl Deserialize for num::NonZeroU32 {
-    type Error = Error;
-
-    fn deserialize(src: &[u8]) -> Result<Self, Self::Error> {
+    fn deserialize(src: &[u8]) -> Result<Self, Error> {
         u32::deserialize(src)?.try_into().map_err(Into::into)
     }
 }
 
 impl Deserialize for NonZeroU64 {
-    type Error = Error;
-
-    fn deserialize(src: &[u8]) -> Result<Self, Self::Error> {
+    fn deserialize(src: &[u8]) -> Result<Self, Error> {
         u64::deserialize(src)?.try_into().map_err(Into::into)
     }
 }
 
 impl Deserialize for num::NonZeroU128 {
-    type Error = Error;
-
-    fn deserialize(src: &[u8]) -> Result<Self, Self::Error>
+    fn deserialize(src: &[u8]) -> Result<Self, Error>
     where
         Self: Sized,
     {
@@ -692,9 +667,7 @@ impl Deserialize for num::NonZeroU128 {
 }
 
 impl Deserialize for i8 {
-    type Error = Error;
-
-    fn deserialize(src: &[u8]) -> Result<Self, Self::Error> {
+    fn deserialize(src: &[u8]) -> Result<Self, Error> {
         let buf = Self::take(src)?;
         let num = Self::from_le_bytes(buf);
         Ok(num)
@@ -702,9 +675,7 @@ impl Deserialize for i8 {
 }
 
 impl Deserialize for i16 {
-    type Error = Error;
-
-    fn deserialize(src: &[u8]) -> Result<Self, Self::Error> {
+    fn deserialize(src: &[u8]) -> Result<Self, Error> {
         let buf = Self::take(src)?;
         let num = Self::from_le_bytes(buf);
         Ok(num)
@@ -712,9 +683,7 @@ impl Deserialize for i16 {
 }
 
 impl Deserialize for i32 {
-    type Error = Error;
-
-    fn deserialize(src: &[u8]) -> Result<Self, Self::Error> {
+    fn deserialize(src: &[u8]) -> Result<Self, Error> {
         let buf = Self::take(src)?;
         let num = Self::from_le_bytes(buf);
         Ok(num)
@@ -722,9 +691,7 @@ impl Deserialize for i32 {
 }
 
 impl Deserialize for i64 {
-    type Error = Error;
-
-    fn deserialize(src: &[u8]) -> Result<Self, Self::Error> {
+    fn deserialize(src: &[u8]) -> Result<Self, Error> {
         let buf = Self::take(src)?;
         let num = Self::from_le_bytes(buf);
         Ok(num)
@@ -732,9 +699,7 @@ impl Deserialize for i64 {
 }
 
 impl Deserialize for i128 {
-    type Error = Error;
-
-    fn deserialize(src: &[u8]) -> Result<Self, Self::Error> {
+    fn deserialize(src: &[u8]) -> Result<Self, Error> {
         let buf = Self::take(src)?;
         let num = Self::from_le_bytes(buf);
         Ok(num)
@@ -742,49 +707,37 @@ impl Deserialize for i128 {
 }
 
 impl Deserialize for num::NonZeroI8 {
-    type Error = Error;
-
-    fn deserialize(src: &[u8]) -> Result<Self, Self::Error> {
+    fn deserialize(src: &[u8]) -> Result<Self, Error> {
         i8::deserialize(src)?.try_into().map_err(Into::into)
     }
 }
 
 impl Deserialize for num::NonZeroI16 {
-    type Error = Error;
-
-    fn deserialize(src: &[u8]) -> Result<Self, Self::Error> {
+    fn deserialize(src: &[u8]) -> Result<Self, Error> {
         i16::deserialize(src)?.try_into().map_err(Into::into)
     }
 }
 
 impl Deserialize for num::NonZeroI32 {
-    type Error = Error;
-
-    fn deserialize(src: &[u8]) -> Result<Self, Self::Error> {
+    fn deserialize(src: &[u8]) -> Result<Self, Error> {
         i32::deserialize(src)?.try_into().map_err(Into::into)
     }
 }
 
 impl Deserialize for num::NonZeroI64 {
-    type Error = Error;
-
-    fn deserialize(src: &[u8]) -> Result<Self, Self::Error> {
+    fn deserialize(src: &[u8]) -> Result<Self, Error> {
         i64::deserialize(src)?.try_into().map_err(Into::into)
     }
 }
 
 impl Deserialize for num::NonZeroI128 {
-    type Error = Error;
-
-    fn deserialize(src: &[u8]) -> Result<Self, Self::Error> {
+    fn deserialize(src: &[u8]) -> Result<Self, Error> {
         i128::deserialize(src)?.try_into().map_err(Into::into)
     }
 }
 
 impl Deserialize for f32 {
-    type Error = Error;
-
-    fn deserialize(src: &[u8]) -> Result<Self, Self::Error> {
+    fn deserialize(src: &[u8]) -> Result<Self, Error> {
         let buf = Self::take(src)?;
         let num = Self::from_le_bytes(buf);
         Ok(num)
@@ -792,9 +745,7 @@ impl Deserialize for f32 {
 }
 
 impl Deserialize for f64 {
-    type Error = Error;
-
-    fn deserialize(src: &[u8]) -> Result<Self, Self::Error> {
+    fn deserialize(src: &[u8]) -> Result<Self, Error> {
         let buf = Self::take(src)?;
         let num = Self::from_le_bytes(buf);
         Ok(num)
