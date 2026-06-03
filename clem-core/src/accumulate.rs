@@ -20,6 +20,7 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //! Each accumulator type implements the [`Accumulate`] trait, which defines a shared interface for
 //! handling in-memory value accumulation.
 
+use std::collections::BTreeMap;
 use std::num::*;
 use std::ops::Sub;
 
@@ -28,15 +29,21 @@ use bitvec::vec::BitVec;
 use minicbor::{CborLen, Decode, Encode};
 use static_assertions::const_assert;
 
-use crate::schema::number::Error;
+use crate::manifest::{self, Column};
+use crate::number::Error;
 use crate::schema::{size_of_opt, Unfold};
 use crate::segment::Variant;
+use crate::Sector;
 
 /// Shorthand type-erased stack-allocated [pointer](Box) to an [`Accumulate`] trait object backed by
 /// a heap-allocated growable [`Buffer`](Serialize::Buffer).
 // NOTE: Buffer must be a growable Vec; compiler cannot predict the number of accumulated items
 // TODO → Impl Debug + Display + Clone (empty accumulator via Accumulate::boxed).
 pub type BoxAcc<I> = Box<dyn Accumulate<Item = I, Buffer = Vec<u8>>>;
+
+/// Shorthand type-erased [`Iterator`] over mutable [`Column`] descriptors.
+// NOTE: Deterministic runtime order via BTreeMap; #[derive] ensures identical compile time order.
+type Columns<'a> = &'a mut dyn Iterator<Item = &'a mut Column>;
 
 /// An **in-memory data accumulator** used to build data segments for the specified [`Schema`].
 ///
