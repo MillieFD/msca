@@ -562,7 +562,20 @@ where
 /// A **type** that can be deserialized from a canonical [`clem`](crate) binary representation.
 pub trait Deserialize {
     /// The error type returned by [`deserialize`](Self::deserialize) on failure.
-    type Error;
+    type Error: From<TryFromSliceError> + From<Error>;
+
+    /// Read [`N`] bytes from the provided slice into a fixed-size array for deserialization.
+    ///
+    /// ### Errors
+    ///
+    /// Returns [`Error::Truncated`] if the source contains fewer than [`N`] bytes.
+    /// Returns [`Error::Slice`] if the slice cannot be coerced into a fixed-sized array.
+    fn take<const N: usize>(src: &[u8]) -> Result<[u8; N], Self::Error> {
+        src.get(..N)
+            .ok_or(Error::Truncated { expected: N, actual: src.len() })?
+            .try_into()
+            .map_err(Into::into)
+    }
 
     /// Deserialize `self` from the provided source byte slice.
     #[rustfmt::skip] // Single line where clause improves readability
