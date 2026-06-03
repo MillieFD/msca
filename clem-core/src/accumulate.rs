@@ -372,6 +372,10 @@ impl<I> Accumulate for Accumulator<I> {
     fn max(&self) -> Option<Self::Item> {
         self.data.max()
     }
+
+    fn buffers(&self, offset: u64, columns: Columns) -> Result<u64, Error> {
+        self.data.buffers(offset, columns)
+    }
 }
 
 impl Accumulate for BitVec {
@@ -407,6 +411,23 @@ impl Accumulate for BitVec {
             true => None,
             false => Some(self.any()),
         }
+
+    fn buffers(&self, offset: u64, mut columns: Columns) -> Result<u64, Error> {
+        let buf = manifest::Buffer {
+            sector: Sector { offset, length: self.size()? },
+            count: self.count().try_into()?,
+            min: match Accumulate::min(self).map(u8::from) {
+                Some(min) => min.serialize()?.into(),
+                None => Vec::new(),
+            },
+            max: match Accumulate::max(self).map(u8::from) {
+                Some(max) => max.serialize()?.into(),
+                None => Vec::new(),
+            },
+        };
+        let next = buf.sector.next().ok_or(Error::Zero)?.get();
+        columns.next().map(|column| column.buffers.push(buf));
+        Ok(next)
     }
 }
 
@@ -445,6 +466,24 @@ where
             false => b,
         })
     }
+
+    fn buffers(&self, offset: u64, mut columns: Columns) -> Result<u64, Error> {
+        let buf = manifest::Buffer {
+            sector: Sector { offset, length: self.size()? },
+            count: self.count().try_into()?,
+            min: match self.min() {
+                Some(min) => min.serialize()?.into(),
+                None => Vec::new(),
+            },
+            max: match self.max() {
+                Some(max) => max.serialize()?.into(),
+                None => Vec::new(),
+            },
+        };
+        let next = buf.sector.next().ok_or(Error::Zero)?.get();
+        columns.next().map(|column| column.buffers.push(buf));
+        Ok(next)
+    }
 }
 
 impl<T> Accumulate for OptInSitu<T>
@@ -476,6 +515,10 @@ where
     fn max(&self) -> Option<Self::Item> {
         self.data.max()
     }
+
+    fn buffers(&self, offset: u64, columns: Columns) -> Result<u64, Error> {
+        self.data.buffers(offset, columns)
+    }
 }
 
 impl<T> Accumulate for OptBitVec<T>
@@ -500,6 +543,10 @@ where
 
     fn count(&self) -> u64 {
         self.mask.len() as u64
+    }
+
+    fn buffers(&self, offset: u64, columns: Columns) -> Result<u64, Error> {
+        self.data.buffers(offset, columns)
     }
 }
 
@@ -529,6 +576,10 @@ where
 
     fn count(&self) -> u64 {
         self.offsets.len() as u64
+    }
+
+    fn buffers(&self, offset: u64, columns: Columns) -> Result<u64, Error> {
+        self.data.buffers(offset, columns)
     }
 }
 
@@ -562,6 +613,10 @@ where
     fn count(&self) -> u64 {
         self.offsets.len() as u64
     }
+
+    fn buffers(&self, offset: u64, columns: Columns) -> Result<u64, Error> {
+        self.data.buffers(offset, columns)
+    }
 }
 
 impl<A, B> Accumulate for Flatten<A>
@@ -585,6 +640,10 @@ where
     fn count(&self) -> u64 {
         self.0.count()
     }
+
+    fn buffers(&self, offset: u64, columns: Columns) -> Result<u64, Error> {
+        self.0.buffers(offset, columns)
+    }
 }
 
 impl<A, B> From<A> for Flatten<A>
@@ -599,7 +658,7 @@ where
 /* ------------------------------------------------------------------ Serialize Trait Definition */
 
 /// A **buffer** that can hold the serialized byte representation of a value.
-pub trait Buffer: AsRef<[u8]> + AsMut<[u8]> {
+pub trait Buffer: AsRef<[u8]> + AsMut<[u8]> + Into<Vec<u8>> {
     /// [`Serialize`] the provided [`item`](I) and append into [`self`](Buffer).
     fn serialize_push<I>(self, item: &I) -> Result<Self, Error>
     where
@@ -614,7 +673,7 @@ pub trait Buffer: AsRef<[u8]> + AsMut<[u8]> {
 ///
 /// This design defines a fixed-size buffer for types with a known size at compile time, while
 /// facilitating dynamic buffer sizing for types that require heap allocation.
-impl<T> Buffer for T where T: AsRef<[u8]> + AsMut<[u8]> {}
+impl<T> Buffer for T where T: AsRef<[u8]> + AsMut<[u8]> + Into<Vec<u8>> {}
 
 /// A **type** that can be serialized into a canonical [`clem`](crate) binary representation for
 /// on-disk storage.
