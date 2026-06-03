@@ -584,6 +584,80 @@ pub trait Deserialize {
 
 /* ------------------------------------------------------------ Deserialize Trait Implementation */
 
+impl Deserialize for u8 {
+    type Error = Error;
+
+    fn deserialize(src: &[u8]) -> Result<Self, Self::Error> {
+        let buf = Self::take(src)?;
+        let num = Self::from_le_bytes(buf);
+        Ok(num)
+    }
+}
+
+impl Deserialize for u16 {
+    type Error = Error;
+
+    fn deserialize(src: &[u8]) -> Result<Self, Self::Error> {
+        let buf = Self::take(src)?;
+        let num = Self::from_le_bytes(buf);
+        Ok(num)
+    }
+}
+
+impl Deserialize for u32 {
+    type Error = Error;
+
+    fn deserialize(src: &[u8]) -> Result<Self, Self::Error> {
+        let buf = Self::take(src)?;
+        let num = Self::from_le_bytes(buf);
+        Ok(num)
+    }
+}
+
+impl Deserialize for u64 {
+    type Error = Error;
+
+    fn deserialize(src: &[u8]) -> Result<Self, Self::Error> {
+        let buf = Self::take(src)?;
+        let num = Self::from_le_bytes(buf);
+        Ok(num)
+    }
+}
+
+impl Deserialize for u128 {
+    type Error = Error;
+
+    fn deserialize(src: &[u8]) -> Result<Self, Self::Error> {
+        let buf = Self::take(src)?;
+        let num = Self::from_le_bytes(buf);
+        Ok(num)
+    }
+}
+
+impl Deserialize for num::NonZeroU8 {
+    type Error = Error;
+
+    fn deserialize(src: &[u8]) -> Result<Self, Self::Error> {
+        u8::deserialize(src)?.try_into().map_err(Into::into)
+    }
+}
+
+impl Deserialize for num::NonZeroU16 {
+    type Error = Error;
+
+    fn deserialize(src: &[u8]) -> Result<Self, Self::Error> {
+        u16::deserialize(src)?.try_into().map_err(Into::into)
+    }
+}
+
+impl Deserialize for num::NonZeroU32 {
+    type Error = Error;
+
+    fn deserialize(src: &[u8]) -> Result<Self, Self::Error> {
+        u32::deserialize(src)?.try_into().map_err(Into::into)
+    }
+}
+
 impl Deserialize for NonZeroU64 {
     type Error = Error;
 
@@ -592,18 +666,124 @@ impl Deserialize for NonZeroU64 {
     }
 }
 
-impl Deserialize for u64 {
+impl Deserialize for num::NonZeroU128 {
+    type Error = Error;
+
+    fn deserialize(src: &[u8]) -> Result<Self, Self::Error>
+    where
+        Self: Sized,
+    {
+        u128::deserialize(src)?.try_into().map_err(Into::into)
+    }
+}
+
+impl Deserialize for i8 {
     type Error = Error;
 
     fn deserialize(src: &[u8]) -> Result<Self, Self::Error> {
-        let buf = src
-            .get(0..size_of::<Self>())
-            .ok_or(Error::Truncated {
-                expected: size_of::<Self>(),
-                actual: src.len(),
-            })?
-            .try_into()?;
-        Ok(u64::from_le_bytes(buf))
+        let buf = Self::take(src)?;
+        let num = Self::from_le_bytes(buf);
+        Ok(num)
+    }
+}
+
+impl Deserialize for i16 {
+    type Error = Error;
+
+    fn deserialize(src: &[u8]) -> Result<Self, Self::Error> {
+        let buf = Self::take(src)?;
+        let num = Self::from_le_bytes(buf);
+        Ok(num)
+    }
+}
+
+impl Deserialize for i32 {
+    type Error = Error;
+
+    fn deserialize(src: &[u8]) -> Result<Self, Self::Error> {
+        let buf = Self::take(src)?;
+        let num = Self::from_le_bytes(buf);
+        Ok(num)
+    }
+}
+
+impl Deserialize for i64 {
+    type Error = Error;
+
+    fn deserialize(src: &[u8]) -> Result<Self, Self::Error> {
+        let buf = Self::take(src)?;
+        let num = Self::from_le_bytes(buf);
+        Ok(num)
+    }
+}
+
+impl Deserialize for i128 {
+    type Error = Error;
+
+    fn deserialize(src: &[u8]) -> Result<Self, Self::Error> {
+        let buf = Self::take(src)?;
+        let num = Self::from_le_bytes(buf);
+        Ok(num)
+    }
+}
+
+impl Deserialize for num::NonZeroI8 {
+    type Error = Error;
+
+    fn deserialize(src: &[u8]) -> Result<Self, Self::Error> {
+        i8::deserialize(src)?.try_into().map_err(Into::into)
+    }
+}
+
+impl Deserialize for num::NonZeroI16 {
+    type Error = Error;
+
+    fn deserialize(src: &[u8]) -> Result<Self, Self::Error> {
+        i16::deserialize(src)?.try_into().map_err(Into::into)
+    }
+}
+
+impl Deserialize for num::NonZeroI32 {
+    type Error = Error;
+
+    fn deserialize(src: &[u8]) -> Result<Self, Self::Error> {
+        i32::deserialize(src)?.try_into().map_err(Into::into)
+    }
+}
+
+impl Deserialize for num::NonZeroI64 {
+    type Error = Error;
+
+    fn deserialize(src: &[u8]) -> Result<Self, Self::Error> {
+        i64::deserialize(src)?.try_into().map_err(Into::into)
+    }
+}
+
+impl Deserialize for num::NonZeroI128 {
+    type Error = Error;
+
+    fn deserialize(src: &[u8]) -> Result<Self, Self::Error> {
+        i128::deserialize(src)?.try_into().map_err(Into::into)
+    }
+}
+
+impl Deserialize for f32 {
+    type Error = Error;
+
+    fn deserialize(src: &[u8]) -> Result<Self, Self::Error> {
+        let buf = Self::take(src)?;
+        let num = Self::from_le_bytes(buf);
+        Ok(num)
+    }
+}
+
+impl Deserialize for f64 {
+    type Error = Error;
+
+    fn deserialize(src: &[u8]) -> Result<Self, Self::Error> {
+        let buf = Self::take(src)?;
+        let num = Self::from_le_bytes(buf);
+        Ok(num)
     }
 }
 
