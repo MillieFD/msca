@@ -399,18 +399,13 @@ impl Accumulate for BitVec {
 
     fn min(&self) -> Option<Self::Item> {
         const_assert!(false < true);
-        match self.is_empty() {
-            true => None,
-            false => Some(self.all()),
-        }
+        self.iter().min().as_deref().copied()
     }
 
     fn max(&self) -> Option<Self::Item> {
         const_assert!(false < true);
-        match self.is_empty() {
-            true => None,
-            false => Some(self.any()),
-        }
+        self.iter().max().as_deref().copied()
+    }
 
     fn buffers(&self, offset: u64, mut columns: Columns) -> Result<u64, Error> {
         let buf = manifest::Buffer {
