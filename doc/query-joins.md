@@ -9,7 +9,7 @@ columns are matched by value and must share a compatible type.
 
 Retain only rows where the key is present in both legs.
 
-```rust
+```rust,ignore
 let readings = dataset.query("readings").select(["time", "sensor", "value"]).range("value", 10.0..=20.0);
 let sensors = dataset.query("sensors").select(["id", "location"]);
 let result = readings.join(sensors, "sensor", "id").read().await?
@@ -20,7 +20,7 @@ let result = readings.join(sensors, "sensor", "id").read().await?
 Retain rows from the left leg if the key is also present in the right leg, but do not include any right-leg columns in
 the output. Useful for existence filtering without column inflation.
 
-```rust
+```rust,ignore
 .semi_join(
 dataset.query("active_sensors").eq("online", true),
 "sensor_id",
@@ -33,7 +33,7 @@ dataset.query("active_sensors").eq("online", true),
 The complement of semi-join. Retain rows from the left leg whose key does *not* appear in the right leg, but do not
 include any right-leg columns in the output.
 
-```rust
+```rust,ignore
 .anti_join(
 dataset.query("faulty_sensors"),
 "sensor_id",
@@ -46,7 +46,7 @@ dataset.query("faulty_sensors"),
 The query builder is deliberately composable. Each `join` returns a new `Query` instance that can itself be further
 filtered or joined.
 
-```rust
+```rust,ignore
 let result = dataset
 .query("measurements")
 .range("time", t0..t1)

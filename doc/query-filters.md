@@ -10,7 +10,7 @@ filtering is applied during [Phase 3][2] for predicates that cannot be fully res
 A query returns all columns defined by the schema unless otherwise specified. The `.select` method restricts the
 returned columns to a named subset, reducing file IO to only the required buffers.
 
-```rust
+```rust,ignore
 .select(["a", "b"]) // Return only columns "a" and "b"
 ```
 
@@ -22,14 +22,14 @@ Omitting `select` is equivalent to selecting every column.
 Retain rows where the value in the specified column falls within a specified interval `[min, max]`. Directly exploits
 the `min` and `max` buffer statistics for segment pruning.
 
-```rust
+```rust,ignore
 .range("temperature", 10..20) // 10.0 ≤ temperature < 20.0 inclusive range
 .range("altitude", 100..=500) // inclusive upper bound on additonal column
 ```
 
 Open or half-open ranges are also supported:
 
-```rust
+```rust,ignore
 .range("pressure", 101.3..) // pressure ≥ 101.3  (no upper bound)
 .range("pressure", ..105.0) // pressure < 105.0  (no lower bound)
 ```
@@ -39,7 +39,7 @@ Open or half-open ranges are also supported:
 Retain rows where the value in the specified column exactly equals a given value. Useful for boolean flags, integer
 codes, and enum discriminants.
 
-```rust
+```rust,ignore
 .eq("active", true)
 .eq("sensor_id", 42u32)
 ```
@@ -51,7 +51,7 @@ Equality on an orderable type is equivalent to `.range(col, v..=v)` and benefits
 Retain or reject optional rows that contain `Some` or `None`. Exploits the null bitmap or *in situ* option encoding for
 each buffer. Returns an error if the column type is not optional.
 
-```rust
+```rust,ignore
 .is_some("calibration") // row must have a calibration value
 .is_none("error_code")  // row must have no error code
 ```
@@ -61,7 +61,7 @@ each buffer. Returns an error if the column type is not optional.
 Retain or reject rows where the column value is a member of a finite set. Useful for allowlists, category codes, or
 string tags. Orderable types benefit from segment pruning; skipped if `buffer.max < set.min || buffer.min > set.max`.
 
-```rust
+```rust,ignore
 .one_of("sensor_id", [1u32, 4, 7, 12])
 .none_of("status_code", [404u16, 500])
 ```
@@ -71,7 +71,7 @@ string tags. Orderable types benefit from segment pruning; skipped if `buffer.ma
 Retain rows by position using a boolean or optional column. Applies the named column as a bitmask; only rows where the
 mask column is `true` or `some` are returned.
 
-```rust
+```rust,ignore
 .mask("is_valid") // equivalent to .eq("is_valid", true) with cross-column semantics
 ```
 
@@ -81,7 +81,7 @@ Restrict the number of rows returned without a value-based predicate. Segment pr
 segments that fall entirely outside the requested window. Limit and offset filters are applied to the result set after
 all other conditions have been evaluated.
 
-```rust
+```rust,ignore
 .limit(1000) // return at most 1000 rows
 .offset(500) // skip the first 499 matching rows
 .limit(1000).offset(500) // rows 500..1500
@@ -91,7 +91,7 @@ all other conditions have been evaluated.
 
 Sample every nth row from the result set. Useful for decimation and preview reads on dense time-series data.
 
-```rust
+```rust,ignore
 .stride(10) // return every 10th row
 ```
 
@@ -101,7 +101,7 @@ Sample every nth row from the result set. Useful for decimation and preview read
 yields one deserialized row; no row is deserialized before being requested. The reader chains across segments
 transparently, meaning callers observe a flat sequence regardless of the underlying segment structure.
 
-```rust
+```rust,ignore
 let mut cursor = dataset
 .query("schema_name")
 .select(["latitude", "longitude"])
@@ -114,7 +114,7 @@ while let Some(row) = cursor.next().await { process(row?); }
 A `.collect().await` convenience method collects the full result into an owned `Vec` for callers that require random
 access over the result set.
 
-```rust
+```rust,ignore
 let result: Vec<R> = dataset
 .query("schema_name")
 .eq("active", true)
