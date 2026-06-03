@@ -1335,6 +1335,46 @@ where
     }
 }
 
+impl<K, I> Serialize for BTreeMap<K, I>
+where
+    K: Serialize + Ord,
+    I: Serialize,
+{
+    type Buffer = Vec<u8>;
+
+    fn size(&self) -> Result<NonZeroU64, Error> {
+        let prefix = size_of::<NonZeroU64>().try_into()?;
+        // Recursively sum the sizes of all elements.
+        self.iter()
+            .try_fold(u64::MIN, |total, entry| {
+                let size = entry.0.size()?.get() + entry.1.size()?.get();
+                total.checked_add(size).ok_or(Error::Zero)
+            })?
+            .checked_add(prefix) // Add length prefix
+            .and_then(NonZeroU64::new)
+            .ok_or(Error::Zero)
+    }
+
+    fn serialize_into(&self, mut buf: Self::Buffer) -> Result<Self::Buffer, Error> {
+        let prefix: u64 = size_of::<NonZeroU64>().try_into()?;
+        // NOTE: Self::size returns Error if Σ overflows u64 (not expected in production)
+        let size = self.size()?.get().checked_sub(prefix).ok_or(Error::Zero)?.to_le_bytes();
+        buf.extend_from_slice(&size);
+        self.iter().try_fold(buf, |sink, entry| {
+            let sink = entry.0.extend(sink)?;
+            entry.1.extend(sink)
+        })
+    }
+
+    fn serialize(&self) -> Result<Self::Buffer, Error> {
+        let size = self.size()?.get().try_into()?;
+        let buf = Vec::with_capacity(size).serialize_push(self)?;
+        // NOTE: cannot use static assertion as size is dependent on runtime data accumulation.
+        debug_assert_eq!(buf.len(), size, "actual size ≠ predicted size");
+        Ok(buf)
+    }
+}
+
 impl Serialize for BitVec {
     type Buffer = Vec<u8>;
 
