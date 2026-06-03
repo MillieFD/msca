@@ -650,12 +650,34 @@ impl<I> Write for Accumulator<I> {
     }
 }
 
-/* --------------------------------------------------------------------- Record Trait Definition */
+/* --------------------------------------------------------------------- Ingest Trait Definition */
 
-/// A **data source** that can be recorded to the [`Manifest`] before writing to disk.
-pub(crate) trait Ingest {
-    /// Add [`self`](Self) to the [`Manifest`] and return the corresponding [`Write`] sector.
-    fn ingest(&self, manifest: &mut Manifest) -> Result<Sector, Error>;
+/// A **data source** that is appended to the [`Manifest`] before writing to disk.
+pub(crate) trait Push {
+    /// The **lightweight record** type used to describe values of [`Self`] in the [`Manifest`].
+    type Record;
+
+    /// Build a [`Descriptor`](Self::Record) for [`Self`] and append to the [`Manifest`].
+    fn push_to_manifest(&self, man: &mut Manifest, sec: Sector) -> Result<Sector, number::Error>;
+}
+
+/* ----------------------------------------------------------------- Ingest Trait Implementation */
+
+impl<I> Push for Accumulator<I> {
+    type Record = Buffer;
+
+    fn push_to_manifest(&self, man: &mut Manifest, sec: Sector) -> Result<Sector, number::Error> {
+        let columns = man
+            .schemas
+            .get_mut(&self.name)
+            // SAFETY: Dataset::schema registers the schema before producing an Accumulator
+            .expect("Schema missing from manifest")
+            .columns
+            .values_mut();
+        self.data.buffers(sec.offset, columns)?;
+        Ok(sec)
+    }
+
 }
 
 /* --------------------------------------------------------------------------------------- Tests */
