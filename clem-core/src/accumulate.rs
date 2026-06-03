@@ -335,6 +335,13 @@ pub trait Accumulate: Serialize {
     fn max(&self) -> Option<Self::Item> {
         None
     }
+
+    /// Generates a [`Buffer`] describing the accumulated data and appends to the [`Manifest`][1].
+    ///
+    /// Returns the next available offset for subsequent buffers, or [`Error`] on overflow.
+    ///
+    /// [1]: manifest::Manifest
+    fn buffers(&self, offset: u64, columns: Columns) -> Result<u64, Error>;
 }
 
 /* ------------------------------------------------------------- Accumulate Trait Implementation */
