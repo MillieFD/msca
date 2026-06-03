@@ -149,6 +149,16 @@ impl Sector {
     pub const fn next(&self) -> Option<NonZeroU64> {
         self.length.checked_add(self.offset)
     }
+
+    /// Read a byte slice from the [`Mmap`] region defined by [`self`](Sector).
+    pub fn slice<'a>(&self, mmap: &'a Mmap) -> Result<&'a [u8], Error> {
+        let start = self.offset.try_into()?;
+        let end = self.next().ok_or(number::Error::Zero)?.get().try_into()?;
+        mmap.get(start..end).ok_or(Error::Truncated {
+            expected: end - start,
+            actual: mmap.len().saturating_sub(start),
+        })
+    }
 }
 
 impl Add for Sector {
