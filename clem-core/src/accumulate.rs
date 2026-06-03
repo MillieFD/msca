@@ -20,7 +20,7 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //! Each accumulator type implements the [`Accumulate`] trait, which defines a shared interface for
 //! handling in-memory value accumulation.
 
-use std::collections::BTreeMap;
+use std::collections::{btree_map, BTreeMap};
 use std::num::*;
 use std::ops::Sub;
 
@@ -41,9 +41,9 @@ use crate::Sector;
 // TODO → Impl Debug + Display + Clone (empty accumulator via Accumulate::boxed).
 pub type BoxAcc<I> = Box<dyn Accumulate<Item = I, Buffer = Vec<u8>>>;
 
-/// Shorthand type-erased [`Iterator`] over mutable [`Column`] descriptors.
+/// Shorthand [`Iterator`] over mutable [`Column`] descriptors.
 // NOTE: Deterministic runtime order via BTreeMap; #[derive] ensures identical compile time order.
-type Columns<'a> = &'a mut dyn Iterator<Item = &'a mut Column>;
+type Columns<'a> = btree_map::ValuesMut<'a, String, Column>;
 
 /// An **in-memory data accumulator** used to build data segments for the specified [`Schema`].
 ///
