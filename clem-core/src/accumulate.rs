@@ -82,7 +82,7 @@ type Columns<'a> = &'a mut dyn Iterator<Item = &'a mut Column>;
 /// [1]: schema::Schema
 /// [2]: crate::Data
 /// [3]: schema::Type
-/// [4]: crate::Sector
+/// [4]: Sector
 pub struct Accumulator<I> {
     /// Type-erased [`Accumulate`] trait object.
     pub data: BoxAcc<I>,
@@ -91,9 +91,9 @@ pub struct Accumulator<I> {
     /// [1]: crate::Schema
     /// [2]: crate::manifest::Manifest
     pub(crate) name: String,
-    /// [`Sector`](crate::Sector) of the corresponding [`Schema`](crate::Schema) segment describing
-    /// the structure of accumulated data.
-    pub schema: crate::Sector,
+    /// [`Sector`] of the corresponding [`Schema`](crate::Schema) segment describing the structure
+    /// of accumulated data.
+    pub schema: Sector,
 }
 
 impl<I> Accumulator<I> {
