@@ -483,7 +483,7 @@ where
 
 impl<T> Accumulate for OptInSitu<T>
 where
-    Option<T>: Serialize,
+    Option<T>: Serialize + Copy + PartialOrd,
 {
     type Item = Option<T>;
 
