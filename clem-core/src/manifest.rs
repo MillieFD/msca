@@ -16,7 +16,8 @@ use std::num::NonZeroU64;
 use minicbor::{CborLen, Decode, Encode};
 use smol::io::{AsyncRead, AsyncReadExt, AsyncSeek};
 
-use crate::io::{Header, Write};
+use crate::io::{Header, Push, Write};
+use crate::schema::number::Error;
 use crate::schema::Type;
 use crate::{io, number, Deserialize, Sector, Serialize};
 
@@ -91,6 +92,11 @@ impl Manifest {
     /// header is decoded sequentially and re-registered in a fresh [`Manifest`].
     pub fn rebuild(data: &[u8], tail: NonZeroU64) -> Self {
         unimplemented!("Manifest::rebuild is not yet implemented")
+    }
+
+    /// Build a descriptor for the provided [`Segment`](S) and register to the [`Manifest`].
+    pub fn push<S: Push>(&mut self, seg: &S, loc: Sector) -> Result<Sector, Error> {
+        S::push_to_manifest(seg, self, loc)
     }
 }
 
