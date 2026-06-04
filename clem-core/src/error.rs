@@ -11,7 +11,7 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 use std::fmt;
 
 use crate::schema::number;
-use crate::{io, schema, segment};
+use crate::{io, query, schema, segment};
 
 /* ------------------------------------------------------------------------------ Public Exports */
 
@@ -33,6 +33,8 @@ pub enum Error {
     Io(io::Error),
     /// Underlying [`number::Error`] from a numerical operation or conversion.
     Number(number::Error),
+    /// Underlying [`query::Error`] from [querying](query) the [`Dataset`](crate::Dataset).
+    Query(query::Error),
     /// Underlying [`schema::Error`] from schema composition.
     Schema(schema::Error),
     /// Underlying [`segment::Error`] while encoding a `Segment`
@@ -49,8 +51,10 @@ pub enum Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::Io(io::Error::Io(e)) => write!(f, "File IO error → {e}"),
             Self::Io(e) => write!(f, "File IO error → {e}"),
             Self::Number(e) => write!(f, "Number error → {e}"),
+            Self::Query(e) => write!(f, "Query error → {e}"),
             Self::Schema(e) => write!(f, "Schema error → {e}"),
             Self::Segment(e) => write!(f, "Segment error → {e}"),
             Self::Slice(e) => write!(f, "Try from slice error → {e}"),
@@ -64,6 +68,7 @@ impl std::error::Error for Error {
         match self {
             Self::Io(e) => Some(e),
             Self::Number(e) => Some(e),
+            Self::Query(e) => Some(e),
             Self::Schema(e) => Some(e),
             Self::Segment(e) => Some(e),
             Self::Slice(e) => Some(e),
@@ -122,6 +127,12 @@ impl From<io::Error> for Error {
 impl From<number::Error> for Error {
     fn from(error: number::Error) -> Self {
         Self::Number(error)
+    }
+}
+
+impl From<query::Error> for Error {
+    fn from(error: query::Error) -> Self {
+        Self::Query(error)
     }
 }
 
