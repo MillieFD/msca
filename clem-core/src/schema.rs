@@ -157,7 +157,7 @@ impl Schema {
     ///
     /// Returns an immutable reference to the inserted or existing [`manifest::Schema`] on success.
     // TODO → Impl Push<Schema> for Manifest. Then finish can delegate to file.manifest.push(self)
-    pub fn finish(self, file: &mut File) -> Result<&manifest::Schema, Error> {
+    pub(crate) fn finish(self, file: &mut File) -> Result<&manifest::Schema, Error> {
         let sector = self.sector(&file.header)?;
         let columns = self.columns.into_iter().map(Schema::map).collect();
         match file.manifest.schemas.entry(self.name) {
@@ -351,7 +351,7 @@ pub mod number {
     #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
     #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode, CborLen)]
     #[non_exhaustive] // To accommodate the potential stabilisation of additional numeric kinds.
-    pub(crate) enum Kind {
+    pub enum Kind {
         /* ---------------------------------------------------------------------------- Unsigned */
         /// Unsigned integer type.
         #[n(0)]
@@ -394,13 +394,13 @@ pub mod number {
     /// and `bytes` corresponds to a specific Rust numeric primitive type.
     #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
     #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode, CborLen)]
-    pub(crate) struct Number {
+    pub struct Number {
         /// Semantic classification of the numeric primitive type.
         #[n(0)]
-        pub(crate) kind: Kind,
+        pub kind: Kind,
         /// Number of bytes used to encode each value.
         #[n(1)]
-        pub(crate) size: u8,
+        pub size: u8,
     }
 
     impl fmt::Display for Number {
