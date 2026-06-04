@@ -9,7 +9,7 @@ repository = "https://github.com/MillieFD/clem"
 
 # See a full list of keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-[cargo.clippy]
+[lints.clippy]
 missing_const_for_fn = "deny"
 unwrap_used = "deny"
 
