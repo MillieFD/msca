@@ -573,6 +573,9 @@ where
 
 /// A **type** that can be deserialized from a canonical [`clem`](crate) binary representation.
 pub trait Deserialize {
+    /// Byte source from which values of [`Self`] are deserialized.
+    type Src<'a>;
+
     /// Read [`N`] bytes from the provided slice into a fixed-size stack-allocated array for
     /// [deserialization](Self::deserialize).
     ///
@@ -587,9 +590,10 @@ pub trait Deserialize {
             .map_err(Into::into)
     }
 
-    /// Deserialize `self` from the provided source byte slice.
+    /// Deserialize [`Self`] from the provided [source](Self::Src).
     #[rustfmt::skip] // Single line where clause improves readability
-    fn deserialize(src: &[u8]) -> Result<Self, Error> where Self: Sized;
+    // TODO → Remove Sized trait bound on Self to support unsized types; could try return Box<Self>
+    fn deserialize(src: Self::Src<'_>) -> Result<Self, Error> where Self: Sized;
 }
 
 /* ------------------------------------------------------------ Deserialize Trait Implementation */
