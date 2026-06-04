@@ -29,6 +29,8 @@
 15. Avoid cloning data. Use references and borrowing where possible to reduce allocations.
 16. The `bitvec` crate includes many optimised functions for working with single bits. Use the `bitvec` built-in
     functions. Do not implement manual bitwise operations.
+17. Prefer vertically symmetrical letters for type generics e.g. `I` instead of `T` or `E` instead of `F`.
+    - Type generics should use the first letter of their semantic meaning e.g. `I` for `Item` or `E` for `Error`.
 
 # Testing and Verification
 
