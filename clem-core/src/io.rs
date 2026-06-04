@@ -299,7 +299,7 @@ impl Deserialize for Header {
 /// An exclusive owned file handle for an open [`clem`](crate) dataset.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug)]
-pub struct File {
+pub(crate) struct File {
     /// todo → field doc comment
     pub file: fs::File,
     /// todo → field doc comment
