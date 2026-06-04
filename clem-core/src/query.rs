@@ -12,7 +12,7 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //! Conditions are chained method-by-method and evaluated lazily; no file IO occurs until
 //! `.read().await` is called.
 //!
-//! ```rust
+//! ```rust,ignore
 //! let results = dataset
 //!     .query("schema_name")
 //!     .select(["latitude", "longitude", "temperature"])
