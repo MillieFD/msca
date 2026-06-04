@@ -45,6 +45,8 @@
 - [ ] Design `Dataset` API with quality-of-life improvements and documentation.
 - [ ] Finish `clem-core` root module (lib) to re-export public API. Check all visibility modifiers.
 - [ ] Finalise `clem-derive` procedural macro design.
+- [ ] Resolve discrepancies between [doc](./doc) and actual implementations. Update documentation as needed.
+- [ ] Add comprehensive unit tests for core functionalities in each module; cover edge cases.
 
 ### Extend Functionality (Priority III)
 
