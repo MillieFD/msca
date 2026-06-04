@@ -573,7 +573,8 @@ where
 
 /// A **type** that can be deserialized from a canonical [`clem`](crate) binary representation.
 pub trait Deserialize {
-    /// Read [`N`] bytes from the provided slice into a fixed-size array for deserialization.
+    /// Read [`N`] bytes from the provided slice into a fixed-size stack-allocated array for
+    /// [deserialization](Self::deserialize).
     ///
     /// ### Errors
     ///
