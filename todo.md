@@ -1,37 +1,37 @@
 ### Foundational Functionality (Priority I)
 
 - [ ] Implement `dictionary` and `index` abstractions without adding new segment types.
-- [ ] Add a query builder with an async file reader.
-    - [ ] New query instance via `Dataset::query(&self, name: &str) -> Result<Query, Error>`:
-        - [ ] Add `query::Column` which holds buffers and filters.
-        - [ ] `Dataset::query` maps the schema `BTreeMap<String, manifest::Column>` → `BTreeMap<String, query::Column>`.
-        - [ ] The `Query` therefore starts with every column and every buffer.
-        - [ ] Columns and buffers are removed by calling filter methods on the `Query` instance (subtractive).
-    - [ ] Some filters can be applied before file IO:
-        - [ ] Column-level filters to remove whole columns from the query map.
-        - [ ] Buffer-level filters to remove buffers from the query map e.g. using min / max statistics.
-        - [ ] Columns are removed if their buffer count falls to zero.
-    - [ ] Other filters must be applied during file IO:
-        - [ ] `query::Filter` added to a collection owned by the `Query` instance.
-        - [ ] Use a `BTreeSet` or `HashSet` to ensure filter uniqueness; duplicate filters reduce efficiency.
-        - [ ] Retain the most constrained filter if two filters conflict e.g. `> 20` should replace `> 10`.
-    - [ ] Some filters can be used before file IO to remove buffers, but must also be evaluated during IO e.g. `range`
-    - [ ] Add `Read` trait with associated `Item` type:
-        - [ ] Readers are strongly typed and inherently know how to deserialize bytes into their target Rust type.
-        - [ ] Type-erased `BoxRead` trait object hides the concrete reader type; mirror the `BoxAcc` accumulator design.
-        - [ ] Add `Type::reader(&self) -> BoxRead` to initialise a deserializer for the column via `column.ty.reader()`.
-        - [ ] `Read::next` returns the next deserialized item
-    - [ ] `query::Column::read` executes file IO and applies remaining filters; returns a `BoxRead` for the column.
-    - [ ] Generalise `Deserialize` trait w/ a source
-        - [ ] Add an associated source/context type to Deserialize (mirroring Write::Ctx<'a>)
-        - [ ] Leaves deserialize from `&[u8]`
-        - [ ] External types deserialize from a composite reader
-        - [ ] Users can add `#[derive(Deserialize)]` on their external types:
-            - [ ] Generates a hidden composite reader struct that holds a reader for each external type field.
-            - [ ] `deserialize` calls `next` on each sub-reader to construct one instance of the external type.
-        - [ ] This allows us to merge the Reconstruct and Deserialize traits
-    - `Query::read::<I>` returns the composite reader for `I`; mirrors `Data::accumulator`.
-        - [ ] Type-erased as `BoxRead<Item = I>` to hide the generated reader type from users.
+- [x] Add a query builder with an async file reader.
+    - [x] New query instance via `Dataset::query(&self, name: &str) -> Result<Query, Error>`:
+        - [x] Add `query::Column` which holds buffers and filters.
+        - [x] `Dataset::query` maps the schema `BTreeMap<String, manifest::Column>` → `BTreeMap<String, query::Column>`.
+        - [x] The `Query` therefore starts with every column and every buffer.
+        - [x] Columns and buffers are removed by calling filter methods on the `Query` instance (subtractive).
+    - [x] Some filters can be applied before file IO:
+        - [x] Column-level filters to remove whole columns from the query map. (`select`)
+        - [x] Buffer-level filters to remove buffers from the query map e.g. using min / max statistics. (`range`)
+        - [x] Columns are removed if their buffer count falls to zero.
+    - [x] Other filters must be applied during file IO:
+        - [x] `query::Filter` added to a collection owned by the `Query` instance.
+        - [x] Use a `BTreeSet` or `HashSet` to ensure filter uniqueness; duplicate filters reduce efficiency. (`HashSet`)
+        - [x] Retain the most constrained filter if two filters conflict e.g. `> 20` should replace `> 10`. (conjunction)
+    - [x] Some filters can be used before file IO to remove buffers, but must also be evaluated during IO e.g. `range`
+    - [x] Add `Read` trait with associated `Item` type:
+        - [x] Readers are strongly typed and inherently know how to deserialize bytes into their target Rust type.
+        - [x] Type-erased `BoxRead` trait object hides the concrete reader type; mirror the `BoxAcc` accumulator design.
+        - [x] Add `Type::reader(&self) -> BoxRead` to initialise a deserializer for the column via `column.ty.reader()`.
+        - [x] `Read::next` returns the next deserialized item
+    - [x] `query::Column::read` executes file IO and applies remaining filters; returns a `BoxRead` for the column.
+    - [x] Generalise `Deserialize` trait w/ a source
+        - [x] Add an associated source/context type to Deserialize (mirroring Write::Ctx<'a>)
+        - [x] Leaves deserialize from `&[u8]`
+        - [x] External types deserialize from a composite reader
+        - [x] Users can add `#[derive(Deserialize)]` on their external types:
+            - [x] Generates a hidden composite reader struct that holds a reader for each external type field.
+            - [x] `deserialize` calls `next` on each sub-reader to construct one instance of the external type.
+        - [x] This allows us to merge the Reconstruct and Deserialize traits
+    - [x] `Query::read::<I>` returns the composite reader for `I`; mirrors `Data::accumulator`.
+        - [x] Type-erased as `BoxRead<Item = I>` to hide the generated reader type from users.
     - [ ] Implement optional and unsized layout readers: `OptBitVec` + `OptInSitu` + `Seq` + `OptSeq` + `Flatten`
     - [ ] Add remaining query filters: `eq` + `one_of` + `none_of` + `is_some` + `is_none` + `mask` + `limit` + `offset`
 - [ ] SIMD alignment on all critical data fields.

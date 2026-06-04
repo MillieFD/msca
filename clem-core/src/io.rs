@@ -896,17 +896,18 @@ impl<I> Push for Accumulator<I> {
     type Record = Buffer;
 
     fn push_to_manifest(&self, man: &mut Manifest, sec: Sector) -> Result<Sector, number::Error> {
-        let columns = man
+        let mut columns = man
             .schemas
             .get_mut(&self.name)
             // SAFETY: Dataset::schema registers the schema before producing an Accumulator
             .expect("Schema missing from manifest")
             .columns
             .values_mut();
-        self.data.buffers(sec.offset, columns)?;
+        let header = Accumulator::<I>::HEADER.try_into()?;
+        let offset = sec.offset.checked_add(header).ok_or(number::Error::Zero)?;
+        self.data.buffers(offset, &mut columns)?;
         Ok(sec)
     }
-
 }
 
 /* --------------------------------------------------------------------------------------- Tests */
