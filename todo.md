@@ -17,7 +17,8 @@
     - [ ] Retain the most constrained filter if two filters conflict e.g. `> 20` should replace `> 10`.
   - [ ] Add `Read` trait with associated `Item` type:
     - [ ] Readers are strongly typed and inherently know how to deserialize bytes into their target Rust type.
-    - [ ] Type-erased `BoxRead` trait object hides the concrete reader type; mirror the `BoxAcc` writer design.
+    - [ ] Type-erased `BoxRead` trait object hides the concrete reader type; mirror the `BoxAcc` accumulator design.
+    - [ ] Add `Type::reader(&self) -> BoxRead` to initialise an appropriate reader for the column e.g. `column.ty.reader()`.
     - [ ] `Read::next` returns the next deserialized item
   - [ ] `query::Column::read` executes file IO and applies remaining filters; returns a `BoxRead` for the column.
   - [ ] Generalise `Deserialize` trait w/ a source
