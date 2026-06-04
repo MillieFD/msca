@@ -58,7 +58,7 @@ impl fmt::Display for Error {
             Self::Schema(e) => write!(f, "Schema error → {e}"),
             Self::Segment(e) => write!(f, "Segment error → {e}"),
             Self::Slice(e) => write!(f, "Try from slice error → {e}"),
-            Self::Utf8(e) => write!(f, "UTF8 from u8 error → {e}"),
+            Self::Utf8(e) => write!(f, "UTF8 from bytes error → {e}"),
         }
     }
 }
