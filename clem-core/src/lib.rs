@@ -15,9 +15,9 @@ mod dataset;
 mod error;
 mod io;
 mod manifest;
+mod query;
 mod schema;
 mod segment;
-mod query;
 
 /* ----------------------------------------------------------------------------- Private Imports */
 
