@@ -79,7 +79,8 @@ use static_assertions::{assert_eq_size, const_assert_ne};
 use self::number::Number;
 use crate::accumulate::{Accumulate, BoxAcc, Flatten, OptBitVec, OptInSitu, OptSeq, Seq};
 use crate::io::{File, Write};
-use crate::{manifest, Serialize};
+use crate::read::{Bits, Deferred, Values};
+use crate::{manifest, BoxRead, Read, Serialize, Source};
 
 /* ------------------------------------------------------------------------------ Public Exports */
 
@@ -554,11 +555,11 @@ pub trait Unfold: Sized {
     // NOTE: Buffer must be a growable Vec; compiler cannot predict the number of accumulated items
     type OptAcc: Accumulate<Item = Option<Self>> + Serialize<Buffer = Vec<u8>> + Default + 'static;
 
-    /// The [reader](read::Read) type used to deserialize values of [`Self`].
-    type RawRead: read::Read<Item = Self> + From<read::Source> + 'static;
+    /// The [reader](Read) type used to deserialize values of [`Self`].
+    type RawRead: Read<Item = Self> + From<Source> + 'static;
 
-    /// The [reader](read::Read) type used to deserialize [optional](Option) values of [`Self`].
-    type OptRead: read::Read<Item = Option<Self>> + From<read::Source> + 'static;
+    /// The [reader](Read) type used to deserialize [optional](Option) values of [`Self`].
+    type OptRead: Read<Item = Option<Self>> + From<Source> + 'static;
 
     /// Delegates to [`unfold`](Unfolder::unfold) on the provided [`Unfolder`].
     fn with_unfolder<U>() -> Type
