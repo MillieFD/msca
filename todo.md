@@ -48,6 +48,7 @@
 - [ ] Finalise `clem-derive` procedural macro design.
 - [ ] Resolve discrepancies between [doc](./doc) and actual implementations. Update documentation as needed.
 - [ ] Add comprehensive unit tests for core functionalities in each module; cover edge cases.
+- [ ] Remove references to concurrency model `RwLock<Manifest>` in read-cycle documentation
 
 ### Extend Functionality (Priority III)
 
