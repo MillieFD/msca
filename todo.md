@@ -32,6 +32,8 @@
         - [ ] This allows us to merge the Reconstruct and Deserialize traits
     - `Query::read::<I>` returns the composite reader for `I`; mirrors `Data::accumulator`.
         - [ ] Type-erased as `BoxRead<Item = I>` to hide the generated reader type from users.
+    - [ ] Implement optional and unsized layout readers: `OptBitVec` + `OptInSitu` + `Seq` + `OptSeq` + `Flatten`
+    - [ ] Add remaining query filters: `eq` + `one_of` + `none_of` + `is_some` + `is_none` + `mask` + `limit` + `offset`
 - [ ] SIMD alignment on all critical data fields.
 - [ ] Manifest rebuild function
     - [ ] Triggered automatically during `File::open` if corruption is detected.
@@ -43,15 +45,17 @@
 
 ### Path to Prototype (Priority II)
 
-- [ ] Design `Dataset` API with quality-of-life improvements and documentation.
+- [ ] Design public `Dataset` API with quality-of-life improvements and documentation.
 - [ ] Finish `clem-core` root module (lib) to re-export public API. Check all visibility modifiers.
 - [ ] Finalise `clem-derive` procedural macro design.
 - [ ] Resolve discrepancies between [doc](./doc) and actual implementations. Update documentation as needed.
 - [ ] Add comprehensive unit tests for core functionalities in each module; cover edge cases.
+- [ ] Add round-trip integration tests for `#[derive(Data)]` and `#[derive(Deserialize)]` in "tests" directory.
 - [ ] Remove references to concurrency model `RwLock<Manifest>` in read-cycle documentation
 
 ### Extend Functionality (Priority III)
 
+- [ ] Fix `serde` feature; needs `serde` feature for `bitvec` dependency.
 - [ ] Add support for free-form metadata written after the manifest. Feature-gated. Ignored if the feature is disabled.
 - [ ] Add a feature-gated `bin` segment variant for immutable binary data in any format (e.g. TOML) like the manifest.
 - [ ] Implement logging macros gated via the `log` feature.
