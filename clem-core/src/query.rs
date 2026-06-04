@@ -24,3 +24,9 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 
 #![doc = include_str!("../../doc/query-filters.md")]
 #![doc = include_str!("../../doc/query-joins.md")]
+
+/* ------------------------------------------------------------------------------ Public Exports */
+
+/// A [query filter](self) that evaluates the raw bytes **during file IO** and before
+/// [deserialization](Deserialize). Returns `true` if the row should be retained.
+pub(crate) type Filter = Box<dyn Fn(&[u8]) -> Result<bool, io::Error>>;
