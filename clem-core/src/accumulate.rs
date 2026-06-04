@@ -20,7 +20,7 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //! Each accumulator type implements the [`Accumulate`] trait, which defines a shared interface for
 //! handling in-memory value accumulation.
 
-use std::collections::{btree_map, BTreeMap};
+use std::collections::BTreeMap;
 use std::num::*;
 use std::ops::Sub;
 
@@ -41,9 +41,9 @@ use crate::Sector;
 // TODO → Impl Debug + Display + Clone (empty accumulator via Accumulate::boxed).
 pub type BoxAcc<I> = Box<dyn Accumulate<Item = I, Buffer = Vec<u8>>>;
 
-/// Shorthand [`Iterator`] over mutable [`Column`] descriptors.
+/// Shorthand type-erased [`Iterator`] over mutable [`Column`] descriptors.
 // NOTE: Deterministic runtime order via BTreeMap; #[derive] ensures identical compile time order.
-type Columns<'a> = btree_map::ValuesMut<'a, String, Column>;
+pub type Columns<'a> = dyn Iterator<Item = &'a mut Column> + 'a;
 
 /// An **in-memory data accumulator** used to build data segments for the specified [`Schema`].
 ///
@@ -341,7 +341,7 @@ pub trait Accumulate: Serialize {
     /// Returns the next available offset for subsequent buffers, or [`Error`] on overflow.
     ///
     /// [1]: manifest::Manifest
-    fn buffers(&self, offset: u64, columns: Columns) -> Result<u64, Error>;
+    fn buffers(&self, offset: u64, columns: &mut Columns) -> Result<u64, Error>;
 }
 
 /* ------------------------------------------------------------- Accumulate Trait Implementation */
@@ -373,7 +373,7 @@ impl<I> Accumulate for Accumulator<I> {
         self.data.max()
     }
 
-    fn buffers(&self, offset: u64, columns: Columns) -> Result<u64, Error> {
+    fn buffers(&self, offset: u64, columns: &mut Columns) -> Result<u64, Error> {
         self.data.buffers(offset, columns)
     }
 }
@@ -407,7 +407,7 @@ impl Accumulate for BitVec {
         self.iter().max().as_deref().copied()
     }
 
-    fn buffers(&self, offset: u64, mut columns: Columns) -> Result<u64, Error> {
+    fn buffers(&self, offset: u64, columns: &mut Columns) -> Result<u64, Error> {
         let buf = manifest::Buffer {
             sector: Sector { offset, length: self.size()? },
             count: self.count().try_into()?,
@@ -462,7 +462,7 @@ where
         })
     }
 
-    fn buffers(&self, offset: u64, mut columns: Columns) -> Result<u64, Error> {
+    fn buffers(&self, offset: u64, columns: &mut Columns) -> Result<u64, Error> {
         let buf = manifest::Buffer {
             sector: Sector { offset, length: self.size()? },
             count: self.count().try_into()?,
@@ -511,7 +511,7 @@ where
         self.data.max()
     }
 
-    fn buffers(&self, offset: u64, columns: Columns) -> Result<u64, Error> {
+    fn buffers(&self, offset: u64, columns: &mut Columns) -> Result<u64, Error> {
         self.data.buffers(offset, columns)
     }
 }
@@ -540,7 +540,7 @@ where
         self.mask.len() as u64
     }
 
-    fn buffers(&self, offset: u64, columns: Columns) -> Result<u64, Error> {
+    fn buffers(&self, offset: u64, columns: &mut Columns) -> Result<u64, Error> {
         self.data.buffers(offset, columns)
     }
 }
@@ -573,7 +573,7 @@ where
         self.offsets.len() as u64
     }
 
-    fn buffers(&self, offset: u64, columns: Columns) -> Result<u64, Error> {
+    fn buffers(&self, offset: u64, columns: &mut Columns) -> Result<u64, Error> {
         self.data.buffers(offset, columns)
     }
 }
@@ -609,7 +609,7 @@ where
         self.offsets.len() as u64
     }
 
-    fn buffers(&self, offset: u64, columns: Columns) -> Result<u64, Error> {
+    fn buffers(&self, offset: u64, columns: &mut Columns) -> Result<u64, Error> {
         self.data.buffers(offset, columns)
     }
 }
@@ -636,7 +636,7 @@ where
         self.0.count()
     }
 
-    fn buffers(&self, offset: u64, columns: Columns) -> Result<u64, Error> {
+    fn buffers(&self, offset: u64, columns: &mut Columns) -> Result<u64, Error> {
         self.0.buffers(offset, columns)
     }
 }
