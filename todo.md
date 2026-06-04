@@ -7,18 +7,19 @@
     - [ ] `Dataset::query` maps the schema `BTreeMap<String, manifest::Column>` into `BTreeMap<String, query::Column>`.
     - [ ] The `Query` therefore starts with every column and every buffer.
     - [ ] Columns and buffers are removed by calling filter methods on the `Query` instance (subtractive).
-  - [ ] Certain filters can be applied before file IO:
+  - [ ] Some filters can be applied before file IO:
     - [ ] Column-level filters to remove whole columns from the query map.
     - [ ] Buffer-level filters to remove buffers from the query map e.g. using min / max statistics.
     - [ ] Columns are removed if their buffer count falls to zero.
-  - [ ] Certain filters must be applied during file IO:
+  - [ ] Other filters must be applied during file IO:
     - [ ] `query::Filter` added to a collection owned by the `Query` instance.
     - [ ] Investigate using a `BTreeSet` or `HashSet` to ensure filter uniqueness; duplicate filters reduce efficiency.
     - [ ] Retain the most constrained filter if two filters conflict e.g. `> 20` should replace `> 10`.
+  - [ ] Some filters can be used before file IO to remove buffers, but must also be evaluated during IO e.g. `range`
   - [ ] Add `Read` trait with associated `Item` type:
     - [ ] Readers are strongly typed and inherently know how to deserialize bytes into their target Rust type.
     - [ ] Type-erased `BoxRead` trait object hides the concrete reader type; mirror the `BoxAcc` accumulator design.
-    - [ ] Add `Type::reader(&self) -> BoxRead` to initialise an appropriate reader for the column e.g. `column.ty.reader()`.
+    - [ ] Add `Type::reader(&self) -> BoxRead` to initialise a suitible reader for the column via `column.ty.reader()`.
     - [ ] `Read::next` returns the next deserialized item
   - [ ] `query::Column::read` executes file IO and applies remaining filters; returns a `BoxRead` for the column.
   - [ ] Generalise `Deserialize` trait w/ a source
