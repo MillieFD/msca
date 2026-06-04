@@ -106,14 +106,14 @@ pub struct Schema {
         feature = "serde",
         serde(default, skip_serializing_if = "BTreeMap::is_empty")
     )]
-    // TODO → Review visibility of fields / structs / enums / traits
-    pub columns: BTreeMap<String, Column>,
-    #[cbor(n(1), skip_if = "str::is_empty")]
+    columns: BTreeMap<String, Column>,
+    /// Schema name for retrieval via the [manifest].
+    #[cbor(n(1), skip_if = "String::is_empty")]
     #[cfg_attr(
         feature = "serde",
-        serde(default, skip_serializing_if = "str::is_empty")
+        serde(default, skip_serializing_if = "String::is_empty")
     )]
-    pub name: String,
+    name: String,
 }
 
 impl Schema {
