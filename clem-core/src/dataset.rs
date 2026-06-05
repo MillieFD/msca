@@ -29,6 +29,14 @@ use crate::io::File;
 pub struct Dataset {
     /// Underlying [`File`] handle backing this dataset.
     file: File,
+    /// Read-only [memory map](Mmap) backed by the [clem](crate) file.
+    ///
+    /// ### ⚠️ Warning
+    ///
+    /// Undefined behaviour may occur if the mapped region is modified. The [`Mmap`] is therefore
+    /// tightly scoped; mapping only the immutable segment region to reduce the risk of undefined
+    /// behaviour. Refer to the [`File::mmap`] documentation for more details.
+    mmap: Mmap,
 }
 
 impl Dataset {}
