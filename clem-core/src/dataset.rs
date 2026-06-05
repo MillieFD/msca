@@ -36,7 +36,7 @@ pub struct Dataset {
     /// Undefined behaviour may occur if the mapped region is modified. The [`Mmap`] is therefore
     /// tightly scoped; mapping only the immutable segment region to reduce the risk of undefined
     /// behaviour. Refer to the [`File::mmap`] documentation for more details.
-    mmap: Mmap,
+    mmap: Arc<Mmap>,
 }
 
 impl Dataset {}
