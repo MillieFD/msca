@@ -336,7 +336,8 @@ pub trait Accumulate: Serialize {
         None
     }
 
-    /// Generates a [`Buffer`] describing the accumulated data and appends to the [`Manifest`][1].
+    /// Generates one or more [`Buffer`] instances describing the accumulated data and appends to
+    /// the [`Manifest`][1].
     ///
     /// Returns the next available offset for subsequent buffers, or [`Error`] on overflow.
     ///
