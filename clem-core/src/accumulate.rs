@@ -89,7 +89,7 @@ pub struct Accumulator<I> {
     /// [Name](String) of the corresponding [`Schema`][1] registered in the [`Manifest`][2].
     ///
     /// [1]: crate::Schema
-    /// [2]: crate::manifest::Manifest
+    /// [2]: manifest::Manifest
     pub(crate) name: String,
     /// [`Sector`] of the corresponding [`Schema`](crate::Schema) segment describing the structure
     /// of accumulated data.
