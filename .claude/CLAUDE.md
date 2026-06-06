@@ -41,3 +41,4 @@
 # General Guidance
 
 1. Ask questions if anything is uncertain. Do not attempt to guess the user’s intention if there is ambiguity.
+2. Use `rustfmt` to format touched files; don't reformat files that are not touched during your edit.
