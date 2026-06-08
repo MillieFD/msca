@@ -268,6 +268,10 @@ impl From<Type> for Column {
 #[doc(hidden)] // Reachable through Accumulate::buffers for the #[derive(Data)] macro.
 pub struct Buffer {
     /// Location of the [`Buffer`] on disk.
+    ///
+    /// Sector `offset` is calculated relative to the immutable segment region, excluding the file
+    /// header. Refer to the [write-cycle](self) documentation for more details regarding the
+    /// [clem](crate) file layout.
     #[n(0)]
     pub sector: Sector,
     /// Number of data entries.
