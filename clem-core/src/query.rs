@@ -105,6 +105,16 @@ impl Column {
     }
 }
 
+impl From<manifest::Column> for Column {
+    fn from(src: manifest::Column) -> Self {
+        Self {
+            ty: src.ty,
+            buffers: src.buffers,
+            filters: HashSet::new(),
+        }
+    }
+}
+
 /* --------------------------------------------------------------------------------------- Tests */
 
 #[cfg(test)]
