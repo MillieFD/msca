@@ -328,6 +328,20 @@ impl Type {
     }
 }
 
+impl Display for Type {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Bool => f.write_str("bool"),
+            Self::Char => f.write_str("char"),
+            Self::Number(n) => n.fmt(f),
+            Self::Option { subtype } => write!(f, "Option<{subtype}>"),
+            Self::Tuple { .. } => f.write_str("tuple"),
+            Self::String => f.write_str("String"),
+            Self::Sequence { subtype } => write!(f, "Vec<{subtype}>"),
+        }
+    }
+}
+
 pub mod number {
     //! This module provides a minimal and extensible [`Number`] **descriptor** for Rust numeric
     //! primitives.
