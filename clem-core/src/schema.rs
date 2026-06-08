@@ -69,7 +69,7 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //! are achieved by appending additional schema segments.
 
 use std::collections::btree_map::{BTreeMap, Entry};
-use std::fmt::{Display, Formatter};
+use std::fmt::{self, Display};
 use std::num;
 
 use bitvec::vec::BitVec;
@@ -515,7 +515,7 @@ pub enum Error {
 }
 
 impl Display for Error {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Collision { name } => write!(f, "Name collision → {name}"),
             Self::Number(e) => write!(f, "Number error → {e}"),
