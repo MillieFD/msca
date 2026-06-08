@@ -150,7 +150,12 @@ impl Sector {
         self.length.checked_add(self.offset)
     }
 
-    /// Read a byte slice from the [`Mmap`] region defined by [`self`](Sector).
+    /// Read the byte slice defined by [`self`](Sector) from the provided [`Mmap`].
+    ///
+    /// ### Errors
+    ///
+    /// Returns [`Error::Truncated`] if the sector extends beyond the end of the [`Mmap`], or
+    /// [`Error::Number`] if numeric conversion overflow occurs.
     pub fn slice<'a>(&self, mmap: &'a Mmap) -> Result<&'a [u8], Error> {
         let start = self.offset.try_into()?;
         let end = self.next().ok_or(number::Error::Zero)?.get().try_into()?;
