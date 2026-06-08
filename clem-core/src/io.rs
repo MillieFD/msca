@@ -372,7 +372,7 @@ impl File {
     }
 
     /// Open an existing [clem](crate) file with read and write permissions at the specified
-    /// [path](PathBuf).
+    /// [path](P).
     ///
     /// The [magic bytes](MAGIC) and [version number](VERSION) are validated immediately on open. A
     /// [`Mmap`] is scoped to the immutable [`Segment`] file region. Implementors must ensure that
