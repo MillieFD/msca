@@ -68,6 +68,32 @@ impl Dataset {
         let mmap = unsafe { file.mmap(file.header.tail)? }.into();
         Ok(Self { file, mmap })
     }
+
+    /// Open an existing [`Dataset`] with read and write permissions at the specified [`path`](P).
+    ///
+    /// A [`Mmap`] is scoped to the immutable segment file region. Implementors must ensure that the
+    /// provided [`path`](P) remains valid and accessible for the entire duration of the operation.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Io`] if the underlying system call fails. This can occur for a variety of
+    /// reasons, including:
+    ///
+    /// - A file already exists at the specified [`path`](P)
+    /// - The current process lacks read and write permissions
+    /// - Unexpected `EOF` while parsing the [`Header`] or [`Manifest`]
+    /// - The platform does not support [memory mapping](memmap2)
+    ///
+    /// Returns [`Error::Zero`] if a `u64` overflow occurs while calculating `size` or `offset` for
+    /// the relevant file regions.
+    pub async fn open<P>(path: P) -> Result<Self, Error>
+    where
+        P: AsRef<Path>,
+    {
+        let file = File::open(path).await?;
+        let mmap = unsafe { file.mmap(file.header.tail)? }.into();
+        Ok(Self { file, mmap })
+    }
 }
 
 /* --------------------------------------------------------------------------------------- Tests */
