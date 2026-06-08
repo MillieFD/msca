@@ -23,7 +23,6 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //! ```
 
 #![doc = include_str!("../../doc/query-filters.md")]
-#![doc = include_str!("../../doc/query-joins.md")]
 
 /* ------------------------------------------------------------------------------ Public Exports */
 
