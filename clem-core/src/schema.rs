@@ -79,8 +79,7 @@ use static_assertions::{assert_eq_size, const_assert_ne};
 use self::number::Number;
 use crate::accumulate::{Accumulate, BoxAcc, Flatten, OptBitVec, OptInSitu, OptSeq, Seq};
 use crate::io::{File, Write};
-use crate::read::{Bits, Deferred, Values};
-use crate::{manifest, BoxRead, Read, Serialize, Source};
+use crate::{manifest, Serialize};
 
 /* ------------------------------------------------------------------------------ Public Exports */
 
@@ -497,7 +496,7 @@ pub enum Error {
     ///
     /// Some types are deliberately omitted. Please read the [type documentation](Type) for more
     /// details. If you think a type should be supported, please open a new GitHub feature request
-    /// with your use case and justification for inclusion.
+    /// with your use-case and justification for inclusion.
     Unsupported(&'static str),
 }
 
