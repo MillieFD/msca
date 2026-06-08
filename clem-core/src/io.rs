@@ -74,10 +74,10 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 
 use std::array::TryFromSliceError;
 use std::cmp::Ordering;
-use std::convert::TryInto;
+use std::convert::{Infallible, TryInto};
 use std::fmt;
 use std::io::SeekFrom;
-use std::num::{NonZeroU64, TryFromIntError};
+use std::num::{self, NonZeroU64, TryFromIntError};
 use std::ops::Add;
 use std::path::{Path, PathBuf};
 
@@ -87,7 +87,7 @@ use smol::fs::{self, OpenOptions};
 use smol::io::{AsyncRead, AsyncReadExt, AsyncSeek, AsyncSeekExt, AsyncWrite, AsyncWriteExt};
 
 use crate::accumulate::Accumulator;
-use crate::manifest::{Manifest, Pending};
+use crate::manifest::{Buffer, Manifest, Pending};
 use crate::{number, schema, Serialize};
 
 /* ------------------------------------------------------------------------------ Public Exports */
