@@ -219,7 +219,7 @@ pub struct Schema {
     pub columns: BTreeMap<String, Column>,
 }
 
-/// A minimal column **descriptor** that wraps a list of [`Buffer`] descriptors.
+/// A minimal column **descriptor** wrapping a collection of [`Buffer`] descriptors.
 ///
 /// This type does **not** contain the actual buffer data; it is a lightweight descriptor for column
 /// discovery and access without holding buffer contents in memory. Data is stored via one or more
