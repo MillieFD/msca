@@ -72,6 +72,32 @@ pub struct Query {
 }
 
 
+/* ----------------------------------------------------------------------------- Query Internals */
+
+/// A minimal column **descriptor** for [`Query`] planning and execution.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Debug, Clone, Eq, PartialEq, Encode, Decode, CborLen)]
+pub struct Column {
+    /// The [`Type`] of values contained within this [`Column`].
+    #[n(0)]
+    pub ty: Type,
+    /// List of [`Buffer`] descriptors for this [`Column`] across all data segments.
+    #[cbor(n(1), skip_if = "Vec::is_empty")]
+    #[cfg_attr(
+        feature = "serde",
+        serde(default, skip_serializing_if = "Vec::is_empty")
+    )]
+    buffers: Vec<Buffer>,
+    /// Deduplicated [`Filter`] set attached to this [`Column`] for lazy evaluation during
+    /// [deserialization](Deserialize).
+    #[cbor(n(2), skip_if = "HashSet::is_empty")]
+    #[cfg_attr(
+        feature = "serde",
+        serde(default, skip_serializing_if = "HashSet::is_empty")
+    )]
+    filters: HashSet<Filter>,
+}
+
 /* --------------------------------------------------------------------------------------- Tests */
 
 #[cfg(test)]
