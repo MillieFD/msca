@@ -103,6 +103,27 @@ impl Column {
     pub(crate) fn map(entry: (&String, &manifest::Column)) -> (String, Self) {
         (entry.0.clone(), entry.1.clone().into())
     }
+
+    /// Returns a new [`Decoder`] capable of [deserializing](Deserialize) bytes from each on-disk
+    /// [`Buffer`] into instances of the requested [`Item`](I) type.
+    ///
+    /// The requested [`Type`] is evaluated against the on-disk [`Column`] type exactly once;
+    /// enabling subsequent deserialization to occur fearlessly without additional runtime checks.
+    ///
+    /// ### Errors
+    ///
+    /// Returns [`Error::Type`] if the on-disk [`Type`] is incompatible with [`I`].
+    fn reader<'a, I>(&'a self, mmap: &'a Mmap) -> Result<BoxRead<'a, I>, Error>
+    where
+        Schema: Unfolder<I>,
+        Decoder<'a>: Read<I>,
+    {
+        let expected = Schema::unfold();
+        match self.ty == expected {
+            true => unimplemented!("Decoder construction path"),
+            false => unimplemented!("Type mismatch error"),
+        }
+    }
 }
 
 impl From<manifest::Column> for Column {
