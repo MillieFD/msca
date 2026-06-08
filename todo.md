@@ -35,6 +35,9 @@
     - [ ] Implement optional and unsized layout readers: `OptBitVec` + `OptInSitu` + `Seq` + `OptSeq` + `Flatten`
     - [ ] Add remaining query filters: `eq` + `one_of` + `none_of` + `is_some` + `is_none` + `mask` + `limit` + `offset`
 - [ ] SIMD alignment on all critical data fields.
+- [ ] Standardise buffer sector offset is relative to the immutable segment region; excludes the file header:
+    - [x] Update `Serialize::sector` and `Header::tail` documentation.
+    - [ ] Refactor all buffer offset calculations to reflect this change.
 - [ ] Manifest rebuild function
     - [ ] Triggered automatically during `File::open` if corruption is detected.
     - [ ] Ensure the on-disk layout is sufficiently self-describing to support rebuild.
