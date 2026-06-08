@@ -372,7 +372,7 @@ impl File {
     }
 
     /// Open an existing [clem](crate) file with read and write permissions at the specified
-    /// [path](P).
+    /// [`path`](P).
     ///
     /// The [magic bytes](MAGIC) and [version number](VERSION) are validated immediately on open.
     /// Implementors must ensure that the provided `path` remains valid and accessible for the
@@ -383,7 +383,7 @@ impl File {
     /// Returns [`Error::Io`] if the underlying system call fails. This can occur for a variety of
     /// reasons, including:
     ///
-    /// - A file already exists at the specified [`Path`](P)
+    /// - A file already exists at the specified [`path`](P)
     /// - The current process lacks read and write permissions
     /// - Unexpected `EOF` while parsing the [`Header`] or [`Manifest`]
     /// - The platform does not support [memory mapping](memmap2)
