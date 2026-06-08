@@ -16,6 +16,7 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //! high-level surface for registering [`Record`] types and ingesting data while delegating
 //! low-level IO to an internal [`File`] handle.
 
+use std::num::NonZeroU32;
 use std::path::Path;
 use std::sync::Arc;
 
