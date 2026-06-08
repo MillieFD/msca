@@ -30,7 +30,9 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //! ```
 
 #![doc = include_str!("../../doc/query-filters.md")]
+
 use std::collections::{BTreeMap, BTreeSet, HashSet};
+use std::fmt::{self, Display};
 use std::num::NonZeroU32;
 use std::sync::Arc;
 
@@ -150,6 +152,86 @@ pub(crate) enum Filter {
         #[n(1)] // todo → CBOR and serde options e.g. skip_if
         ub: Bound<Vec<u8>>,
     },
+}
+
+/* ------------------------------------------------------------------------------ Specific Error */
+
+/// Errors returned from [`Query`] construction and execution.
+///
+/// Enum variants cover various granular error cases that may arise when working with queries.
+/// Users should consider handling errors explicitly wherever possible to provide meaningful
+/// error messages and recovery actions.
+///
+/// ### Implementation
+///
+/// This enum is `#[non_exhaustive]` meaning additional variants may be added in future versions.
+/// Implementers are advised to include a wildcard arm `_` to account for potential additions.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Debug)]
+#[non_exhaustive] // To accommodate potential future error cases.
+pub enum Error {
+    /// Underlying [`io::Error`] from the [clem](crate) [file](io::File).
+    Io(io::Error),
+    /// Underlying [`number::Error`] from a numerical operation or conversion.
+    Number(number::Error),
+    /// The requested [`Type`] did not match the actual on-disk [`Column`] type.
+    Type {
+        /// The [`Type`] expected by the caller.
+        expected: Type,
+        /// The actual on-disk column [`Type`].
+        found: Type,
+    },
+    /// The requested [`Column`] name was not found in the query [`BTreeMap`].
+    Column(String),
+}
+
+impl Error {
+    /// Constructor for [`Error::Column`] wrapping the provided column [`name`]().
+    pub(crate) fn column<S>(name: S) -> Self
+    where
+        String: From<S>,
+    {
+        let owned = name.into();
+        Self::Column(owned)
+    }
+}
+
+impl Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Io(e) => write!(f, "Query IO error → {e}"),
+            Self::Number(e) => write!(f, "Number error → {e}"),
+            Self::Type { expected, found } => write!(f, "Type error → {expected} ≠ {found}"),
+            Self::Column(name) => write!(f, "Column '{name}' not found"),
+        }
+    }
+}
+
+impl std::error::Error for Error {}
+
+impl From<io::Error> for Error {
+    fn from(src: io::Error) -> Self {
+        match src {
+            io::Error::Number(e) => e.into(), // Flatten number error nesting
+            other => Self::Io(other),
+        }
+    }
+}
+
+impl From<number::Error> for Error {
+    fn from(e: number::Error) -> Self {
+        Self::Number(e)
+    }
+}
+
+//noinspection DuplicatedCode → Conversion is implemented for error types in different modules.
+impl<T, E> From<Error> for Result<T, E>
+where
+    E: From<Error>,
+{
+    fn from(error: Error) -> Self {
+        Err(E::from(error))
+    }
 }
 
 /* --------------------------------------------------------------------------------------- Tests */
