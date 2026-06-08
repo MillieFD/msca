@@ -147,9 +147,11 @@ pub(crate) enum Filter {
     Range {
         /// Lower bound
         #[n(0)] // todo → CBOR and serde options e.g. skip_if
+        // TODO → Vec is 24 (stack) + n (heap); u128 is 16 (stack); use [u8; 16] instead of Vec<u8>
         lb: Bound<Vec<u8>>,
         /// Upper bound
         #[n(1)] // todo → CBOR and serde options e.g. skip_if
+        // TODO → Vec is 24 (stack) + n (heap); u128 is 16 (stack); use [u8; 16] instead of Vec<u8>
         ub: Bound<Vec<u8>>,
     },
 }

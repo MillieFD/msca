@@ -288,6 +288,7 @@ pub struct Buffer {
         feature = "serde",
         serde(default, skip_serializing_if = "Vec::is_empty")
     )]
+    // TODO → Vec is 24 (stack) + n (heap); u128 is 16 (stack); use [u8; 16] instead of Vec<u8>
     pub min: Vec<u8>,
     /// Maximum value recorded in this buffer. Used for segment-level predicate pruning.
     ///
@@ -298,6 +299,7 @@ pub struct Buffer {
         feature = "serde",
         serde(default, skip_serializing_if = "Vec::is_empty")
     )]
+    // TODO → Vec is 24 (stack) + n (heap); u128 is 16 (stack); use [u8; 16] instead of Vec<u8>
     pub max: Vec<u8>,
 }
 
