@@ -317,10 +317,11 @@ pub(crate) struct File {
 }
 
 impl File {
-    /// Create a new [clem](crate) file with read and write permissions at the specified [path][1].
+    /// Create a new [clem](crate) file with read and write permissions at the specified
+    /// [`path`](P).
     ///
     /// The file is initialised in a valid empty state with a default [`Manifest`] and no
-    /// [`Segments`](Segment) or [`Metadata`][2]. The tail and manifest offset pointers are
+    /// [`Segments`](Segment) or [`Metadata`][1]. The tail and manifest offset pointers are
     /// guaranteed to align exactly.
     ///
     /// ```text
@@ -328,7 +329,7 @@ impl File {
     ///         ↑ tail & manifest.offset
     /// ```
     ///
-    /// Implementors must ensure that the provided `path` remains valid and accessible for the
+    /// Implementors must ensure that the provided [`path`](P) remains valid and accessible for the
     /// entire duration of the operation.
     ///
     /// # Errors
@@ -336,14 +337,13 @@ impl File {
     /// Returns [`Error::Io`] if the underlying system call fails. This can occur for a variety of
     /// reasons, including:
     ///
-    /// - A file already exists at the specified [`Path`](P)
+    /// - A file already exists at the specified [`path`](P)
     /// - The current process lacks read and write permissions
     ///
     /// Returns [`Error::Zero`] if a `u64` overflow occurs while calculating `size` or `offset` for
     /// the relevant file regions.
     ///
-    /// [1]: PathBuf
-    // [2]: todo → link to metadata struct or feature documentation
+    // [1]: todo → link to metadata struct or feature documentation
     pub(crate) async fn create<P>(path: P) -> Result<Self, Error>
     where
         P: AsRef<Path>,

@@ -51,15 +51,15 @@ impl Dataset {
     ///
     /// # Errors
     ///
-    /// Returns [`crate::io::Error::Io`] if the underlying system call fails. This can occur for a
-    /// variety of reasons, including:
+    /// Returns [`Error::Io`] if the underlying system call fails. This can occur for a variety of
+    /// reasons, including:
     ///
-    /// - A file already exists at the specified [`Path`](P)
+    /// - A file already exists at the specified [`path`](P)
     /// - The current process lacks read and write permissions
     /// - The platform does not support [memory mapping](memmap2)
     ///
-    /// Returns [`crate::io::Error::Zero`] if a `u64` overflow occurs while calculating `size` or
-    /// `offset` for the relevant file regions.
+    /// Returns [`Error::Zero`] if a `u64` overflow occurs while calculating `size` or `offset` for
+    /// the relevant file regions.
     pub async fn new<P>(path: P) -> Result<Self, Error>
     where
         P: AsRef<Path>,
