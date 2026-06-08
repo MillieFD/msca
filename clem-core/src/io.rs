@@ -150,12 +150,14 @@ impl Sector {
         self.length.checked_add(self.offset)
     }
 
-    /// Read the byte slice defined by [`self`](Sector) from the provided [`Mmap`].
+    /// Read the byte [slice][1] defined by [`self`](Sector) from the provided [`Mmap`].
     ///
     /// ### Errors
     ///
     /// Returns [`Error::Truncated`] if the sector extends beyond the end of the [`Mmap`], or
     /// [`Error::Number`] if numeric conversion overflow occurs.
+    ///
+    /// [1]: https://doc.rust-lang.org/std/primitive.slice.html
     pub fn slice<'a>(&self, mmap: &'a Mmap) -> Result<&'a [u8], Error> {
         let start = self.offset.try_into()?;
         let end = self.next().ok_or(number::Error::Zero)?.get().try_into()?;
@@ -342,7 +344,6 @@ impl File {
     ///
     /// Returns [`Error::Zero`] if a `u64` overflow occurs while calculating `size` or `offset` for
     /// the relevant file regions.
-    ///
     // [1]: todo → link to metadata struct or feature documentation
     pub(crate) async fn create<P>(path: P) -> Result<Self, Error>
     where
