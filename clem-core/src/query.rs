@@ -42,9 +42,6 @@ use crate::Serialize;
 
 /* ------------------------------------------------------------------------------ Public Exports */
 
-/// A [query filter](self) that evaluates the raw bytes **during file IO** and before
-/// [deserialization](Deserialize). Returns `true` if the row should be retained.
-pub(crate) type Filter = Box<dyn Fn(&[u8]) -> Result<bool, io::Error>>;
 /// A composable query builder to [read](Read) data from any [clem](crate) file; initialised from
 /// [`Dataset::query`][1] and executed when [`read`](Self::read) is [awaited][2].
 ///
