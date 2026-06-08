@@ -13,8 +13,8 @@
         - [x] Columns are removed if their buffer count falls to zero.
     - [x] Other filters must be applied during file IO:
         - [x] `query::Filter` added to a collection owned by the `Query` instance.
-        - [x] Use a `BTreeSet` or `HashSet` to ensure filter uniqueness; duplicate filters reduce efficiency. (`HashSet`)
-        - [x] Retain the most constrained filter if two filters conflict e.g. `> 20` should replace `> 10`. (conjunction)
+        - [x] Use a `HashSet` to ensure filter uniqueness; duplicate filters reduce efficiency.
+        - [x] Retain the most constrained conjunction if two filters conflict e.g. `> 20` should replace `> 10`.
     - [x] Some filters can be used before file IO to remove buffers, but must also be evaluated during IO e.g. `range`
     - [x] Add `Read` trait with associated `Item` type:
         - [x] Readers are strongly typed and inherently know how to deserialize bytes into their target Rust type.
