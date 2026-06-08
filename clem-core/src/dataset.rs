@@ -16,7 +16,14 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //! high-level surface for registering [`Record`] types and ingesting data while delegating
 //! low-level IO to an internal [`File`] handle.
 
+use std::path::Path;
+use std::sync::Arc;
+
+use memmap2::Mmap;
+
 use crate::io::File;
+use crate::query::{self, Query};
+use crate::Error;
 
 /* ------------------------------------------------------------------------------ Public Exports */
 
