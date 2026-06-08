@@ -212,7 +212,8 @@ impl Serialize for Sector {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Copy, Clone, Eq, PartialEq, PartialOrd, Hash, Encode, Decode, CborLen)]
 pub(crate) struct Header {
-    /// Byte offset immediately following the last committed [`Segment`].
+    /// Byte offset immediately following the last committed [`Segment`]; calculated relative to
+    /// the immutable segment region excluding the file [`Header`].
     #[n(0)]
     pub tail: NonZeroU64,
     /// On-disk location of the encoded [`Manifest`].
