@@ -136,6 +136,22 @@ impl From<manifest::Column> for Column {
     }
 }
 
+/// A row-level predicate lazily evaluated during [deserialization](Deserialize).
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Encode, Decode, CborLen)]
+pub(crate) enum Filter {
+    /// Retain values within the specified range.
+    #[n(0)]
+    Range {
+        /// Lower bound
+        #[n(0)] // todo → CBOR and serde options e.g. skip_if
+        lb: Bound<Vec<u8>>,
+        /// Upper bound
+        #[n(1)] // todo → CBOR and serde options e.g. skip_if
+        ub: Bound<Vec<u8>>,
+    },
+}
+
 /* --------------------------------------------------------------------------------------- Tests */
 
 #[cfg(test)]
