@@ -14,10 +14,10 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //!
 //! Each new [`Query`] begins with **every** column and **every** buffer from the specified schema.
 //! [`Filter`] functions are then applied subtractively to reduce the result set. Some filters are
-//! evaluated **before** file IO to remove individual buffers or entire columns using [manifest]
-//! statistics. Other filters are attached to the relevant column and evaluated lazily **during**
-//! buffer [deserialization](Deserialize). No file IO is executed until [`read`](Query::read) is
-//! awaited.
+//! evaluated eagerly **before** file IO; removing individual buffers or entire columns informed by
+//! [manifest] statistics. Other filters are attached to the relevant column and evaluated lazily
+//! **during** [deserialization](Deserialize). No file IO is executed until [`read`](Query::read)
+//! is awaited.
 //!
 //! ```rust,ignore
 //! let results = dataset
