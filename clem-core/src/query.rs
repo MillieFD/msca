@@ -38,10 +38,13 @@ use std::ops::{Bound, Range, RangeBounds};
 use std::sync::Arc;
 
 use memmap2::Mmap;
+use minicbor::{CborLen, Decode, Encode};
 
 use crate::io::{self, Deserialize};
 use crate::manifest::{self, Buffer};
-use crate::Serialize;
+use crate::read::{BoxRead, Decoder, Outcome, Read, Stride};
+use crate::schema::{number, Schema, Type, Unfolder};
+use crate::{Reader, Serialize};
 
 /* ------------------------------------------------------------------------------ Public Exports */
 
