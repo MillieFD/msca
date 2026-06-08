@@ -98,6 +98,13 @@ pub struct Column {
     filters: HashSet<Filter>,
 }
 
+impl Column {
+    /// Map the provided [`Key`](String) to a new empty [`Column`].
+    pub(crate) fn map(entry: (&String, &manifest::Column)) -> (String, Self) {
+        (entry.0.clone(), entry.1.clone().into())
+    }
+}
+
 /* --------------------------------------------------------------------------------------- Tests */
 
 #[cfg(test)]
