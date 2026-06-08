@@ -912,6 +912,7 @@ impl<I> Push for Accumulator<I> {
             .expect("Schema missing from manifest")
             .columns
             .values_mut();
+        // NOTE: Buffer offset is relative to the immutable region; excludes the file header.
         let header = Accumulator::<I>::HEADER.try_into()?;
         let offset = sec.offset.checked_add(header).ok_or(number::Error::Zero)?;
         self.data.buffers(offset, &mut columns)?;
