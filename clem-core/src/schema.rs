@@ -555,12 +555,6 @@ pub trait Unfold: Sized {
     // NOTE: Buffer must be a growable Vec; compiler cannot predict the number of accumulated items
     type OptAcc: Accumulate<Item = Option<Self>> + Serialize<Buffer = Vec<u8>> + Default + 'static;
 
-    /// The [reader](Read) type used to deserialize values of [`Self`].
-    type RawRead: Read<Item = Self> + From<Source> + 'static;
-
-    /// The [reader](Read) type used to deserialize [optional](Option) values of [`Self`].
-    type OptRead: Read<Item = Option<Self>> + From<Source> + 'static;
-
     /// Delegates to [`unfold`](Unfolder::unfold) on the provided [`Unfolder`].
     fn with_unfolder<U>() -> Type
     where
