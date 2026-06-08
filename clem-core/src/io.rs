@@ -338,7 +338,6 @@ impl File {
     ///
     /// - A file already exists at the specified [`Path`](P)
     /// - The current process lacks read and write permissions
-    /// - The platform does not support [memory mapping](memmap2)
     ///
     /// Returns [`Error::Zero`] if a `u64` overflow occurs while calculating `size` or `offset` for
     /// the relevant file regions.
@@ -386,7 +385,6 @@ impl File {
     /// - A file already exists at the specified [`path`](P)
     /// - The current process lacks read and write permissions
     /// - Unexpected `EOF` while parsing the [`Header`] or [`Manifest`]
-    /// - The platform does not support [memory mapping](memmap2)
     ///
     /// Returns [`Error::Zero`] if a `u64` overflow occurs while calculating `size` or `offset` for
     /// the relevant file regions.
