@@ -46,4 +46,26 @@ pub struct Dataset {
     mmap: Arc<Mmap>,
 }
 
-impl Dataset {}
+impl Dataset {
+    /// Create a new empty [`Dataset`] at the specified [`path`](P).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::io::Error::Io`] if the underlying system call fails. This can occur for a
+    /// variety of reasons, including:
+    ///
+    /// - A file already exists at the specified [`Path`](P)
+    /// - The current process lacks read and write permissions
+    /// - The platform does not support [memory mapping](memmap2)
+    ///
+    /// Returns [`crate::io::Error::Zero`] if a `u64` overflow occurs while calculating `size` or
+    /// `offset` for the relevant file regions.
+    pub async fn new<P>(path: P) -> Result<Self, Error>
+    where
+        P: AsRef<Path>,
+    {
+        let file = File::create(path).await?;
+        let mmap = unsafe { file.mmap(file.header.tail)? }.into();
+        Ok(Self { file, mmap })
+    }
+}
