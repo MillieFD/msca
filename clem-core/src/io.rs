@@ -836,8 +836,9 @@ pub(crate) trait Write: Serialize {
     /// This function is purely predictive; no file IO is executed. Implementing types can leverage
     /// the associated [`Context`](Self::Ctx) type for dynamic sector identification at runtime.
     ///
-    /// Refer to the [write-cycle](self) documentation for more details regarding the [clem](crate)
-    /// file layout.
+    /// Sector `offset` is calculated relative to the immutable segment region; excludes the file
+    /// header. Refer to the [write-cycle](self) documentation for more details regarding the
+    /// [clem](crate) file layout.
     fn sector(&self, ctx: Self::Ctx<'_>) -> Result<Sector, number::Error>;
 
     /// Write [`Self`] to the file at the [`Sector`](Self::sector) computed from [`Ctx`](Self::Ctx).
