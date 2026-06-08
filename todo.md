@@ -45,6 +45,11 @@
     - [ ] Remove redundant fields to optimise on-disk size.
 - [ ] Ensure schema / type verification is performed exactly once; not per-read.
 - [ ] Add static assertion for usize into u64, then remove all `try_into` runtime checks with faster unchecked fn.
+- [ ] Refactor `Buffer` min / max to use `[u8; 16]` instead of `Vec<u8>`
+    - [ ] Min default value `[0u8; 16]` (all unset bits)
+    - [ ] Max default value `[0xFFu8; 16]` (all set bits)
+    - [ ] Update all min / max comparisons to use the new fixed-size array format; store values as LE bytes.
+    - [ ] Remove `Vec::is_empty` semantics; default min / max encompass all possible values.
 
 ### Path to Prototype (Priority II)
 
