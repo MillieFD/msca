@@ -42,3 +42,8 @@
 
 1. Ask questions if anything is uncertain. Do not attempt to guess the user’s intention if there is ambiguity.
 2. Use `+nightly rustfmt` to format touched files only; never reformat files that are not touched during your edit.
+3. A project TODO list is maintained in [todo.md](../todo.md):
+    - Read [todo.md](../todo.md) before starting work to understand how your task fits into the project roadmap.
+    - Mark tasks as complete in [todo.md](../todo.md) when finished; add bullet points w/ relevant details.
+    - Unmark completed tasks if your edit removes previously implemented functionality.
+    - The [todo.md](../todo.md) file must always accurately reflect the current state of the project.
