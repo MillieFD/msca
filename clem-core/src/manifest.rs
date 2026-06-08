@@ -95,8 +95,8 @@ impl Manifest {
     }
 
     /// Build a descriptor for the provided [`Segment`](S) and register to the [`Manifest`].
-    pub fn push<S: Push>(&mut self, seg: &S, loc: Sector) -> Result<Sector, Error> {
-        S::push_to_manifest(seg, self, loc)
+    pub fn push<S: Push>(&mut self, seg: &S, sec: Sector) -> Result<Sector, Error> {
+        S::push_to_manifest(seg, self, sec)
     }
 }
 
