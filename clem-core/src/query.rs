@@ -30,12 +30,50 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //! ```
 
 #![doc = include_str!("../../doc/query-filters.md")]
+use std::collections::{BTreeMap, BTreeSet, HashSet};
+use std::num::NonZeroU32;
+use std::sync::Arc;
+
+use memmap2::Mmap;
+
+use crate::io::{self, Deserialize};
+use crate::manifest::{self, Buffer};
+use crate::Serialize;
 
 /* ------------------------------------------------------------------------------ Public Exports */
 
 /// A [query filter](self) that evaluates the raw bytes **during file IO** and before
 /// [deserialization](Deserialize). Returns `true` if the row should be retained.
 pub(crate) type Filter = Box<dyn Fn(&[u8]) -> Result<bool, io::Error>>;
+/// A composable query builder to [read](Read) data from any [clem](crate) file; initialised from
+/// [`Dataset::query`][1] and executed when [`read`](Self::read) is [awaited][2].
+///
+/// Refer to the [module-level documentation](self) for implementation details and a list of
+/// supported filters.
+///
+/// [1]: crate::Dataset::query
+/// [2]: https://doc.rust-lang.org/book/ch17-00-async-await.html
+// TODO → add derive attributes
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Debug, Clone)]
+pub struct Query {
+    /// Read-only [memory map](Mmap) backed by the immutable segment region of a [clem](crate) file.
+    ///
+    /// Refer to the [safety documentation](io::File::mmap) for details.
+    pub(crate) mmap: Arc<Mmap>,
+    /// [`Column`] descriptors keyed by name.
+    ///
+    /// The [`BTreeMap`] guarantees a stable deterministic column order for consistent binary
+    /// encoding and schema comparison.
+    #[cfg_attr(
+        feature = "serde",
+        serde(default, skip_serializing_if = "BTreeMap::is_empty")
+    )]
+    pub columns: BTreeMap<String, Column>,
+    /// Decimation factor applied to downsample the result set; defaults to 1 (keep all data).
+    pub stride: NonZeroU32,
+}
+
 
 /* --------------------------------------------------------------------------------------- Tests */
 
