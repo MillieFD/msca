@@ -718,7 +718,7 @@ impl Unfold for f64 {
 
 impl<T> Unfold for Option<T>
 where
-    T: Unfold,
+    T: Unfold + 'static,
 {
     type RawAcc = T::OptAcc;
     type OptAcc = Flatten<T::OptAcc>;
