@@ -94,6 +94,23 @@ impl Dataset {
         let mmap = unsafe { file.mmap(file.header.tail)? }.into();
         Ok(Self { file, mmap })
     }
+    pub fn query(&self, name: &str) -> Result<Query, query::Error> {
+        let columns = self
+            .file
+            .manifest
+            .schemas
+            .get(name)
+            .ok_or_else(|| query::Error::column(name))?
+            .columns
+            .iter()
+            .map(query::Column::map) // Clone each entry
+            .collect();
+        Ok(Query {
+            mmap: self.mmap.clone(), // Inexpensive Arc Clone
+            columns,
+            stride: NonZeroU32::MIN,
+        })
+    }
 }
 
 /* --------------------------------------------------------------------------------------- Tests */
