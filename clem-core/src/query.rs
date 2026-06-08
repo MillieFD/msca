@@ -124,7 +124,7 @@ impl Column {
         let expected = Schema::unfold();
         match self.ty == expected {
             true => unimplemented!("Decoder construction path"),
-            false => unimplemented!("Type mismatch error"),
+            false => Error::Type { expected, found: self.ty.clone() }.into(),
         }
     }
 }
