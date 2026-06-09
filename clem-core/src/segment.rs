@@ -89,16 +89,13 @@ impl Serialize for Header {
         { Self::SIZE as u64 }.try_into().map_err(number::Error::Convert)
     }
 
-    fn serialize_into(&self, mut buf: Self::Buffer) -> Result<Self::Buffer, number::Error> {
+    fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], number::Error> {
         // SAFETY: Header::Buffer size is Σ of fixed-size fields; guaranteed to fit all data.
-        buf[..size_of::<u8>()].copy_from_slice(&self.variant.serialize()?);
-        buf[size_of::<u8>()..].copy_from_slice(&self.length.serialize()?);
-        Ok(buf)
+        buf.serialize_push(&self.variant)?.serialize_push(&self.length)
     }
 
     fn serialize(&self) -> Result<Self::Buffer, number::Error> {
-        let buf = [u8::MIN; Self::SIZE];
-        self.serialize_into(buf)
+        [u8::MIN; Self::SIZE].serialize_push(self)
     }
 }
 
@@ -114,6 +111,7 @@ mod variant {
 
     use minicbor::{CborLen, Decode, Encode};
 
+    use crate::accumulate::Buffer;
     use crate::schema::number;
     use crate::Serialize;
 
@@ -169,13 +167,12 @@ mod variant {
             { *self as u8 }.size()
         }
 
-        fn serialize_into(&self, buf: Self::Buffer) -> Result<Self::Buffer, number::Error> {
+        fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], number::Error> {
             { *self as u8 }.serialize_into(buf)
         }
 
         fn serialize(&self) -> Result<Self::Buffer, number::Error> {
-            let buf = [u8::MIN; size_of::<u8>()];
-            self.serialize_into(buf)
+            [u8::MIN; size_of::<u8>()].serialize_push(self)
         }
     }
 
@@ -262,11 +259,10 @@ impl Serialize for Schema {
         size.try_into().map_err(number::Error::Convert)
     }
 
-    fn serialize_into(&self, mut buf: Self::Buffer) -> Result<Self::Buffer, number::Error> {
+    fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], number::Error> {
+        buf.serialize_push(&{ Variant::Schema as u8 })?;
         // NOTE: Self::size returns Error if usize overflows u64 (not expected in production)
-        let size = self.size()?.get().to_le_bytes();
-        buf.push(Variant::Schema as u8);
-        buf.extend_from_slice(&size);
+        let mut buf = self.size()?.get().to_le_bytes().serialize_into(buf)?;
         // SAFETY: minicbor::encode is infallible when writing to Vec<u8>
         minicbor::encode(self, &mut buf).expect("Infallible encode failed");
         Ok(buf)

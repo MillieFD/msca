@@ -86,8 +86,8 @@ use minicbor::{CborLen, Decode, Encode};
 use smol::fs::{self, OpenOptions};
 use smol::io::{AsyncRead, AsyncReadExt, AsyncSeek, AsyncSeekExt, AsyncWrite, AsyncWriteExt};
 
-use crate::accumulate::Accumulator;
-use crate::manifest::{Buffer, Manifest, Pending};
+use crate::accumulate::{Accumulator, Buffer};
+use crate::manifest::{self, Manifest, Pending};
 use crate::{number, schema, Serialize};
 
 /* ------------------------------------------------------------------------------ Public Exports */
@@ -188,19 +188,15 @@ impl Serialize for Sector {
     type Buffer = [u8; size_of::<Self>()];
 
     fn size(&self) -> Result<NonZeroU64, number::Error> {
-        let size: u64 = size_of::<Self>().try_into()?;
-        size.try_into().map_err(number::Error::from)
+        { size_of::<Self>() as u64 }.try_into().map_err(number::Error::from)
     }
 
-    fn serialize_into(&self, mut buf: Self::Buffer) -> Result<Self::Buffer, number::Error> {
-        buf[..size_of::<NonZeroU64>()].copy_from_slice(self.offset.to_le_bytes().as_ref());
-        buf[size_of::<NonZeroU64>()..].copy_from_slice(self.length.get().to_le_bytes().as_ref());
-        Ok(buf)
+    fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], number::Error> {
+        buf.serialize_push(&self.offset)?.serialize_push(&self.length)
     }
 
     fn serialize(&self) -> Result<Self::Buffer, number::Error> {
-        let buf = [u8::MIN; size_of::<Self>()];
-        self.serialize_into(buf)
+        [u8::MIN; size_of::<Self>()].serialize_push(self)
     }
 }
 
@@ -271,19 +267,15 @@ impl Serialize for Header {
     type Buffer = [u8; size_of::<Self>()];
 
     fn size(&self) -> Result<NonZeroU64, number::Error> {
-        let size: u64 = size_of::<Self>().try_into()?;
-        size.try_into().map_err(number::Error::from)
+        { size_of::<Self>() as u64 }.try_into().map_err(number::Error::from)
     }
 
-    fn serialize_into(&self, mut buf: Self::Buffer) -> Result<Self::Buffer, number::Error> {
-        const TAIL: usize = size_of::<NonZeroU64>();
-        buf[..TAIL].copy_from_slice(&self.tail.serialize()?);
-        buf[TAIL..].copy_from_slice(&self.manifest.serialize()?);
-        Ok(buf)
+    fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], number::Error> {
+        buf.serialize_push(&self.tail)?.serialize_push(&self.manifest)
     }
 
     fn serialize(&self) -> Result<Self::Buffer, number::Error> {
-        self.serialize_into([0u8; size_of::<Self>()])
+        [0u8; size_of::<Self>()].serialize_push(self)
     }
 }
 
@@ -901,7 +893,7 @@ pub(crate) trait Push {
 /* ----------------------------------------------------------------- Ingest Trait Implementation */
 
 impl<I> Push for Accumulator<I> {
-    type Record = Buffer;
+    type Record = manifest::Buffer;
 
     fn push_to_manifest(&self, man: &mut Manifest, sec: Sector) -> Result<Sector, number::Error> {
         let mut columns = man

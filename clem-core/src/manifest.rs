@@ -19,7 +19,7 @@ use smol::io::{AsyncRead, AsyncReadExt, AsyncSeek};
 use crate::io::{Header, Push, Write};
 use crate::schema::number::Error;
 use crate::schema::Type;
-use crate::{io, number, Deserialize, Sector, Serialize};
+use crate::{io, Deserialize, Sector, Serialize};
 
 /* ------------------------------------------------------------------------------ Public Exports */
 
@@ -162,18 +162,18 @@ impl Write for Manifest {
 impl Serialize for Manifest {
     type Buffer = Vec<u8>;
 
-    fn size(&self) -> Result<NonZeroU64, number::Error> {
+    fn size(&self) -> Result<NonZeroU64, Error> {
         let size: u64 = minicbor::len(self).try_into()?;
-        size.try_into().map_err(number::Error::Convert)
+        size.try_into().map_err(Error::Convert)
     }
 
-    fn serialize_into(&self, mut buf: Self::Buffer) -> Result<Self::Buffer, number::Error> {
-        // SAFETY: minicbor::encode is infallible when writing to Vec<u8>
+    fn serialize_into<'a>(&self, mut buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
+        // SAFETY: minicbor::encode is infallible when writing to &mut [u8]
         minicbor::encode(self, &mut buf).expect("Infallible manifest CBOR encode failed");
         Ok(buf)
     }
 
-    fn serialize(&self) -> Result<Self::Buffer, number::Error> {
+    fn serialize(&self) -> Result<Self::Buffer, Error> {
         // NOTE: Scoped trait import avoids namespace conflict with Buffer struct (below)
         use crate::accumulate::Buffer;
         let size = self.size()?.get().try_into()?;

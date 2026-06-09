@@ -29,7 +29,7 @@ use bitvec::vec::BitVec;
 use minicbor::{CborLen, Decode, Encode};
 use static_assertions::const_assert;
 
-use crate::manifest::{self, Column};
+use crate::manifest::{self, Column, B};
 use crate::number::Error;
 use crate::schema::{size_of_opt, Unfold};
 use crate::segment::Variant;
@@ -412,14 +412,8 @@ impl Accumulate for BitVec {
         let buf = manifest::Buffer {
             sector: Sector { offset, length: self.size()? },
             count: self.count().try_into()?,
-            min: match Accumulate::min(self).map(u8::from) {
-                Some(min) => min.serialize()?.into(),
-                None => Vec::new(),
-            },
-            max: match Accumulate::max(self).map(u8::from) {
-                Some(max) => max.serialize()?.into(),
-                None => Vec::new(),
-            },
+            min: Accumulate::min(self).map(u128::from).unwrap_or(u128::MIN).serialize()?,
+            max: Accumulate::min(self).map(u128::from).unwrap_or(u128::MAX).serialize()?,
         };
         let next = buf.sector.next().ok_or(Error::Zero)?.get();
         columns.next().map(|column| column.buffers.push(buf));
@@ -464,16 +458,18 @@ where
     }
 
     fn buffers(&self, offset: u64, columns: &mut Columns) -> Result<u64, Error> {
+        let min = [u8::MIN; B];
+        let max = [u8::MAX; B];
         let buf = manifest::Buffer {
             sector: Sector { offset, length: self.size()? },
             count: self.count().try_into()?,
-            min: match self.min() {
-                Some(min) => min.serialize()?.into(),
-                None => Vec::new(),
+            min: match Accumulate::min(self) {
+                Some(v) => min.serialize_push(&v)?,
+                None => min,
             },
-            max: match self.max() {
-                Some(max) => max.serialize()?.into(),
-                None => Vec::new(),
+            max: match Accumulate::max(self) {
+                Some(v) => max.serialize_push(&v)?,
+                None => max,
             },
         };
         let next = buf.sector.next().ok_or(Error::Zero)?.get();
@@ -656,12 +652,14 @@ where
 /// A **buffer** that can hold the serialized byte representation of a value.
 pub trait Buffer: AsRef<[u8]> + AsMut<[u8]> + Into<Vec<u8>> {
     /// [`Serialize`] the provided [`item`](I) and append into [`self`](Buffer).
-    fn serialize_push<I>(self, item: &I) -> Result<Self, Error>
+    fn serialize_push<I>(mut self, item: &I) -> Result<Self, Error>
     where
-        I: Serialize<Buffer = Self>,
+        I: Serialize,
         Self: Sized,
     {
-        item.serialize_into(self)
+        let buf = self.as_mut();
+        item.serialize_into(buf)?;
+        Ok(self)
     }
 }
 
@@ -685,7 +683,7 @@ pub trait Serialize {
     fn size(&self) -> Result<NonZeroU64, Error>;
 
     /// Serialize `self` into the provided [`Buffer`].
-    fn serialize_into(&self, buf: Self::Buffer) -> Result<Self::Buffer, Error>;
+    fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], Error>;
 
     /// Serialize `self` and return the encoded bytes in a new [`Buffer`].
     fn serialize(&self) -> Result<Self::Buffer, Error>;
@@ -695,23 +693,40 @@ pub trait Serialize {
     /// This function provides a unified interface for serializing fixed-size (stack) and
     /// dynamic-size (heap) types into a growable [`Buffer`].
     fn extend(&self, mut sink: Vec<u8>) -> Result<Vec<u8>, Error> {
-        let bytes = self.serialize()?;
-        sink.extend_from_slice(bytes.as_ref());
+        let buf = &mut sink;
+        self.serialize_into(buf)?;
         Ok(sink)
     }
 }
 
 /* -------------------------------------------------------------- Serialize Trait Implementation */
 
+impl<const N: usize> Serialize for [u8; N] {
+    type Buffer = Self;
+
+    fn size(&self) -> Result<NonZeroU64, Error> {
+        { N as u64 }.try_into().map_err(Error::from)
+    }
+
+    fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
+        debug_assert!(buf.len() >= N, "actual size < expected size");
+        buf[..N].copy_from_slice(self);
+        Ok(&mut buf[N..])
+    }
+
+    fn serialize(&self) -> Result<Self::Buffer, Error> {
+        Ok(*self)
+    }
+}
+
 impl Serialize for char {
     type Buffer = [u8; size_of::<Self>()];
 
     fn size(&self) -> Result<NonZeroU64, Error> {
-        let size: u64 = size_of::<Self>().try_into()?;
-        size.try_into().map_err(Error::from)
+        { size_of::<Self>() as u64 }.try_into().map_err(Error::from)
     }
 
-    fn serialize_into(&self, buf: Self::Buffer) -> Result<Self::Buffer, Error> {
+    fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
         static_assertions::assert_eq_size!(char, u32);
         u32::from(*self).serialize_into(buf)
     }
@@ -725,13 +740,11 @@ impl Serialize for u8 {
     type Buffer = [u8; size_of::<Self>()];
 
     fn size(&self) -> Result<NonZeroU64, Error> {
-        let size: u64 = size_of::<Self>().try_into()?;
-        size.try_into().map_err(Error::from)
+        { size_of::<Self>() as u64 }.try_into().map_err(Error::from)
     }
 
-    fn serialize_into(&self, mut buf: Self::Buffer) -> Result<Self::Buffer, Error> {
-        buf[0] = *self;
-        Ok(buf)
+    fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
+        self.to_le_bytes().serialize_into(buf)
     }
 
     fn serialize(&self) -> Result<Self::Buffer, Error> {
@@ -743,13 +756,11 @@ impl Serialize for u16 {
     type Buffer = [u8; size_of::<Self>()];
 
     fn size(&self) -> Result<NonZeroU64, Error> {
-        let size: u64 = size_of::<Self>().try_into()?;
-        size.try_into().map_err(Error::from)
+        { size_of::<Self>() as u64 }.try_into().map_err(Error::from)
     }
 
-    fn serialize_into(&self, mut buf: Self::Buffer) -> Result<Self::Buffer, Error> {
-        buf = self.to_le_bytes();
-        Ok(buf)
+    fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
+        self.to_le_bytes().serialize_into(buf)
     }
 
     fn serialize(&self) -> Result<Self::Buffer, Error> {
@@ -761,13 +772,11 @@ impl Serialize for u32 {
     type Buffer = [u8; size_of::<Self>()];
 
     fn size(&self) -> Result<NonZeroU64, Error> {
-        let size: u64 = size_of::<Self>().try_into()?;
-        size.try_into().map_err(Error::from)
+        { size_of::<Self>() as u64 }.try_into().map_err(Error::from)
     }
 
-    fn serialize_into(&self, mut buf: Self::Buffer) -> Result<Self::Buffer, Error> {
-        buf = self.to_le_bytes();
-        Ok(buf)
+    fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
+        self.to_le_bytes().serialize_into(buf)
     }
 
     fn serialize(&self) -> Result<Self::Buffer, Error> {
@@ -779,13 +788,11 @@ impl Serialize for u64 {
     type Buffer = [u8; size_of::<Self>()];
 
     fn size(&self) -> Result<NonZeroU64, Error> {
-        let size: u64 = size_of::<Self>().try_into()?;
-        size.try_into().map_err(Error::from)
+        { size_of::<Self>() as u64 }.try_into().map_err(Error::from)
     }
 
-    fn serialize_into(&self, mut buf: Self::Buffer) -> Result<Self::Buffer, Error> {
-        buf = self.to_le_bytes();
-        Ok(buf)
+    fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
+        self.to_le_bytes().serialize_into(buf)
     }
 
     fn serialize(&self) -> Result<Self::Buffer, Error> {
@@ -797,13 +804,11 @@ impl Serialize for u128 {
     type Buffer = [u8; size_of::<Self>()];
 
     fn size(&self) -> Result<NonZeroU64, Error> {
-        let size: u64 = size_of::<Self>().try_into()?;
-        size.try_into().map_err(Error::from)
+        { size_of::<Self>() as u64 }.try_into().map_err(Error::from)
     }
 
-    fn serialize_into(&self, mut buf: Self::Buffer) -> Result<Self::Buffer, Error> {
-        buf = self.to_le_bytes();
-        Ok(buf)
+    fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
+        self.to_le_bytes().serialize_into(buf)
     }
 
     fn serialize(&self) -> Result<Self::Buffer, Error> {
@@ -818,7 +823,7 @@ impl Serialize for NonZeroU8 {
         self.get().size()
     }
 
-    fn serialize_into(&self, buf: Self::Buffer) -> Result<Self::Buffer, Error> {
+    fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
         self.get().serialize_into(buf)
     }
 
@@ -834,7 +839,7 @@ impl Serialize for NonZeroU16 {
         self.get().size()
     }
 
-    fn serialize_into(&self, buf: Self::Buffer) -> Result<Self::Buffer, Error> {
+    fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
         self.get().serialize_into(buf)
     }
 
@@ -850,7 +855,7 @@ impl Serialize for NonZeroU32 {
         self.get().size()
     }
 
-    fn serialize_into(&self, buf: Self::Buffer) -> Result<Self::Buffer, Error> {
+    fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
         self.get().serialize_into(buf)
     }
 
@@ -866,7 +871,7 @@ impl Serialize for NonZeroU64 {
         self.get().size()
     }
 
-    fn serialize_into(&self, buf: Self::Buffer) -> Result<Self::Buffer, Error> {
+    fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
         self.get().serialize_into(buf)
     }
 
@@ -882,7 +887,7 @@ impl Serialize for NonZeroU128 {
         self.get().size()
     }
 
-    fn serialize_into(&self, buf: Self::Buffer) -> Result<Self::Buffer, Error> {
+    fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
         self.get().serialize_into(buf)
     }
 
@@ -895,13 +900,11 @@ impl Serialize for i8 {
     type Buffer = [u8; size_of::<Self>()];
 
     fn size(&self) -> Result<NonZeroU64, Error> {
-        let size: u64 = size_of::<Self>().try_into()?;
-        size.try_into().map_err(Error::from)
+        { size_of::<Self>() as u64 }.try_into().map_err(Error::from)
     }
 
-    fn serialize_into(&self, mut buf: Self::Buffer) -> Result<Self::Buffer, Error> {
-        buf = self.to_le_bytes();
-        Ok(buf)
+    fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
+        self.to_le_bytes().serialize_into(buf)
     }
 
     fn serialize(&self) -> Result<Self::Buffer, Error> {
@@ -913,13 +916,11 @@ impl Serialize for i16 {
     type Buffer = [u8; size_of::<Self>()];
 
     fn size(&self) -> Result<NonZeroU64, Error> {
-        let size: u64 = size_of::<Self>().try_into()?;
-        size.try_into().map_err(Error::from)
+        { size_of::<Self>() as u64 }.try_into().map_err(Error::from)
     }
 
-    fn serialize_into(&self, mut buf: Self::Buffer) -> Result<Self::Buffer, Error> {
-        buf = self.to_le_bytes();
-        Ok(buf)
+    fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
+        self.to_le_bytes().serialize_into(buf)
     }
 
     fn serialize(&self) -> Result<Self::Buffer, Error> {
@@ -931,13 +932,11 @@ impl Serialize for i32 {
     type Buffer = [u8; size_of::<Self>()];
 
     fn size(&self) -> Result<NonZeroU64, Error> {
-        let size: u64 = size_of::<Self>().try_into()?;
-        size.try_into().map_err(Error::from)
+        { size_of::<Self>() as u64 }.try_into().map_err(Error::from)
     }
 
-    fn serialize_into(&self, mut buf: Self::Buffer) -> Result<Self::Buffer, Error> {
-        buf = self.to_le_bytes();
-        Ok(buf)
+    fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
+        self.to_le_bytes().serialize_into(buf)
     }
 
     fn serialize(&self) -> Result<Self::Buffer, Error> {
@@ -949,13 +948,11 @@ impl Serialize for i64 {
     type Buffer = [u8; size_of::<Self>()];
 
     fn size(&self) -> Result<NonZeroU64, Error> {
-        let size: u64 = size_of::<Self>().try_into()?;
-        size.try_into().map_err(Error::from)
+        { size_of::<Self>() as u64 }.try_into().map_err(Error::from)
     }
 
-    fn serialize_into(&self, mut buf: Self::Buffer) -> Result<Self::Buffer, Error> {
-        buf = self.to_le_bytes();
-        Ok(buf)
+    fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
+        self.to_le_bytes().serialize_into(buf)
     }
 
     fn serialize(&self) -> Result<Self::Buffer, Error> {
@@ -967,13 +964,11 @@ impl Serialize for i128 {
     type Buffer = [u8; size_of::<Self>()];
 
     fn size(&self) -> Result<NonZeroU64, Error> {
-        let size: u64 = size_of::<Self>().try_into()?;
-        size.try_into().map_err(Error::from)
+        { size_of::<Self>() as u64 }.try_into().map_err(Error::from)
     }
 
-    fn serialize_into(&self, mut buf: Self::Buffer) -> Result<Self::Buffer, Error> {
-        buf = self.to_le_bytes();
-        Ok(buf)
+    fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
+        self.to_le_bytes().serialize_into(buf)
     }
 
     fn serialize(&self) -> Result<Self::Buffer, Error> {
@@ -988,7 +983,7 @@ impl Serialize for NonZeroI8 {
         self.get().size()
     }
 
-    fn serialize_into(&self, buf: Self::Buffer) -> Result<Self::Buffer, Error> {
+    fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
         self.get().serialize_into(buf)
     }
 
@@ -1004,7 +999,7 @@ impl Serialize for NonZeroI16 {
         self.get().size()
     }
 
-    fn serialize_into(&self, buf: Self::Buffer) -> Result<Self::Buffer, Error> {
+    fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
         self.get().serialize_into(buf)
     }
 
@@ -1020,7 +1015,7 @@ impl Serialize for NonZeroI32 {
         self.get().size()
     }
 
-    fn serialize_into(&self, buf: Self::Buffer) -> Result<Self::Buffer, Error> {
+    fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
         self.get().serialize_into(buf)
     }
 
@@ -1036,7 +1031,7 @@ impl Serialize for NonZeroI64 {
         self.get().size()
     }
 
-    fn serialize_into(&self, buf: Self::Buffer) -> Result<Self::Buffer, Error> {
+    fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
         self.get().serialize_into(buf)
     }
 
@@ -1052,7 +1047,7 @@ impl Serialize for NonZeroI128 {
         self.get().size()
     }
 
-    fn serialize_into(&self, buf: Self::Buffer) -> Result<Self::Buffer, Error> {
+    fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
         self.get().serialize_into(buf)
     }
 
@@ -1065,13 +1060,11 @@ impl Serialize for f32 {
     type Buffer = [u8; size_of::<Self>()];
 
     fn size(&self) -> Result<NonZeroU64, Error> {
-        let size: u64 = size_of::<Self>().try_into()?;
-        size.try_into().map_err(Error::from)
+        { size_of::<Self>() as u64 }.try_into().map_err(Error::from)
     }
 
-    fn serialize_into(&self, mut buf: Self::Buffer) -> Result<Self::Buffer, Error> {
-        buf = self.to_le_bytes();
-        Ok(buf)
+    fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
+        self.to_le_bytes().serialize_into(buf)
     }
 
     fn serialize(&self) -> Result<Self::Buffer, Error> {
@@ -1083,13 +1076,11 @@ impl Serialize for f64 {
     type Buffer = [u8; size_of::<Self>()];
 
     fn size(&self) -> Result<NonZeroU64, Error> {
-        let size: u64 = size_of::<Self>().try_into()?;
-        size.try_into().map_err(Error::from)
+        { size_of::<Self>() as u64 }.try_into().map_err(Error::from)
     }
 
-    fn serialize_into(&self, mut buf: Self::Buffer) -> Result<Self::Buffer, Error> {
-        buf = self.to_le_bytes();
-        Ok(buf)
+    fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
+        self.to_le_bytes().serialize_into(buf)
     }
 
     fn serialize(&self) -> Result<Self::Buffer, Error> {
@@ -1101,11 +1092,10 @@ impl Serialize for Option<char> {
     type Buffer = [u8; size_of::<Self>()];
 
     fn size(&self) -> Result<NonZeroU64, Error> {
-        let size: u64 = size_of::<Self>().try_into()?;
-        size.try_into().map_err(Error::from)
+        { size_of::<Self>() as u64 }.try_into().map_err(Error::from)
     }
 
-    fn serialize_into(&self, buf: Self::Buffer) -> Result<Self::Buffer, Error> {
+    fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
         // None writes u32::MAX (outside the valid scalar range).
         self.map_or(u32::MAX, u32::from).serialize_into(buf)
     }
@@ -1119,11 +1109,10 @@ impl Serialize for Option<NonZeroU8> {
     type Buffer = [u8; size_of::<Self>()];
 
     fn size(&self) -> Result<NonZeroU64, Error> {
-        let size: u64 = size_of::<Self>().try_into()?;
-        size.try_into().map_err(Error::from)
+        { size_of::<Self>() as u64 }.try_into().map_err(Error::from)
     }
 
-    fn serialize_into(&self, buf: Self::Buffer) -> Result<Self::Buffer, Error> {
+    fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
         // None writes u8::MIN (outside the valid non-zero range).
         self.map_or(u8::MIN, NonZeroU8::get).serialize_into(buf)
     }
@@ -1137,11 +1126,10 @@ impl Serialize for Option<NonZeroU16> {
     type Buffer = [u8; size_of::<Self>()];
 
     fn size(&self) -> Result<NonZeroU64, Error> {
-        let size: u64 = size_of::<Self>().try_into()?;
-        size.try_into().map_err(Error::from)
+        { size_of::<Self>() as u64 }.try_into().map_err(Error::from)
     }
 
-    fn serialize_into(&self, buf: Self::Buffer) -> Result<Self::Buffer, Error> {
+    fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
         // None writes u16::MIN (outside the valid non-zero range).
         self.map_or(u16::MIN, NonZeroU16::get).serialize_into(buf)
     }
@@ -1155,11 +1143,10 @@ impl Serialize for Option<NonZeroU32> {
     type Buffer = [u8; size_of::<Self>()];
 
     fn size(&self) -> Result<NonZeroU64, Error> {
-        let size: u64 = size_of::<Self>().try_into()?;
-        size.try_into().map_err(Error::from)
+        { size_of::<Self>() as u64 }.try_into().map_err(Error::from)
     }
 
-    fn serialize_into(&self, buf: Self::Buffer) -> Result<Self::Buffer, Error> {
+    fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
         // None writes u32::MIN (outside the valid non-zero range).
         self.map_or(u32::MIN, NonZeroU32::get).serialize_into(buf)
     }
@@ -1173,11 +1160,10 @@ impl Serialize for Option<NonZeroU64> {
     type Buffer = [u8; size_of::<Self>()];
 
     fn size(&self) -> Result<NonZeroU64, Error> {
-        let size: u64 = size_of::<Self>().try_into()?;
-        size.try_into().map_err(Error::from)
+        { size_of::<Self>() as u64 }.try_into().map_err(Error::from)
     }
 
-    fn serialize_into(&self, buf: Self::Buffer) -> Result<Self::Buffer, Error> {
+    fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
         // None writes u64::MIN (outside the valid non-zero range).
         self.map_or(u64::MIN, NonZeroU64::get).serialize_into(buf)
     }
@@ -1191,11 +1177,10 @@ impl Serialize for Option<NonZeroU128> {
     type Buffer = [u8; size_of::<Self>()];
 
     fn size(&self) -> Result<NonZeroU64, Error> {
-        let size: u64 = size_of::<Self>().try_into()?;
-        size.try_into().map_err(Error::from)
+        { size_of::<Self>() as u64 }.try_into().map_err(Error::from)
     }
 
-    fn serialize_into(&self, buf: Self::Buffer) -> Result<Self::Buffer, Error> {
+    fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
         // None writes u128::MIN (outside the valid non-zero range).
         self.map_or(u128::MIN, NonZeroU128::get).serialize_into(buf)
     }
@@ -1209,11 +1194,10 @@ impl Serialize for Option<NonZeroI8> {
     type Buffer = [u8; size_of::<Self>()];
 
     fn size(&self) -> Result<NonZeroU64, Error> {
-        let size: u64 = size_of::<Self>().try_into()?;
-        size.try_into().map_err(Error::from)
+        { size_of::<Self>() as u64 }.try_into().map_err(Error::from)
     }
 
-    fn serialize_into(&self, buf: Self::Buffer) -> Result<Self::Buffer, Error> {
+    fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
         // None writes 0i8 (outside the valid non-zero range).
         self.map_or(0i8, NonZeroI8::get).serialize_into(buf)
     }
@@ -1227,11 +1211,10 @@ impl Serialize for Option<NonZeroI16> {
     type Buffer = [u8; size_of::<Self>()];
 
     fn size(&self) -> Result<NonZeroU64, Error> {
-        let size: u64 = size_of::<Self>().try_into()?;
-        size.try_into().map_err(Error::from)
+        { size_of::<Self>() as u64 }.try_into().map_err(Error::from)
     }
 
-    fn serialize_into(&self, buf: Self::Buffer) -> Result<Self::Buffer, Error> {
+    fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
         // None writes 0i16 (outside the valid non-zero range).
         self.map_or(0i16, NonZeroI16::get).serialize_into(buf)
     }
@@ -1245,11 +1228,10 @@ impl Serialize for Option<NonZeroI32> {
     type Buffer = [u8; size_of::<Self>()];
 
     fn size(&self) -> Result<NonZeroU64, Error> {
-        let size: u64 = size_of::<Self>().try_into()?;
-        size.try_into().map_err(Error::from)
+        { size_of::<Self>() as u64 }.try_into().map_err(Error::from)
     }
 
-    fn serialize_into(&self, buf: Self::Buffer) -> Result<Self::Buffer, Error> {
+    fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
         // None writes 0i32 (outside the valid non-zero range).
         self.map_or(0i32, NonZeroI32::get).serialize_into(buf)
     }
@@ -1263,11 +1245,10 @@ impl Serialize for Option<NonZeroI64> {
     type Buffer = [u8; size_of::<Self>()];
 
     fn size(&self) -> Result<NonZeroU64, Error> {
-        let size: u64 = size_of::<Self>().try_into()?;
-        size.try_into().map_err(Error::from)
+        { size_of::<Self>() as u64 }.try_into().map_err(Error::from)
     }
 
-    fn serialize_into(&self, buf: Self::Buffer) -> Result<Self::Buffer, Error> {
+    fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
         // None writes 0i64 (outside the valid non-zero range).
         self.map_or(0i64, NonZeroI64::get).serialize_into(buf)
     }
@@ -1281,11 +1262,10 @@ impl Serialize for Option<NonZeroI128> {
     type Buffer = [u8; size_of::<Self>()];
 
     fn size(&self) -> Result<NonZeroU64, Error> {
-        let size: u64 = size_of::<Self>().try_into()?;
-        size.try_into().map_err(Error::from)
+        { size_of::<Self>() as u64 }.try_into().map_err(Error::from)
     }
 
-    fn serialize_into(&self, buf: Self::Buffer) -> Result<Self::Buffer, Error> {
+    fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
         // None writes 0i128 (outside the valid non-zero range).
         self.map_or(0i128, NonZeroI128::get).serialize_into(buf)
     }
@@ -1314,11 +1294,11 @@ where
             .ok_or(Error::Zero)
     }
 
-    fn serialize_into(&self, mut buf: Self::Buffer) -> Result<Self::Buffer, Error> {
+    fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
+        let prefix: u64 = size_of::<NonZeroU64>().try_into()?;
         // NOTE: Self::size returns Error if Σ overflows u64 (not expected in production)
-        let size = self.size()?.get().sub(8).to_le_bytes();
-        buf.extend_from_slice(&size);
-        self.iter().try_fold(buf, |sink, element| element.extend(sink))
+        let buf = self.size()?.get().sub(prefix).to_le_bytes().serialize_into(buf)?;
+        self.iter().try_fold(buf, |sink, element| element.serialize_into(sink))
     }
 
     fn serialize(&self) -> Result<Self::Buffer, Error> {
@@ -1327,10 +1307,6 @@ where
         // NOTE: cannot use static assertion as size is dependent on runtime data accumulation.
         debug_assert_eq!(buf.len(), size, "actual size ≠ predicted size");
         Ok(buf)
-    }
-
-    fn extend(&self, sink: Vec<u8>) -> Result<Vec<u8>, Error> {
-        self.serialize_into(sink)
     }
 }
 
@@ -1354,14 +1330,13 @@ where
             .ok_or(Error::Zero)
     }
 
-    fn serialize_into(&self, mut buf: Self::Buffer) -> Result<Self::Buffer, Error> {
+    fn serialize_into<'a>(&self, mut buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
         let prefix: u64 = size_of::<NonZeroU64>().try_into()?;
         // NOTE: Self::size returns Error if Σ overflows u64 (not expected in production)
-        let size = self.size()?.get().checked_sub(prefix).ok_or(Error::Zero)?.to_le_bytes();
-        buf.extend_from_slice(&size);
+        let buf = self.size()?.get().sub(prefix).to_le_bytes().serialize_into(buf)?;
         self.iter().try_fold(buf, |sink, entry| {
-            let sink = entry.0.extend(sink)?;
-            entry.1.extend(sink)
+            let sink = entry.0.serialize_into(sink)?;
+            entry.1.serialize_into(sink)
         })
     }
 
@@ -1384,16 +1359,14 @@ impl Serialize for BitVec {
         payload.checked_add(8).and_then(NonZeroU64::new).ok_or(Error::Zero)
     }
 
-    fn serialize_into(&self, mut buf: Self::Buffer) -> Result<Self::Buffer, Error> {
+    fn serialize_into<'a>(&self, mut buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
+        let prefix: u64 = size_of::<NonZeroU64>().try_into()?;
         // NOTE: Self::size returns Error if BitVec::len overflows u64 (not expected in production)
-        let size = self.size()?.get().sub(8).to_le_bytes();
-        buf.extend_from_slice(&size);
+        let buf = self.size()?.get().sub(prefix).to_le_bytes().serialize_into(buf)?;
         // Intermediate chunks contain 8 bits in Lsb0 order; the final chunk may contain ≤ 8 bits.
         // BitVec::load_le packs each chunk into one u8 in LE order, padding with zeros if the final
         // chunk is shorter than 8 bits. The resulting bytes are pushed into the provided buffer.
-        buf.reserve(self.len().div_ceil(8));
-        self.chunks(8).for_each(|bits| buf.push(bits.load_le::<u8>()));
-        Ok(buf)
+        self.chunks(8).try_fold(buf, |sink, bits| bits.load_le::<u8>().serialize_into(sink))
     }
 
     fn serialize(&self) -> Result<Self::Buffer, Error> {
@@ -1402,10 +1375,6 @@ impl Serialize for BitVec {
         // NOTE: cannot use static assertion as size is dependent on runtime data accumulation.
         debug_assert_eq!(buf.len(), size, "actual size ≠ predicted size");
         Ok(buf)
-    }
-
-    fn extend(&self, sink: Vec<u8>) -> Result<Vec<u8>, Error> {
-        self.serialize_into(sink)
     }
 }
 
@@ -1419,7 +1388,7 @@ where
         self.data.size()
     }
 
-    fn serialize_into(&self, buf: Self::Buffer) -> Result<Self::Buffer, Error> {
+    fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
         self.data.serialize_into(buf)
     }
 
@@ -1446,10 +1415,10 @@ where
         mask.checked_add(data).ok_or(Error::Zero)?.checked_add(8).ok_or(Error::Zero)
     }
 
-    fn serialize_into(&self, mut buf: Self::Buffer) -> Result<Self::Buffer, Error> {
+    fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
+        let prefix: u64 = size_of::<NonZeroU64>().try_into()?;
         // NOTE: Self::size returns Error if Σ overflows u64 (not expected in production)
-        let size = self.size()?.get().sub(8).to_le_bytes();
-        buf.extend_from_slice(&size);
+        self.size()?.get().sub(prefix).to_le_bytes().serialize_into(buf)?;
         buf.serialize_push(&self.mask)?.serialize_push(&self.data)
     }
 
@@ -1459,10 +1428,6 @@ where
         // NOTE: cannot use static assertion as size is dependent on runtime data accumulation.
         debug_assert_eq!(buf.len(), size, "actual size ≠ predicted size");
         Ok(buf)
-    }
-
-    fn extend(&self, sink: Vec<u8>) -> Result<Vec<u8>, Error> {
-        self.serialize_into(sink)
     }
 }
 
@@ -1480,10 +1445,10 @@ where
         offsets.checked_add(data).ok_or(Error::Zero)?.checked_add(prefix).ok_or(Error::Zero)
     }
 
-    fn serialize_into(&self, mut buf: Self::Buffer) -> Result<Self::Buffer, Error> {
+    fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
+        let prefix: u64 = size_of::<NonZeroU64>().try_into()?;
         // NOTE: Self::size returns Error if Σ overflows u64 (not expected in production)
-        let size = self.size()?.get().sub(8).to_le_bytes();
-        buf.extend_from_slice(&size);
+        let buf = self.size()?.get().sub(prefix).to_le_bytes().serialize_into(buf)?;
         buf.serialize_push(&self.offsets)?.serialize_push(&self.data)
     }
 
@@ -1493,10 +1458,6 @@ where
         // NOTE: cannot use static assertion as size is dependent on runtime data accumulation.
         debug_assert_eq!(buf.len(), size, "actual size ≠ predicted size");
         Ok(buf)
-    }
-
-    fn extend(&self, sink: Vec<u8>) -> Result<Vec<u8>, Error> {
-        self.serialize_into(sink)
     }
 }
 
@@ -1514,10 +1475,10 @@ where
         offsets.checked_add(data).ok_or(Error::Zero)?.checked_add(8).ok_or(Error::Zero)
     }
 
-    fn serialize_into(&self, mut buf: Self::Buffer) -> Result<Self::Buffer, Error> {
+    fn serialize_into<'a>(&self, mut buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
+        let prefix: u64 = size_of::<NonZeroU64>().try_into()?;
         // NOTE: Self::size returns Error if Σ overflows u64 (not expected in production)
-        let size = self.size()?.get().sub(8).to_le_bytes();
-        buf.extend_from_slice(&size);
+        self.size()?.get().sub(prefix).to_le_bytes().serialize_into(buf)?;
         buf.serialize_push(&self.offsets)?.serialize_push(&self.data)
     }
 
@@ -1527,10 +1488,6 @@ where
         // NOTE: cannot use static assertion as size is dependent on runtime data accumulation.
         debug_assert_eq!(buf.len(), size, "actual size ≠ predicted size");
         Ok(buf)
-    }
-
-    fn extend(&self, sink: Vec<u8>) -> Result<Vec<u8>, Error> {
-        self.serialize_into(sink)
     }
 }
 
@@ -1544,7 +1501,7 @@ where
         self.0.size() // Transparent wrapper
     }
 
-    fn serialize_into(&self, buf: Self::Buffer) -> Result<Self::Buffer, Error> {
+    fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
         self.0.serialize_into(buf) // Transparent wrapper
     }
 
@@ -1565,12 +1522,12 @@ impl<I> Serialize for Accumulator<I> {
         self.data.size()?.get().checked_add(header).and_then(NonZeroU64::new).ok_or(Error::Zero)
     }
 
-    fn serialize_into(&self, mut buf: Self::Buffer) -> Result<Self::Buffer, Error> {
+    fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
         // 1. Header fields (see accumulator documentation)
-        buf.push(Variant::Data as u8);
-        buf.extend_from_slice(&self.data.size()?.get().to_le_bytes());
-        buf.extend_from_slice(&self.schema.offset.to_le_bytes());
-        buf.extend_from_slice(&self.data.count().to_le_bytes());
+        buf.serialize_push(&{ Variant::Data as u8 })?
+            .serialize_push(&self.data.size()?.get())?
+            .serialize_push(&self.schema.offset)?
+            .serialize_push(&self.data.count())?;
         // 2. Columnar data buffers
         self.data.serialize_into(buf)
     }
