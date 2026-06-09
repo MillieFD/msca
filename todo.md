@@ -40,7 +40,9 @@
     - [ ] Implement optional and unsized readers: `OptBitVec` + `OptInSitu` + `Seq` + `OptSeq` + `Flatten`
     - [ ] Add remaining query filters: `eq` + `one_of` + `none_of` + `is_some` + `is_none` + `mask` + `limit` + `offset`
 - [ ] SIMD alignment on all critical data fields.
-- [ ] Standardise buffer sector offset is relative to the immutable segment region; excludes the file header:
+    - `align` function already exists (unused) in [segment.rs](./clem-core/src/segment.rs).
+    - Critical fields are described in [simd-alignment.md](./doc/simd-alignment.md).
+- [ ] Standardise buffer sector offset is relative to the immutable segment region excluding the file header:
     - [x] Update `Serialize::sector` and `Header::tail` documentation.
     - [ ] Refactor all buffer offset calculations to reflect this change.
 - [ ] Manifest rebuild function
@@ -59,8 +61,8 @@
 - [ ] Finalise `clem-derive` procedural macro design.
 - [ ] Resolve discrepancies between [doc](./doc) and actual implementations. Update documentation as needed.
 - [ ] Add comprehensive unit tests for core functionalities in each module; cover edge cases.
-- [ ] Add round-trip integration tests for `#[derive(Data)]` and `#[derive(Deserialize)]` in "tests" directory.
-- [ ] Remove references to concurrency model `RwLock<Manifest>` in read-cycle documentation
+- [ ] Add round-trip integration tests for `#[derive(Data)]` and `#[derive(Read)]` in "tests" directory.
+- [ ] Remove all references to concurrency model `RwLock<Manifest>` in documentation; concurrency is deferred.
 
 ### Extend Functionality (Priority III)
 
