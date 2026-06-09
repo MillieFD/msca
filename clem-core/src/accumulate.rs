@@ -682,8 +682,6 @@ pub trait Serialize {
     type Buffer: Buffer;
 
     /// Returns the number of bytes required to encode `self`.
-    ///
-    /// Defaults to the [`size_of`](size_of)`::<Self>` if not otherwise specified.
     fn size(&self) -> Result<NonZeroU64, Error>;
 
     /// Serialize `self` into the provided [`Buffer`].
