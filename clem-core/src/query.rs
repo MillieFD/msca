@@ -40,8 +40,9 @@ use std::sync::Arc;
 use memmap2::Mmap;
 use minicbor::{CborLen, Decode, Encode};
 
+use crate::accumulate::Buffer;
 use crate::io::{self, Deserialize};
-use crate::manifest::{self, Buffer};
+use crate::manifest::{self, B};
 use crate::read::{BoxRead, Decoder, Outcome, Read, Stride};
 use crate::schema::{number, Schema, Type, Unfolder};
 use crate::{Reader, Serialize};
@@ -78,6 +79,28 @@ pub struct Query {
 }
 
 impl Query {
+    /// A [`Query`] retains all columns defined by the [`Schema`] unless otherwise specified. The
+    /// `select` filter restricts the returned columns to a named subset, reducing file IO to only
+    /// the required buffers.
+    ///
+    /// ```rust,ignore
+    /// .select(["a", "b"]) // Return only columns "a" and "b"
+    /// ```
+    ///
+    /// Any [`Column`] omitted from `select` is never read from disk; the primary mechanism to
+    /// reduce file IO on wide schemas. Omitting `select` is equivalent to selecting every column.
+    ///
+    /// Refer to the [module-level documentation](self) for more details.
+    pub fn select<N, S>(mut self, names: N) -> Self
+    where
+        N: IntoIterator<Item = S>,
+        String: From<S>,
+    {
+        let keep: BTreeSet<String> = names.into_iter().map(String::from).collect();
+        self.columns.retain(|name, column| keep.contains(name));
+        self // return to builder pattern
+    }
+
     /// Retain rows from the named [`Column`] only if the deserialized [`Item`](I) value falls
     /// within the specified [`Range`](RangeBounds). Excluded rows are removed from all columns.
     ///
