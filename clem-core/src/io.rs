@@ -408,7 +408,7 @@ impl File {
     /// [`Error::Io`] if the underlying system call fails. This can occur for a variety of reasons,
     /// such as the file is no longer accessible, or the platform does not support memory mapping.
     ///
-    /// ### Safety
+    /// ### ⚠️ Safety
     ///
     /// This function is marked as [unsafe][1] because of the potential for undefined behaviour if
     /// the underlying file region is subsequently modified, in or out of process. Implementers are
