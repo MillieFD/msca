@@ -251,44 +251,25 @@ pub(crate) enum Filter {
     #[n(0)]
     Range {
         /// Lower bound
-        #[n(0)] // todo → CBOR and serde options e.g. skip_if
-        // TODO → Vec is 24 (stack) + n (heap); u128 is 16 (stack); use [u8; 16] instead of Vec<u8>
-        lb: Bound<Vec<u8>>,
+        #[n(0)]
+        lb: Bound<[u8; B]>,
         /// Upper bound
-        #[n(1)] // todo → CBOR and serde options e.g. skip_if
-        // TODO → Vec is 24 (stack) + n (heap); u128 is 16 (stack); use [u8; 16] instead of Vec<u8>
-        ub: Bound<Vec<u8>>,
+        #[n(1)]
+        ub: Bound<[u8; B]>,
     },
 }
 
 impl Filter {
-    /// Returns `true` if the provided [`Buffer`] is provably disjoint from the specified [`Range`].
-    fn disjoint<D>(buf: &Buffer, range: Range<D>) -> Result<bool, io::Error>
+    /// Construct a [`Filter::Range`] from the provided [`range`](RangeBounds).
+    fn bounds<B, I>(range: &B) -> Self
     where
-        D: for<'b> Deserialize<Src<'b> = &'b [u8]> + PartialOrd,
+        B: RangeBounds<I>,
+        I: Serialize,
     {
-        let min = D::deserialize(&buf.min)?;
-        let max = D::deserialize(&buf.max)?;
-        let above = match range.end_bound() {
-            Bound::Included(h) => &min > h,
-            Bound::Excluded(h) => &min >= h,
-            Bound::Unbounded => false,
-        };
-        let below = match range.start_bound() {
-            Bound::Included(l) => &max < l,
-            Bound::Excluded(l) => &max <= l,
-            Bound::Unbounded => false,
-        };
-        Ok(above || below)
-    }
-}
-
-/// Serialize a [`Bound`] value into its binary representation for storage in a [`Filter`].
-fn bytes<V: Serialize>(bound: Bound<&V>) -> Result<Bound<Vec<u8>>, number::Error> {
-    match bound {
-        Bound::Included(value) => Ok(Bound::Included(value.serialize()?.as_ref().to_vec())),
-        Bound::Excluded(value) => Ok(Bound::Excluded(value.serialize()?.as_ref().to_vec())),
-        Bound::Unbounded => Ok(Bound::Unbounded),
+        Self::Range {
+            lb: range.start_bound().map(|v| [u8::MIN; B].serialize_push(v).unwrap_or([u8::MIN; B])),
+            ub: range.end_bound().map(|v| [u8::MAX; B].serialize_push(v).unwrap_or([u8::MAX; B])),
+        }
     }
 }
 
