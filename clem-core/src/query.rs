@@ -130,6 +130,19 @@ impl Column {
             false => Error::Type { expected, found: self.ty.clone() }.into(),
         }
     }
+
+    /// Returns [`Error::Type`] if the requested [`Type`] does not match the on-disk [`Column`]
+    /// type; otherwise returns [`Ok`](Ok)`(`[`Self`](Column)`)` unmodified for method chaining.
+    fn verify<I>(self) -> Result<Self, Error>
+    where
+        Schema: Unfolder<I>,
+    {
+        let expected = Schema::unfold();
+        match self.ty == expected {
+            true => Ok(self),
+            false => Error::Type { expected, found: self.ty.clone() }.into(),
+        }
+    }
 }
 
 impl From<manifest::Column> for Column {
