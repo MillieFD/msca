@@ -37,7 +37,7 @@
           external type; rejects the entire item if any sub-reader returns `Outcome::Excluded`.
         - [ ] `Read::boxed` hides the generated reader type from users behind a type-erased trait object.
         - [ ] `Query::read::<I>` returns the composite reader for `I`; mirrors `Data::accumulator`.
-    - [ ] Implement optional and unsized layout readers: `OptBitVec` + `OptInSitu` + `Seq` + `OptSeq` + `Flatten`
+    - [ ] Implement optional and unsized readers: `OptBitVec` + `OptInSitu` + `Seq` + `OptSeq` + `Flatten`
     - [ ] Add remaining query filters: `eq` + `one_of` + `none_of` + `is_some` + `is_none` + `mask` + `limit` + `offset`
 - [ ] SIMD alignment on all critical data fields.
 - [ ] Standardise buffer sector offset is relative to the immutable segment region; excludes the file header:
