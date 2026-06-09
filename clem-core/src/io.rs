@@ -91,10 +91,10 @@ use crate::{number, schema, Serialize};
 
 /* ------------------------------------------------------------------------------ Public Exports */
 
-/// Magic byte sequence used to identify a valid [`clem`](crate) file.
+/// Magic byte sequence used to identify a valid [clem](crate) file.
 const MAGIC: [u8; 4] = *b"clem";
 
-/// Current [`clem`](crate) major version number which is embedded in the file header to indicate
+/// Current [clem](crate) major version number which is embedded in the file header to indicate
 /// breaking changes in the format specification. Forwards and backwards compatibility across
 /// version numbers is not guaranteed. Implementers must reject any unrecognised version number.
 const VERSION: u8 = 1;
@@ -105,7 +105,7 @@ const VERSION: u8 = 1;
 /// [2]: VERSION
 pub const HEADER: usize = size_of_val(&MAGIC) + size_of_val(&VERSION) + size_of::<Header>();
 
-/// A contiguous byte region within the [`clem`](crate) file.
+/// A contiguous byte region within the [clem](crate) file.
 ///
 /// Implementers must [`Copy`] into an owned type when mutability is required e.g. for downstream
 /// data processing.
