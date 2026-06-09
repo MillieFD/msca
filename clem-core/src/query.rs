@@ -151,6 +151,19 @@ impl Query {
         }
         Ok(self)
     }
+
+    /// Sample every nth row from the result set. Useful for decimation and preview reads on dense
+    /// time-series data.
+    ///
+    /// ```rust,ignore
+    /// .stride(10) // return every 10th row
+    /// ```
+    ///
+    /// The default stride value `1` includes every row after filtering.
+    pub fn stride(mut self, n: u32) -> Self {
+        self.stride = NonZeroU32::new(n).unwrap_or(NonZeroU32::MIN);
+        self // return to builder pattern
+    }
 }
 
 /* ----------------------------------------------------------------------------- Query Internals */
