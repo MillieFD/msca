@@ -97,6 +97,8 @@ impl Query {
     /// .range("pressure", ..105.0) // pressure < 105.0  (no lower bound)
     /// ```
     ///
+    /// Refer to the [module-level documentation](self) for more details.
+    ///
     /// ### Errors
     ///
     /// - [`Error::Column`] if the named [`Column`] is not found in the [`Query`].
