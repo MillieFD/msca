@@ -34,7 +34,7 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::fmt::{self, Display};
 use std::num::NonZeroU32;
-use std::ops::{Bound, Range, RangeBounds};
+use std::ops::{Bound, RangeBounds};
 use std::sync::Arc;
 
 use memmap2::Mmap;
@@ -77,6 +77,56 @@ pub struct Query {
     pub stride: NonZeroU32,
 }
 
+impl Query {
+    /// Retain rows from the named [`Column`] only if the deserialized [`Item`](I) value falls
+    /// within the specified [`Range`](RangeBounds). Excluded rows are removed from all columns.
+    ///
+    /// `range` is a **mixed** filter:
+    /// 1. Eagerly evaluated **before** IO using [`Buffer`] statistics.
+    /// 2. Lazily evaluated **during** [deserialization](Deserialize) to filter individual rows.
+    ///
+    /// ```rust,ignore
+    /// .range("temperature", 10..20) // 10.0 ≤ temperature < 20.0 inclusive range
+    /// .range("altitude", 100..=500) // inclusive upper bound on additonal column
+    /// ```
+    ///
+    /// Open or half-open ranges are also supported:
+    ///
+    /// ```rust,ignore
+    /// .range("pressure", 101.3..) // pressure ≥ 101.3  (no upper bound)
+    /// .range("pressure", ..105.0) // pressure < 105.0  (no lower bound)
+    /// ```
+    ///
+    /// ### Errors
+    ///
+    /// - [`Error::Column`] if the named [`Column`] is not found in the [`Query`].
+    /// - [`Error::Type`] if the column's on-disk [`Type`] is incompatible with [`I`].
+    /// - [`Error::Io`] if an error occurs during [deserialization](Deserialize).
+    pub fn range<I, B>(mut self, name: &str, bounds: B) -> Result<Self, Error>
+    where
+        I: Serialize + for<'a> Deserialize<Src<'a> = &'a [u8]> + PartialOrd,
+        B: RangeBounds<I>,
+        Schema: Unfolder<I>,
+    {
+        let col = self.columns.get_mut(name).ok_or_else(|| Error::column(name))?.verify::<I>()?;
+        let filter = Filter::bounds(&bounds);
+        col.filters.insert(filter);
+        let n = col.buffers.len();
+        let mut keep = col
+            .buffers
+            .iter()
+            .try_fold(Vec::with_capacity(n), |mut acc, buf| unsafe {
+                acc.push(buf.disjoint(&bounds)?);
+                Ok::<Vec<bool>, Error>(acc)
+            })?
+            .into_iter()
+            .cycle();
+        for column in self.columns.values_mut() {
+            column.buffers.retain(|buf| keep.next().unwrap_or(false))
+        }
+        Ok(self)
+    }
+}
 
 /* ----------------------------------------------------------------------------- Query Internals */
 
