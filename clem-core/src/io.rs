@@ -67,7 +67,6 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //! own metadata parsing and validation logic.
 //!
 //! [1]: crate::segment::Variant
-//! [2]: crate::manifest
 
 #![doc = include_str!("../../doc/write-cycle.md")]
 #![doc = include_str!("../../doc/read-cycle.md")]
