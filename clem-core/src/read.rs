@@ -24,3 +24,13 @@ pub enum Outcome<I> {
     /// Every candidate [`Column`](query::Column) [`Item`](I) has been [`Read`].
     Finished,
 }
+
+/* ----------------------------------------------------------------------- Read Trait Definition */
+
+/// A **byte-stream** interface that lazily [deserializes](Deserialize::deserialize) and
+/// [filters](Filter) successive [`items`](I) from the [clem](crate) file.
+pub trait Read<I> {
+    /// Advance the byte stream to [`Deserialize`] one candidate row as [`I`] and evaluate against
+    /// the column [filters](Filter).
+    fn next(&mut self) -> Result<Outcome<I>, io::Error>;
+}
