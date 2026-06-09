@@ -31,6 +31,7 @@
     functions. Do not implement manual bitwise operations.
 17. Prefer vertically symmetrical letters for type generics e.g. `I` instead of `T` or `E` instead of `F`.
     - Type generics should use the first letter of their semantic meaning e.g. `I` for `Item` or `E` for `Error`.
+18. Prefer associated functions to free functions.
 
 # Testing and Verification
 
