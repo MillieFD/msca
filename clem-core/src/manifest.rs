@@ -308,7 +308,7 @@ impl Buffer {
     /// requested type [`I`] does not match the actual [`Column`](Column) [`Type`].
     ///
     /// [1]: https://doc.rust-lang.org/book/ch20-01-unsafe-rust.html
-    pub(crate) unsafe fn disjoint<I, B>(&self, bounds: B) -> Result<bool, io::Error>
+    pub(crate) unsafe fn disjoint<I, B>(&self, bounds: &B) -> Result<bool, io::Error>
     where
         B: RangeBounds<I>,
         I: for<'a> Deserialize<Src<'a> = &'a [u8]> + PartialOrd,
