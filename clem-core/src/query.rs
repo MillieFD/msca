@@ -181,7 +181,7 @@ pub struct Column {
         feature = "serde",
         serde(default, skip_serializing_if = "Vec::is_empty")
     )]
-    buffers: Vec<Buffer>,
+    buffers: Vec<manifest::Buffer>,
     /// Deduplicated [`Filter`] set attached to this [`Column`] for lazy evaluation during
     /// [deserialization](Deserialize).
     #[cbor(n(2), skip_if = "HashSet::is_empty")]
