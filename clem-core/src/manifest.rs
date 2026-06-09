@@ -23,6 +23,9 @@ use crate::{io, Deserialize, Sector, Serialize};
 
 /* ------------------------------------------------------------------------------ Public Exports */
 
+/// Size of each serialized [`Buffer`] statistic in bytes; determined by the largest supported type.
+pub(crate) const B: usize = size_of::<u128>();
+
 /// Manifest of file segments and accompanying metadata for random access and predicate pruning.
 /// See the [module-level documentation](self) for details.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -146,14 +149,14 @@ impl Write for Manifest {
     ///
     /// ### Errors
     ///
-    /// Returns [`Error::Zero`](number::Error::Zero) if a `u64` overflow occurs while calculating
+    /// Returns [`Error::Zero`](Error::Zero) if a `u64` overflow occurs while calculating
     /// [`size`](NonZeroU64) or [`offset`](NonZeroU64) for the relevant file regions.
-    fn sector(&self, pending: Pending) -> Result<Sector, number::Error> {
+    fn sector(&self, pending: Pending) -> Result<Sector, Error> {
         let offset = match pending.header.manifest.length < pending.size {
             true => pending.header.tail.checked_add(pending.size.get()),
             false => pending.header.manifest.next(),
         }
-        .ok_or(number::Error::Zero)?
+        .ok_or(Error::Zero)?
         .get();
         Ok(Sector { offset, length: self.size()? })
     }
@@ -285,14 +288,14 @@ pub struct Buffer {
     /// according to the [`Type`] specified by the [`Schema`]. Defaults to unset bits if no
     /// orderable statistic is available e.g. for non-orderable types.
     #[cbor(n(2), with = "minicbor::bytes")]
-    pub min: [u8; 16],
+    pub min: [u8; B],
     /// Maximum value recorded in this buffer; used for segment-level predicate pruning.
     ///
     /// [Serialized](Serialize) LE bytes into a fixed-size array with trailing zeros. [Deserialize]
     /// according to the [`Type`] specified by the [`Schema`]. Defaults to set bits if no orderable
     /// statistic is available e.g. for non-orderable types.
     #[cbor(n(3), with = "minicbor::bytes")]
-    pub max: [u8; 16],
+    pub max: [u8; B],
 }
 
 /// A minimal dictionary **descriptor** that specifies:
