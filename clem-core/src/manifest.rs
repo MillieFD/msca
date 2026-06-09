@@ -10,8 +10,9 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 
 #![doc = include_str!("../../doc/manifest.md")]
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, Bound};
 use std::num::NonZeroU64;
+use std::ops::RangeBounds;
 
 use minicbor::{CborLen, Decode, Encode};
 use smol::io::{AsyncRead, AsyncReadExt, AsyncSeek};
@@ -296,6 +297,36 @@ pub struct Buffer {
     /// statistic is available e.g. for non-orderable types.
     #[cbor(n(3), with = "minicbor::bytes")]
     pub max: [u8; B],
+}
+
+impl Buffer {
+    /// Returns `true` if [`self`](Buffer) is provably disjoint from the specified [`Range`].
+    ///
+    /// ### ⚠️ Safety
+    ///
+    /// This function is marked as [unsafe][1] due to the potential for undefined behaviour if the
+    /// requested type [`I`] does not match the actual [`Column`](Column) [`Type`].
+    ///
+    /// [1]: https://doc.rust-lang.org/book/ch20-01-unsafe-rust.html
+    unsafe fn disjoint<I, B>(&self, bounds: B) -> Result<bool, io::Error>
+    where
+        B: RangeBounds<I>,
+        I: for<'a> Deserialize<Src<'a> = &'a [u8]> + PartialOrd,
+    {
+        let min = I::deserialize(&self.min)?;
+        let max = I::deserialize(&self.max)?;
+        let above = match bounds.end_bound() {
+            Bound::Included(v) => &min > v,
+            Bound::Excluded(v) => &min >= v,
+            Bound::Unbounded => false,
+        };
+        let below = match bounds.start_bound() {
+            Bound::Included(v) => &max < v,
+            Bound::Excluded(v) => &max <= v,
+            Bound::Unbounded => false,
+        };
+        Ok(above || below)
+    }
 }
 
 /// A minimal dictionary **descriptor** that specifies:
