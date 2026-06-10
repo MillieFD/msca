@@ -815,6 +815,26 @@ impl Deserialize for char {
     }
 }
 
+/* --------------------------------------------------------------- Deserializer Trait Definition */
+
+/// A **source** that can be deserialized into a [supported data type](Deserialize).
+pub trait Deserializer<'a, I>
+where
+    I: Deserialize<Src<'a> = Self>,
+{
+    /// Deserialize [`Self`] into an instance of the target type [`I`].
+    fn deserialize_into(self) -> Result<I, Error>
+    where
+        Self: Sized,
+    {
+        I::deserialize(self)
+    }
+}
+
+/* ----------------------------------------------------------- Deserializer Trait Implementation */
+
+impl<'a, I, S> Deserializer<'a, I> for S where I: Deserialize<Src<'a> = S> {}
+
 /* ---------------------------------------------------------------------- Write Trait Definition */
 
 /// A **data type** that is written to the [clem](crate) file at a specific [location](Sector).
