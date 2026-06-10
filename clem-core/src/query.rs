@@ -41,9 +41,9 @@ use memmap2::Mmap;
 use minicbor::{CborLen, Decode, Encode};
 
 use crate::accumulate::Buffer;
-use crate::io::{self, Deserialize};
+use crate::io::{self, Deserialize, Deserializer};
 use crate::manifest::{self, B};
-use crate::read::{BoxRead, Decoder, Outcome, Read, Stride};
+use crate::read::{BoxRead, Decoder, Read};
 use crate::schema::{number, Schema, Type, Unfolder};
 use crate::{Reader, Serialize};
 
@@ -271,6 +271,36 @@ impl Filter {
             lb: range.start_bound().map(|v| [u8::MIN; B].serialize_push(v).unwrap_or([u8::MIN; B])),
             ub: range.end_bound().map(|v| [u8::MAX; B].serialize_push(v).unwrap_or([u8::MAX; B])),
         }
+    }
+
+    /// Returns `true` if the [`item`](I) satisfies [`self`](Filter).
+    pub(crate) fn evaluate<I, S>(&self, item: &I) -> Result<bool, io::Error>
+    where
+        I: for<'a> Deserialize<Src<'a> = &'a [u8]> + PartialOrd,
+    {
+        // NOTE: This dispatch function will grow as new filter variants are added
+        match self {
+            Self::Range { lb, ub } => Filter::contains(lb, ub, item),
+        }
+    }
+
+    /// Returns `true` if the [`item`](I) is contained within the specified [`Range`](RangeBounds).
+    pub(crate) fn contains<I, S>(lb: &Bound<S>, ub: &Bound<S>, item: &I) -> Result<bool, io::Error>
+    where
+        I: for<'a> Deserialize<Src<'a> = &'a [u8]> + PartialOrd,
+        S: AsRef<[u8]>,
+    {
+        let above = match lb {
+            Bound::Included(bytes) => *item >= bytes.as_ref().deserialize_into()?,
+            Bound::Excluded(bytes) => *item > bytes.as_ref().deserialize_into()?,
+            Bound::Unbounded => true,
+        };
+        let below = match ub {
+            Bound::Included(bytes) => *item <= bytes.as_ref().deserialize_into()?,
+            Bound::Excluded(bytes) => *item < bytes.as_ref().deserialize_into()?,
+            Bound::Unbounded => true,
+        };
+        Ok(above && below)
     }
 }
 
