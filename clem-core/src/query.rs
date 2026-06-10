@@ -95,6 +95,21 @@ impl Query {
         Ok(read)
     }
 
+    /// Drain the [`Query`] result set into an owned [`Vec`] of [`deserialized`][1] [`items`](I).
+    ///
+    /// ### Errors
+    ///
+    /// See [`Query::read`] for a description of the error conditions that may arise during setup.
+    /// Returns [`Error::Io`] if a file IO or deserialization error occurs during iteration.
+    ///
+    /// [1]: Deserialize::deserialize
+    pub async fn collect<I>(self) -> Result<Vec<I>, Error>
+    where
+        I: Reader + 'static,
+    {
+        self.read::<I>()?.collect::<Result<Vec<I>, io::Error>>().map_err(Error::from)
+    }
+
     /* --------------------------------------------------------------------------- Query Filters */
 
     /// A [`Query`] retains all columns defined by the [`Schema`] unless otherwise specified. The
