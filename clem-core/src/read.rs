@@ -23,7 +23,7 @@ pub type Stream<'a, I> = Box<dyn Iterator<Item = Outcome<I>> + 'a>;
 
 /// The result of [deserializing](Deserialize) one [`Item`](I) from a [`Read`](Read) [`Stream`].
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Debug)]
 pub enum Outcome<I> {
     /// A [deserialized](Deserialize::deserialize) [`Item`](I) which satisfies every [`Filter`].
     Success(I),
@@ -31,8 +31,11 @@ pub enum Outcome<I> {
     ///
     /// [1]: Deserialize::deserialize
     Excluded,
-    /// Every candidate [`Column`](crate::query::Column) [`Item`](I) has been [`Read`].
+    /// Every candidate [`Item`](I) has been [`Read`].
     Finished,
+    /// An [`Error`](io::Error) occurred while [deserializing](Deserialize) or [filtering](Filter)
+    /// the [`Item`](I).
+    Error(io::Error),
 }
 
 /* ----------------------------------------------------------------------- Read Trait Definition */
