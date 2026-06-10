@@ -295,7 +295,7 @@ pub(crate) enum Filter {
 
 impl Filter {
     /// Construct a [`Filter::Range`] from the provided [`range`](RangeBounds).
-    fn bounds<B, I>(range: &B) -> Self
+    pub(crate) fn bounds<B, I>(range: &B) -> Self
     where
         B: RangeBounds<I>,
         I: Serialize,
