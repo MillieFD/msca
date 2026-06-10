@@ -128,6 +128,23 @@ impl Query {
         self.columns.get_mut(name).ok_or_else(|| Error::column(name))
     }
 
+    /// Returns a [reader](BoxRead) that yields [`deserialized`][1] [`items`](I) from the named
+    /// [`Column`].
+    ///
+    /// ### Errors
+    ///
+    /// - [`Error::Column`] if a required column is not found in the query [`BTreeMap`].
+    /// - [`Error::Type`] if the requested [`Type`] is incompatible with the actual [`Column`] type.
+    ///
+    /// [1]: Deserialize::deserialize
+    pub fn column<I>(&self, name: &str) -> Result<BoxRead<I>, Error>
+    where
+        Schema: Unfolder<I>,
+        for<'a> Decoder<'a>: Read<I>,
+    {
+        self.get(name)?.reader::<I>(&self.mmap)
+    }
+
     /* --------------------------------------------------------------------------- Query Filters */
 
     /// A [`Query`] retains all columns defined by the [`Schema`] unless otherwise specified. The
