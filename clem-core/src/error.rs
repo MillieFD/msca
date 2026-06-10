@@ -168,6 +168,6 @@ mod tests {
         use std::str;
         let source = str::from_utf8(b"\xFF").unwrap_err();
         let error: Error = source.into();
-        assert!(error.to_string().starts_with("UTF8 from u8 error →"));
+        assert!(error.to_string().starts_with("UTF8 from bytes error →"));
     }
 }
