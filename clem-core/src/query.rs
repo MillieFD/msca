@@ -110,6 +110,15 @@ impl Query {
         self.read::<I>()?.collect::<Result<Vec<I>, io::Error>>().map_err(Error::from)
     }
 
+    /// Returns a reference to the [`Column`] descriptor corresponding to the provided `name`.
+    ///
+    /// ### Errors
+    ///
+    /// Returns [`Error::Column`] if the requested `name` is not found in the [`Query`].
+    pub fn get(&self, name: &str) -> Result<&Column, Error> {
+        self.columns.get(name).ok_or_else(|| Error::column(name))
+    }
+
     /* --------------------------------------------------------------------------- Query Filters */
 
     /// A [`Query`] retains all columns defined by the [`Schema`] unless otherwise specified. The
