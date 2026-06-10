@@ -10,8 +10,18 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 
 use crate::io::{self, Deserialize};
 use crate::manifest::Buffer;
-use crate::query::Filter;
-/// The result of [deserializing](Deserialize) a single [`Item`](I) from the [`Read`] stream.
+use crate::query::{self, Filter};
+use crate::schema::{Schema, Unfolder};
+
+/* ------------------------------------------------------------------------------ Public Exports */
+
+/// Shorthand type-erased stack-allocated [pointer](Box) to a lazy [`Iterator`] yielding one
+/// deserialized [`Outcome`] per candidate [`Item`](I).
+///
+/// Constructed via [`Read::boxed`]. Returns [`None`] once every candidate [`Buffer`] is consumed.
+pub type Stream<'a, I> = Box<dyn Iterator<Item = Outcome<I>> + 'a>;
+
+/// The result of [deserializing](Deserialize) one [`Item`](I) from a [`Read`](Read) [`Stream`].
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum Outcome<I> {
