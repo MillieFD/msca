@@ -184,9 +184,12 @@ impl Query {
         B: RangeBounds<I>,
         Schema: Unfolder<I>,
     {
-        let col = self.columns.get_mut(name).ok_or_else(|| Error::column(name))?.verify::<I>()?;
+        let col = self.get_mut(name)?;
+        col.ty.verify()?;
+        // 1. Insert filter for lazy evaluation during deserialization
         let filter = Filter::bounds(&bounds);
         col.filters.insert(filter);
+        // 2. Eagerly evaluate buffer min / max statistics
         let n = col.buffers.len();
         let mut keep = col
             .buffers
@@ -269,19 +272,6 @@ impl Column {
             false => Error::Type { expected, found: self.ty.clone() }.into(),
         }
     }
-
-    /// Returns [`Error::Type`] if the requested [`Type`] does not match the on-disk [`Column`]
-    /// type; otherwise returns [`Ok`](Ok)`(`[`Self`](Column)`)` unmodified for method chaining.
-    fn verify<I>(&mut self) -> Result<&mut Self, Error>
-    where
-        Schema: Unfolder<I>,
-    {
-        let expected = Schema::unfold();
-        match self.ty == expected {
-            true => Ok(self),
-            false => Error::Type { expected, found: self.ty.clone() }.into(),
-        }
-    }
 }
 
 impl From<manifest::Column> for Column {
@@ -297,7 +287,7 @@ impl From<manifest::Column> for Column {
 impl Type {
     /// Returns [`Error::Type`] if the requested [`Type`] does not match the on-disk [`Column`]
     /// type; otherwise returns an unmodified reference to [`self`](Column) for method chaining.
-    pub fn verify<I>(&self) -> Result<&Self, query::Error>
+    pub fn verify<I>(&self) -> Result<&Self, Error>
     where
         Schema: Unfolder<I>,
     {
