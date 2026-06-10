@@ -119,6 +119,15 @@ impl Query {
         self.columns.get(name).ok_or_else(|| Error::column(name))
     }
 
+    /// Returns a mutable reference to the [`Column`] corresponding to the provided `name`.
+    ///
+    /// ### Errors
+    ///
+    /// Returns [`Error::Column`] if the requested `name` is not found in the [`Query`].
+    fn get_mut(&mut self, name: &str) -> Result<&mut Column, Error> {
+        self.columns.get_mut(name).ok_or_else(|| Error::column(name))
+    }
+
     /* --------------------------------------------------------------------------- Query Filters */
 
     /// A [`Query`] retains all columns defined by the [`Schema`] unless otherwise specified. The
