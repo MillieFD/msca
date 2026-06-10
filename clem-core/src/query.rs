@@ -246,6 +246,7 @@ impl From<manifest::Column> for Column {
 /// A row-level predicate lazily evaluated during [deserialization](Deserialize).
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Encode, Decode, CborLen)]
+#[non_exhaustive] // To accommodate potential future filter types.
 pub(crate) enum Filter {
     /// Retain values within the specified range.
     #[n(0)]
