@@ -285,6 +285,21 @@ impl From<manifest::Column> for Column {
     }
 }
 
+impl Type {
+    /// Returns [`Error::Type`] if the requested [`Type`] does not match the on-disk [`Column`]
+    /// type; otherwise returns an unmodified reference to [`self`](Column) for method chaining.
+    pub fn verify<I>(&self) -> Result<&Self, query::Error>
+    where
+        Schema: Unfolder<I>,
+    {
+        let expected = Schema::unfold();
+        match *self == expected {
+            true => Ok(self),
+            false => Error::Type { expected, found: self.clone() }.into(),
+        }
+    }
+}
+
 /// A row-level predicate lazily evaluated during [deserialization](Deserialize).
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Encode, Decode, CborLen)]
