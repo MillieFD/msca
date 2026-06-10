@@ -647,27 +647,58 @@ where
     }
 }
 
-/* ------------------------------------------------------------------ Serialize Trait Definition */
+/* --------------------------------------------------------------------- Buffer Trait Definition */
 
 /// A **buffer** that can hold the serialized byte representation of a value.
+///
+/// Blanket implementations are provided for stack-allocated byte arrays and heap-allocated byte
+/// vectors. This design defines a fixed-size buffer for types with a known size at compile time,
+/// while facilitating dynamic buffer sizing for types that require heap allocation.
 pub trait Buffer: AsRef<[u8]> + AsMut<[u8]> + Into<Vec<u8>> {
     /// [`Serialize`] the provided [`item`](I) and append into [`self`](Buffer).
+    ///
+    /// Writing always begins at the **start** of the buffer; chained calls overwrite. Chain
+    /// sequential writes through [`Serialize::serialize_into`], which returns the advanced slice.
+    fn serialize_push<I>(self, item: &I) -> Result<Self, Error>
+    where
+        I: Serialize,
+        Self: Sized;
+}
+
+/* ----------------------------------------------------------------- Buffer Trait Implementation */
+
+impl Buffer for &mut [u8] {
+    fn serialize_push<I>(self, item: &I) -> Result<Self, Error>
+    where
+        I: Serialize,
+        Self: Sized,
+    {
+        item.serialize_into(self)
+    }
+}
+
+impl<const N: usize> Buffer for [u8; N] {
     fn serialize_push<I>(mut self, item: &I) -> Result<Self, Error>
     where
         I: Serialize,
         Self: Sized,
     {
-        let buf = self.as_mut();
-        item.serialize_into(buf)?;
+        item.serialize_into(&mut self)?;
         Ok(self)
     }
 }
 
-/// Blanket implementation that covers stack-allocated byte arrays and heap-allocated byte vectors.
-///
-/// This design defines a fixed-size buffer for types with a known size at compile time, while
-/// facilitating dynamic buffer sizing for types that require heap allocation.
-impl<T> Buffer for T where T: AsRef<[u8]> + AsMut<[u8]> + Into<Vec<u8>> {}
+impl Buffer for Vec<u8> {
+    fn serialize_push<I>(self, item: &I) -> Result<Self, Error>
+    where
+        I: Serialize,
+        Self: Sized,
+    {
+        item.extend(self)
+    }
+}
+
+/* ------------------------------------------------------------------ Serialize Trait Definition */
 
 /// A **type** that can be serialized into a canonical [`clem`](crate) binary representation for
 /// on-disk storage.
@@ -1330,7 +1361,7 @@ where
             .ok_or(Error::Zero)
     }
 
-    fn serialize_into<'a>(&self, mut buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
+    fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
         let prefix: u64 = size_of::<NonZeroU64>().try_into()?;
         // NOTE: Self::size returns Error if Σ overflows u64 (not expected in production)
         let buf = self.size()?.get().sub(prefix).to_le_bytes().serialize_into(buf)?;
@@ -1359,7 +1390,7 @@ impl Serialize for BitVec {
         payload.checked_add(8).and_then(NonZeroU64::new).ok_or(Error::Zero)
     }
 
-    fn serialize_into<'a>(&self, mut buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
+    fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
         let prefix: u64 = size_of::<NonZeroU64>().try_into()?;
         // NOTE: Self::size returns Error if BitVec::len overflows u64 (not expected in production)
         let buf = self.size()?.get().sub(prefix).to_le_bytes().serialize_into(buf)?;
@@ -1418,7 +1449,7 @@ where
     fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
         let prefix: u64 = size_of::<NonZeroU64>().try_into()?;
         // NOTE: Self::size returns Error if Σ overflows u64 (not expected in production)
-        self.size()?.get().sub(prefix).to_le_bytes().serialize_into(buf)?;
+        let buf = self.size()?.get().sub(prefix).to_le_bytes().serialize_into(buf)?;
         buf.serialize_push(&self.mask)?.serialize_push(&self.data)
     }
 
@@ -1475,10 +1506,10 @@ where
         offsets.checked_add(data).ok_or(Error::Zero)?.checked_add(8).ok_or(Error::Zero)
     }
 
-    fn serialize_into<'a>(&self, mut buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
+    fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
         let prefix: u64 = size_of::<NonZeroU64>().try_into()?;
         // NOTE: Self::size returns Error if Σ overflows u64 (not expected in production)
-        self.size()?.get().sub(prefix).to_le_bytes().serialize_into(buf)?;
+        let buf = self.size()?.get().sub(prefix).to_le_bytes().serialize_into(buf)?;
         buf.serialize_push(&self.offsets)?.serialize_push(&self.data)
     }
 
@@ -1524,10 +1555,10 @@ impl<I> Serialize for Accumulator<I> {
 
     fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
         // 1. Header fields (see accumulator documentation)
-        buf.serialize_push(&{ Variant::Data as u8 })?
-            .serialize_push(&self.data.size()?.get())?
-            .serialize_push(&self.schema.offset)?
-            .serialize_push(&self.data.count())?;
+        let buf = { Variant::Data as u8 }.serialize_into(buf)?;
+        let buf = self.data.size()?.get().serialize_into(buf)?;
+        let buf = self.schema.offset.serialize_into(buf)?;
+        let buf = self.data.count().serialize_into(buf)?;
         // 2. Columnar data buffers
         self.data.serialize_into(buf)
     }
