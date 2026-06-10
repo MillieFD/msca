@@ -270,7 +270,7 @@ impl Serialize for Schema {
 
     fn serialize(&self) -> Result<Self::Buffer, number::Error> {
         let size = self.size()?.get().try_into()?;
-        let buf = Vec::with_capacity(size).serialize_push(self)?;
+        let buf = vec![0u8; size].serialize_push(self)?;
         // NOTE: cannot use static assertion as size is dependent on runtime data accumulation.
         debug_assert_eq!(buf.len(), size, "actual size ≠ predicted size");
         Ok(buf)

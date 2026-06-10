@@ -1303,7 +1303,7 @@ where
 
     fn serialize(&self) -> Result<Self::Buffer, Error> {
         let size = self.size()?.get().try_into()?;
-        let buf = Vec::with_capacity(size).serialize_push(self)?;
+        let buf = vec![0u8; size].serialize_push(self)?;
         // NOTE: cannot use static assertion as size is dependent on runtime data accumulation.
         debug_assert_eq!(buf.len(), size, "actual size ≠ predicted size");
         Ok(buf)
@@ -1342,7 +1342,7 @@ where
 
     fn serialize(&self) -> Result<Self::Buffer, Error> {
         let size = self.size()?.get().try_into()?;
-        let buf = Vec::with_capacity(size).serialize_push(self)?;
+        let buf = vec![0u8; size].serialize_push(self)?;
         // NOTE: cannot use static assertion as size is dependent on runtime data accumulation.
         debug_assert_eq!(buf.len(), size, "actual size ≠ predicted size");
         Ok(buf)
@@ -1371,7 +1371,7 @@ impl Serialize for BitVec {
 
     fn serialize(&self) -> Result<Self::Buffer, Error> {
         let size = self.size()?.get().try_into()?;
-        let buf = Vec::with_capacity(size).serialize_push(self)?;
+        let buf = vec![0u8; size].serialize_push(self)?;
         // NOTE: cannot use static assertion as size is dependent on runtime data accumulation.
         debug_assert_eq!(buf.len(), size, "actual size ≠ predicted size");
         Ok(buf)
@@ -1424,7 +1424,7 @@ where
 
     fn serialize(&self) -> Result<Self::Buffer, Error> {
         let size = self.size()?.get().try_into()?;
-        let buf = Vec::with_capacity(size).serialize_push(self)?;
+        let buf = vec![0u8; size].serialize_push(self)?;
         // NOTE: cannot use static assertion as size is dependent on runtime data accumulation.
         debug_assert_eq!(buf.len(), size, "actual size ≠ predicted size");
         Ok(buf)
@@ -1454,7 +1454,7 @@ where
 
     fn serialize(&self) -> Result<Self::Buffer, Error> {
         let size = self.size()?.get().try_into()?;
-        let buf = Vec::with_capacity(size).serialize_push(self)?;
+        let buf = vec![0u8; size].serialize_push(self)?;
         // NOTE: cannot use static assertion as size is dependent on runtime data accumulation.
         debug_assert_eq!(buf.len(), size, "actual size ≠ predicted size");
         Ok(buf)
@@ -1484,7 +1484,7 @@ where
 
     fn serialize(&self) -> Result<Self::Buffer, Error> {
         let size = self.size()?.get().try_into()?;
-        let buf = Vec::with_capacity(size).serialize_push(self)?;
+        let buf = vec![0u8; size].serialize_push(self)?;
         // NOTE: cannot use static assertion as size is dependent on runtime data accumulation.
         debug_assert_eq!(buf.len(), size, "actual size ≠ predicted size");
         Ok(buf)
@@ -1534,7 +1534,7 @@ impl<I> Serialize for Accumulator<I> {
 
     fn serialize(&self) -> Result<Self::Buffer, Error> {
         let size = self.size()?.get().try_into()?;
-        let buf = Vec::with_capacity(size).serialize_push(self)?;
+        let buf = vec![0u8; size].serialize_push(self)?;
         // NOTE: cannot use static assertion as size is dependent on runtime data accumulation.
         debug_assert_eq!(buf.len(), size, "actual size ≠ predicted size");
         Ok(buf)
