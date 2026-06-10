@@ -300,6 +300,9 @@ pub struct Buffer {
 }
 
 impl Buffer {
+    /// Byte length of the [`NonZeroU64`] length prefix that precedes every serialized [`Buffer`].
+    pub(crate) const HEADER: usize = size_of::<NonZeroU64>();
+
     /// Returns `true` if [`self`](Buffer) is provably disjoint from the specified [`Range`].
     ///
     /// ### ⚠️ Safety
