@@ -254,7 +254,7 @@ impl Column {
 
     /// Returns [`Error::Type`] if the requested [`Type`] does not match the on-disk [`Column`]
     /// type; otherwise returns [`Ok`](Ok)`(`[`Self`](Column)`)` unmodified for method chaining.
-    fn verify<I>(self) -> Result<Self, Error>
+    fn verify<I>(&mut self) -> Result<&mut Self, Error>
     where
         Schema: Unfolder<I>,
     {
