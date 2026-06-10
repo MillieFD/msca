@@ -163,6 +163,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(invalid_from_utf8)]
     fn from_utf8_error() {
         use std::str;
         let source = str::from_utf8(b"\xFF").unwrap_err();
