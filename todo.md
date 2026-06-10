@@ -39,6 +39,7 @@
         - [ ] `Query::read::<I>` returns the composite reader for `I`; mirrors `Data::accumulator`.
     - [ ] Implement optional and unsized readers: `OptBitVec` + `OptInSitu` + `Seq` + `OptSeq` + `Flatten`
     - [ ] Add remaining query filters: `eq` + `one_of` + `none_of` + `is_some` + `is_none` + `mask` + `limit` + `offset`
+    - [ ] `Query::read` and other supporting functions are no longer async; update documentation.
 - [ ] SIMD alignment on all critical data fields.
     - `align` function already exists (unused) in [segment.rs](./clem-core/src/segment.rs).
     - Critical fields are described in [simd-alignment.md](./doc/simd-alignment.md).
