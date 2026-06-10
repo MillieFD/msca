@@ -21,7 +21,7 @@ pub enum Outcome<I> {
     ///
     /// [1]: Deserialize::deserialize
     Excluded,
-    /// Every candidate [`Column`](query::Column) [`Item`](I) has been [`Read`].
+    /// Every candidate [`Column`](crate::query::Column) [`Item`](I) has been [`Read`].
     Finished,
 }
 
