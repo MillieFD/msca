@@ -79,6 +79,24 @@ pub struct Query {
 }
 
 impl Query {
+    /// Returns an [`Iterator`] over [`deserialized`][1] [`items`](I) from the [`Query`] result set.
+    ///
+    /// ### Errors
+    ///
+    /// - [`Error::Column`] if a required column is not found in the query [`BTreeMap`].
+    /// - [`Error::Type`] if the requested [`Type`] is incompatible with the actual [`Column`] type.
+    ///
+    /// [1]: Deserialize::deserialize
+    pub fn read<I>(&self) -> Result<impl Iterator<Item = Result<I, io::Error>> + '_, Error>
+    where
+        I: Reader + 'static,
+    {
+        let read = I::reader(self)?.rows().step_by(self.stride.get() as usize);
+        Ok(read)
+    }
+
+    /* --------------------------------------------------------------------------- Query Filters */
+
     /// A [`Query`] retains all columns defined by the [`Schema`] unless otherwise specified. The
     /// `select` filter restricts the returned columns to a named subset, reducing file IO to only
     /// the required buffers.
