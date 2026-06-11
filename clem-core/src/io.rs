@@ -614,12 +614,24 @@ pub trait Deserialize {
     ///
     /// ### Errors
     ///
-    fn take<const N: usize>(src: &[u8]) -> Result<[u8; N], Error> {
-        src.get(..N).ok_or(Error::truncated(N, src.len()))?.try_into().map_err(Into::into)
-    /// Returns [`Error::Truncated`](io::Error::Truncated) if `src` contains fewer than the
-    /// requested number of bytes.
+    /// Returns [`Error::Truncated`] if `src` contains fewer than the requested number of bytes.
     ///
     /// [1]: https://doc.rust-lang.org/std/primitive.slice.html
+    fn take(mut src: &[u8]) -> Result<&[u8], Error>
+    where
+        Self: Sized,
+    {
+        let expected = size_of::<Self>();
+        let actual = src.len();
+        src.get(..expected)
+            .map(|data| {
+                src = &src[expected..];
+                Ok(data)
+            })
+            .unwrap_or_else(|| {
+                src = &[];
+                Error::Truncated { expected, actual }.into()
+            })
     }
 
     /// Deserialize [`Self`] from the provided [source](Self::Src).
@@ -634,7 +646,7 @@ impl Deserialize for u8 {
     type Src<'a> = &'a [u8];
 
     fn deserialize(src: &[u8]) -> Result<Self, Error> {
-        let buf = Self::take(src)?;
+        let buf = Self::take(src)?.try_into()?;
         let num = Self::from_le_bytes(buf);
         Ok(num)
     }
@@ -644,7 +656,7 @@ impl Deserialize for u16 {
     type Src<'a> = &'a [u8];
 
     fn deserialize(src: &[u8]) -> Result<Self, Error> {
-        let buf = Self::take(src)?;
+        let buf = Self::take(src)?.try_into()?;
         let num = Self::from_le_bytes(buf);
         Ok(num)
     }
@@ -654,7 +666,7 @@ impl Deserialize for u32 {
     type Src<'a> = &'a [u8];
 
     fn deserialize(src: &[u8]) -> Result<Self, Error> {
-        let buf = Self::take(src)?;
+        let buf = Self::take(src)?.try_into()?;
         let num = Self::from_le_bytes(buf);
         Ok(num)
     }
@@ -664,7 +676,7 @@ impl Deserialize for u64 {
     type Src<'a> = &'a [u8];
 
     fn deserialize(src: &[u8]) -> Result<Self, Error> {
-        let buf = Self::take(src)?;
+        let buf = Self::take(src)?.try_into()?;
         let num = Self::from_le_bytes(buf);
         Ok(num)
     }
@@ -674,7 +686,7 @@ impl Deserialize for u128 {
     type Src<'a> = &'a [u8];
 
     fn deserialize(src: &[u8]) -> Result<Self, Error> {
-        let buf = Self::take(src)?;
+        let buf = Self::take(src)?.try_into()?;
         let num = Self::from_le_bytes(buf);
         Ok(num)
     }
@@ -727,7 +739,7 @@ impl Deserialize for i8 {
     type Src<'a> = &'a [u8];
 
     fn deserialize(src: &[u8]) -> Result<Self, Error> {
-        let buf = Self::take(src)?;
+        let buf = Self::take(src)?.try_into()?;
         let num = Self::from_le_bytes(buf);
         Ok(num)
     }
@@ -737,7 +749,7 @@ impl Deserialize for i16 {
     type Src<'a> = &'a [u8];
 
     fn deserialize(src: &[u8]) -> Result<Self, Error> {
-        let buf = Self::take(src)?;
+        let buf = Self::take(src)?.try_into()?;
         let num = Self::from_le_bytes(buf);
         Ok(num)
     }
@@ -747,7 +759,7 @@ impl Deserialize for i32 {
     type Src<'a> = &'a [u8];
 
     fn deserialize(src: &[u8]) -> Result<Self, Error> {
-        let buf = Self::take(src)?;
+        let buf = Self::take(src)?.try_into()?;
         let num = Self::from_le_bytes(buf);
         Ok(num)
     }
@@ -757,7 +769,7 @@ impl Deserialize for i64 {
     type Src<'a> = &'a [u8];
 
     fn deserialize(src: &[u8]) -> Result<Self, Error> {
-        let buf = Self::take(src)?;
+        let buf = Self::take(src)?.try_into()?;
         let num = Self::from_le_bytes(buf);
         Ok(num)
     }
@@ -767,7 +779,7 @@ impl Deserialize for i128 {
     type Src<'a> = &'a [u8];
 
     fn deserialize(src: &[u8]) -> Result<Self, Error> {
-        let buf = Self::take(src)?;
+        let buf = Self::take(src)?.try_into()?;
         let num = Self::from_le_bytes(buf);
         Ok(num)
     }
@@ -817,7 +829,7 @@ impl Deserialize for f32 {
     type Src<'a> = &'a [u8];
 
     fn deserialize(src: &[u8]) -> Result<Self, Error> {
-        let buf = Self::take(src)?;
+        let buf = Self::take(src)?.try_into()?;
         let num = Self::from_le_bytes(buf);
         Ok(num)
     }
@@ -827,7 +839,7 @@ impl Deserialize for f64 {
     type Src<'a> = &'a [u8];
 
     fn deserialize(src: &[u8]) -> Result<Self, Error> {
-        let buf = Self::take(src)?;
+        let buf = Self::take(src)?.try_into()?;
         let num = Self::from_le_bytes(buf);
         Ok(num)
     }
@@ -966,6 +978,19 @@ impl<I> Push for Accumulator<I> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn take_prefixes_src() {
+        let bytes = [1u8, 0, 2, 0];
+        assert_eq!(u16::take(&bytes).expect("Take failed"), &[1, 0]);
+        assert_eq!(bytes, [1, 0, 2, 0]); // Source is borrowed, never consumed.
+    }
+
+    #[test]
+    fn take_truncated_errors() {
+        let bytes = [1u8]; // One byte cannot encode u16.
+        assert!(matches!(u16::take(&bytes), Err(Error::Truncated { .. })));
+    }
 
     #[test]
     fn sector_ord() {
