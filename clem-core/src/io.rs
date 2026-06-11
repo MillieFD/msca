@@ -511,6 +511,25 @@ pub enum Error {
     Version(u8),
 }
 
+impl Error {
+    /// Constructor for [`Error::Truncated`] wrapping the [`expected`](A) and [`actual`](B) lengths.
+    pub(crate) fn truncated<A, B, E>(expected: A, actual: B) -> Self
+    where
+        usize: TryFrom<A, Error = E> + TryFrom<B, Error = E>,
+        Self: From<E>,
+    {
+        let expected = match usize::try_from(expected) {
+            Ok(value) => value,
+            Err(error) => return Self::from(error),
+        };
+        let actual = match usize::try_from(actual) {
+            Ok(value) => value,
+            Err(error) => return Self::from(error),
+        };
+        Self::Truncated { expected, actual }
+    }
+}
+
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
