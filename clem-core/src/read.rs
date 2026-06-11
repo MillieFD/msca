@@ -105,10 +105,11 @@ pub enum Outcome<I> {
 /// A minimal column **data source** with [deserialization](Deserialize) context; used during
 /// [`Query`] execution.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Copy, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct Column<'a> {
-    /// Retained [`Buffer`] descriptors for this [`Column`] across all data segments.
-    pub(crate) buffers: &'a [Buffer],
+    /// [`Iterator`] over the retained [`Buffer`] descriptors for this [`Column`] across all data
+    /// segments; advanced in situ as each buffer is exhausted.
+    pub(crate) buffers: Iter<'a, Buffer>,
     /// Read-only [memory map](Mmap) backed by the immutable segment region of a [clem](crate) file.
     ///
     /// Refer to the [safety documentation](io::File::mmap) for details.
