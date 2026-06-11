@@ -66,6 +66,24 @@ impl<'a> Column<'a> {
         let actual = bytes.len();
         bytes.get(Buffer::HEADER..).ok_or(io::Error::truncated(Buffer::HEADER, actual))
     }
+
+    /// Returns a read-only [memory map](Mmap) [`BitSlice`] over the raw data bytes of the specified
+    /// [`Buffer`].
+    ///
+    /// Excludes the buffer [`header`](Buffer::HEADER) and leverages [`Buffer::count`] to discard
+    /// any trailing bit padding.
+    ///
+    /// ### Errors
+    ///
+    /// - [`Error::Truncated`](io::Error::Truncated) if the buffer extends beyond the end of
+    /// the [`Mmap`] or contains fewer bits than the expected `count`.
+    /// - [`Error::Number`](io::Error::Number) if the row count overflows [`usize`].
+    fn bits(&self, buffer: &Buffer) -> Result<&'a BitSlice<u8, Lsb0>, io::Error> {
+        let count = buffer.count.get().try_into()?;
+        let bytes = buffer.sector.slice(self.mmap)?.view_bits::<Lsb0>();
+        let actual = bytes.len().mul(8);
+        bytes.get(..count).ok_or(io::Error::truncated(count, actual))
+    }
 }
 
 /* ----------------------------------------------------------------------- Read Trait Definition */
