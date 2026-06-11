@@ -219,8 +219,8 @@ pub trait Read: Sized {
     ///
     /// ### Guidance
     ///
-    /// This function provide provides the top-level iteration pipeline. Implementations should pull
-    /// successive rules via [`Read::next`] and translate [`Outcome::Finished`] into [`None`] to
+    /// This function provides the top-level iteration pipeline. Implementations should pull
+    /// successive rows via [`Read::next`] and translate [`Outcome::Finished`] into [`None`] to
     /// terminate the [`Iterator`].
     ///
     /// ### Errors
