@@ -600,15 +600,26 @@ pub trait Deserialize {
     /// Byte source from which values of [`Self`] are deserialized.
     type Src<'a>;
 
-    /// Read [`N`] bytes from the provided slice into a fixed-size stack-allocated array for
-    /// [deserialization](Self::deserialize).
+    /// Pull the exact number of bytes required to [deserialize](Self::deserialize) one instance
+    /// of [`Self`] from `src`.
+    ///
+    /// Returns a read-only [slice][1] over the extracted bytes; splitting the source without an
+    /// intermediate copy and advancing `src` by the number of bytes read.
+    ///
+    /// ### Guidance
+    ///
+    /// The default implementation leverages [`size_of`]`::<Self>()` for fixed-size types. Unsized
+    /// types must override this default implementation with type-specific size determination logic
+    /// such as reading an on-disk [`length`](NonZeroU64) prefix.
     ///
     /// ### Errors
     ///
-    /// Returns [`Error::Truncated`] if the source contains fewer than [`N`] bytes.
-    /// Returns [`Error::Slice`] if the slice cannot be coerced into a fixed-sized array.
     fn take<const N: usize>(src: &[u8]) -> Result<[u8; N], Error> {
         src.get(..N).ok_or(Error::truncated(N, src.len()))?.try_into().map_err(Into::into)
+    /// Returns [`Error::Truncated`](io::Error::Truncated) if `src` contains fewer than the
+    /// requested number of bytes.
+    ///
+    /// [1]: https://doc.rust-lang.org/std/primitive.slice.html
     }
 
     /// Deserialize [`Self`] from the provided [source](Self::Src).
