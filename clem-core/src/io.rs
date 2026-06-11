@@ -608,10 +608,7 @@ pub trait Deserialize {
     /// Returns [`Error::Truncated`] if the source contains fewer than [`N`] bytes.
     /// Returns [`Error::Slice`] if the slice cannot be coerced into a fixed-sized array.
     fn take<const N: usize>(src: &[u8]) -> Result<[u8; N], Error> {
-        src.get(..N)
-            .ok_or(Error::Truncated { expected: N, actual: src.len() })?
-            .try_into()
-            .map_err(Into::into)
+        src.get(..N).ok_or(Error::truncated(N, src.len()))?.try_into().map_err(Into::into)
     }
 
     /// Deserialize [`Self`] from the provided [source](Self::Src).
