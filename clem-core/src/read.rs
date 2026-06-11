@@ -90,10 +90,118 @@ impl<'a> Column<'a> {
 
 /* ----------------------------------------------------------------------- Read Trait Definition */
 
-/// A **byte-stream** interface that lazily [deserializes](Deserialize::deserialize) and
-/// [filters](Filter) successive [`items`](I) from the [clem](crate) file.
-pub trait Read<I> {
-    /// Advance the byte stream to [`Deserialize`] one candidate row as [`I`] and evaluate against
-    /// the column [filters](Filter).
-    fn next(&mut self) -> Result<Outcome<I>, io::Error>;
+/// An in-memory **data type** that can be lazily [deserialized](Deserialize) and [filtered](Filter)
+/// from a [clem](crate) file as a [`Stream`] of [`Outcome<Self>`](Outcome) items.
+///
+/// ### Guidance
+///
+/// Default implementations are provided for all supported primitive types. Implementors are advised
+/// to [`#[derive(Read)]`][1] for composite types, which zips one [`Stream`] per field and applies
+/// the appropriate [filters](Filter) during iteration.
+// [1]: TODO → add link to clem-derive crate or feature
+pub trait Read: Sized {
+    /// Additional context required to construct a [`Stream`] of [`Self`].
+    ///
+    /// Primitive types read from a [`Column`]; composite types read from a [`Query`](crate::Query).
+    type Ctx<'a>;
+
+    /// Pull the exact number of bytes required to [deserialize](Deserialize) one instance of
+    /// [`Self`] from `src`.
+    ///
+    /// Returns a read-only [memory map](Mmap) [slice][1] over the extracted bytes and advances
+    /// `src` by the number of bytes read.
+    ///
+    /// ### Guidance
+    ///
+    /// The default implementation leverages [`size_of`]`::<Self>()` for fixed-size types. Unsized
+    /// types must override this default implementation with type-specific size determination logic
+    /// such as reading an on-disk [`length`][2] prefix.
+    ///
+    /// ### Errors
+    ///
+    /// Returns [`Error::Truncated`](io::Error::Truncated) if `src` contains fewer than the
+    /// requested number of bytes.
+    ///
+    /// [1]: https://doc.rust-lang.org/std/primitive.slice.html
+    /// [2]: std::num::NonZeroU64
+    // TODO → Deserialize::take fulfils a similar function to Read::take.
+    // TODO → Consider adding Read: Deserialize trait bound; then remove Read::take
+    // TODO → Update Deserialize::take to split the source slice (zero copy)
+    fn take<'a>(src: &mut Iter<'a, u8>) -> Result<&'a [u8], io::Error> {
+        let n = size_of::<Self>();
+        let (data, rem) = src
+            .as_slice()
+            .split_at_checked(n)
+            .ok_or(io::Error::Truncated { expected: n, actual: src.len() })?;
+        *src = rem.iter();
+        Ok(data)
+    }
+
+    /// Evaluate [`self`](Read) against every [`Filter`]:
+    ///
+    /// - `true` ← All filters pass
+    /// - `false` ← One or more filters fail
+    ///
+    /// Items are excluded from the result set if any filter fails.
+    ///
+    /// ### Errors
+    ///
+    /// Returns [`Error`](io::Error) if a stored filter bound cannot [`Deserialize`] as [`Self`].
+    fn filter(&self, filters: &HashSet<Filter>) -> Result<bool, io::Error>
+    where
+        Self: for<'b> Deserialize<Src<'b> = &'b [u8]> + PartialOrd,
+    {
+        filters.iter().try_fold(true, |keep, filter| match keep {
+            true => filter.evaluate(self),
+            false => Ok(false),
+        })
+    }
+
+    /// [`Deserialize`] and [`Filter`] one instance of [`Self`] from `src`.
+    fn next(src: &mut Iter<'_, u8>, filters: &HashSet<Filter>) -> Outcome<Self>
+    where
+        Self: for<'b> Deserialize<Src<'b> = &'b [u8]> + PartialOrd,
+    {
+        // TODO → advance to the next buffer if current src is exhausted; replace src in situ
+        // TODO → return Outcome::Finished only if no more buffers remain
+        if src.as_slice().is_empty() {
+            return Outcome::Finished;
+        }
+        let item = match <Self as Read>::take(src).and_then(Self::deserialize) {
+            Ok(item) => item,
+            Err(e) => return Outcome::Error(e),
+        };
+        match item.filter(filters) {
+            Ok(true) => Outcome::Success(item),
+            Ok(false) => Outcome::Excluded,
+            Err(e) => Outcome::Error(e),
+        }
+    }
+
+    /// Construct a lazy [`Iterator`] from the provided [`context`](Self::Ctx); yielding one
+    /// [deserialized](Deserialize) [`Outcome`] per candidate [`Item`](Self).
+    ///
+    /// ### Guidance
+    ///
+    /// This function provide provides the top-level iteration pipeline. Implementations should pull
+    /// successive rules via [`Read::next`] and translate [`Outcome::Finished`] into [`None`] to
+    /// terminate the [`Iterator`].
+    ///
+    /// ### Errors
+    ///
+    /// Refer to each implementation for a description of the possible error conditions.
+    fn iter(ctx: Self::Ctx<'_>) -> Result<impl Iterator<Item = Outcome<Self>>, query::Error>;
+
+    /// Construct a type-erased [`Stream`] of [`Self`] from the provided [`context`](Self::Ctx);
+    /// uses [`Read::iter`] internally.
+    ///
+    /// ### Errors
+    ///
+    /// See [`Read::iter`] for a description of the possible error conditions.
+    fn boxed<'a>(ctx: Self::Ctx<'a>) -> Result<Stream<'a, Self>, query::Error>
+    where
+        Self: 'a,
+    {
+        Ok(Box::new(Self::iter(ctx)?))
+    }
 }
