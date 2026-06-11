@@ -17,35 +17,46 @@
         - [x] Retain the most constrained conjunction if two filters conflict e.g. `> 20` should replace `> 10`.
     - [x] Some filters can be used before file IO to remove buffers, but must also be evaluated during IO e.g. `range`
     - [x] Add `Read` trait:
-        - [x] Readers are strongly typed and inherently know how to deserialize bytes into their target Rust type.
-        - [x] Type-erased `BoxRead` trait object hides the concrete reader type; mirror the `BoxAcc` accumulator design.
-        - [ ] `Read::boxed` trait method to construct a new `BoxRead`; mirror `Accumulate::boxed`.
+        - [x] Implemented **by each storable type**; mirrors `Data` on the write side and subsumes the `Reader` trait.
+        - [x] Type-erased `Stream` trait object hides the concrete reader type; mirror the `BoxAcc` accumulator design.
+            - `Ctx<'a>` GATs are not dyn-compatible (E0038), so the boxed object erases to `Iterator` directly.
+        - [x] `Read::Ctx<'a>` associated type carries per-type construction context (mirrors `Write::Ctx`):
+            - [x] Primitive types read from a column `Source` (buffers + mmap + filters)
+            - [x] Composite types read from `&Query`.
+        - [x] `Read::filter` evaluates a deserialized value against every column filter.
         - [x] `Read::next` returns an `Outcome` wrapping the next deserialized item.
-        - [ ] Any `Read` implementor can be converted into an `Iterator`:
-            - [ ] `Outcome::Success(item)` yields `Some(item)`.
-            - [ ] `Outcome::Excluded` continues to the next item; loops until `Outcome::Success` or `Outcome::Finished`.
-            - [ ] `Outcome::Finished` yields `None`.
-    - [ ] Query can be converted into an `Iterator`.
-    - [x] `query::Column::read` returns a `BoxRead` for the calling column.
+        - [x] `Read::iter` builds an unboxed stream via `iter::from_fn`:
+            - [x] `Outcome::Success(item)` yields `Some(item)`.
+            - [x] `Outcome::Excluded` continues to the next item; loops until `Outcome::Success` or `Outcome::Finished`.
+            - [x] `Outcome::Finished` yields `None`.
+        - [x] `Read::boxed(ctx)` constructor returns a type-erased `Stream`; mirrors `Accumulate::boxed`.
+    - [x] Query is converted into an `Iterator` via `Query::read::<I>()` where `I: Read` is the composite rebuilder:
+        - [x] `Outcome::Success(item)` yields `Some(Ok(item))`; `Outcome::Error` yields `Some(Err(error))`.
+        - [x] `Outcome::Excluded` continues to the next item; the stream ends with `None`.
+    - [x] `Query::column` verifies the requested type exactly once and returns a `Stream` for the named column.
     - [x] Generalise `Deserialize` trait w/ a source
         - [x] Add an associated `&'a Src` type to the `Deserialize` trait (mirror Write::Ctx)
         - [x] Primitives deserialize from `&[u8]`
         - [ ] External types deserialize from a composite reader
-    - [ ] Users can add `#[derive(Read)]` to their external types:
-        - [ ] Generates a hidden composite reader struct that holds a `BoxRead` for each external type field.
-        - [ ] Generated `Read::next` implementation calls `next` on each sub-reader to construct one instance of the
-          external type; rejects the entire item if any sub-reader returns `Outcome::Excluded`.
-        - [ ] `Read::boxed` hides the generated reader type from users behind a type-erased trait object.
-        - [ ] `Query::read::<I>` returns the composite reader for `I`; mirrors `Data::accumulator`.
+    - [x] Users can add `#[derive(Read)]` to their external types:
+        - [x] Generates an `impl Read for T` where `Read::iter` zips one column `Stream` per field.
+        - [x] Rejects the entire item if any sub-stream returns `Outcome::Excluded`.
+        - [x] Surfaces `Outcome::Error` eagerly.
+        - [x] `Read::boxed` hides the closure type from users behind the type-erased `Stream` trait object.
+        - [x] `Query::read::<I>` reads the composite stream for `I`; mirrors `Data::accumulator`.
+    - [x] Fix inverted buffer pruning in `Query::range`; overlapping buffers are retained, disjoint buffers removed.
     - [ ] Implement optional and unsized readers: `OptBitVec` + `OptInSitu` + `Seq` + `OptSeq` + `Flatten`
     - [ ] Add remaining query filters: `eq` + `one_of` + `none_of` + `is_some` + `is_none` + `mask` + `limit` + `offset`
     - [ ] `Query::read` and other supporting functions are no longer async; update documentation.
+        - [x] Remove async references from [read-cycle.msd](./doc/read-cycle.md)
 - [ ] SIMD alignment on all critical data fields.
     - `align` function already exists (unused) in [segment.rs](./clem-core/src/segment.rs).
     - Critical fields are described in [simd-alignment.md](./doc/simd-alignment.md).
 - [ ] Standardise buffer sector offset is relative to the immutable segment region excluding the file header:
     - [x] Update `Serialize::sector` and `Header::tail` documentation.
     - [ ] Refactor all buffer offset calculations to reflect this change.
+        - [x] `Push for Accumulator` records buffer offsets relative to the mmap (excludes the file header).
+        - [ ] `Header::tail`, segment sectors, and manifest sectors still use absolute file offsets.
 - [ ] Manifest rebuild function
     - [ ] Triggered automatically during `File::open` if corruption is detected.
     - [ ] Ensure the on-disk layout is sufficiently self-describing to support rebuild.
