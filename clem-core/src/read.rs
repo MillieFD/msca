@@ -38,6 +38,21 @@ pub enum Outcome<I> {
     Error(io::Error),
 }
 
+/// A minimal column **data source** with [deserialization](Deserialize) context; used during
+/// [`Query`] execution.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Copy, Clone, Debug)]
+pub struct Column<'a> {
+    /// Retained [`Buffer`] descriptors for this [`Column`] across all data segments.
+    pub(crate) buffers: &'a [Buffer],
+    /// Read-only [memory map](Mmap) backed by the immutable segment region of a [clem](crate) file.
+    ///
+    /// Refer to the [safety documentation](io::File::mmap) for details.
+    pub(crate) mmap: &'a Mmap,
+    /// Deduplicated [`Filter`] set used to [`evaluate`](Filter::evaluate) deserialized items.
+    pub(crate) filters: &'a HashSet<Filter>,
+}
+
 /* ----------------------------------------------------------------------- Read Trait Definition */
 
 /// A **byte-stream** interface that lazily [deserializes](Deserialize::deserialize) and
