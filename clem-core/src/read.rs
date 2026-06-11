@@ -65,7 +65,6 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 
 use std::collections::HashSet;
 use std::iter::from_fn;
-use std::ops::Mul;
 use std::slice::Iter;
 
 use bitvec::order::Lsb0;
@@ -146,10 +145,13 @@ impl<'a> Column<'a> {
     /// the [`Mmap`] or contains fewer bits than the expected `count`.
     /// - [`Error::Number`](io::Error::Number) if the row count overflows [`usize`].
     fn bits(&self, buffer: &Buffer) -> Result<&'a BitSlice<u8, Lsb0>, io::Error> {
-        let count = buffer.count.get().try_into()?;
-        let bytes = buffer.sector.slice(self.mmap)?.view_bits::<Lsb0>();
-        let actual = bytes.len().mul(8);
-        bytes.get(..count).ok_or(io::Error::truncated(count, actual))
+        let bytes = buffer.sector.slice(self.mmap)?;
+        let bits = bytes
+            .get(Buffer::HEADER..)
+            .ok_or_else(|| io::Error::truncated(Buffer::HEADER, bytes.len()))?
+            .view_bits::<Lsb0>();
+        let count: usize = buffer.count.get().try_into()?;
+        bits.get(..count).ok_or_else(|| io::Error::truncated(count, bits.len()))
     }
 }
 
