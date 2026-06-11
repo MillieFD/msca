@@ -194,20 +194,34 @@ pub trait Read: Sized {
     }
 
     /// [`Deserialize`] and [`Filter`] one instance of [`Self`] from `src`.
-    fn next(src: &mut Iter<'_, u8>, filters: &HashSet<Filter>) -> Outcome<Self>
+    fn next<'a>(src: &mut Iter<'a, u8>, ctx: &mut Column<'a>) -> Outcome<Self>
     where
         Self: for<'b> Deserialize<Src<'b> = &'b [u8]> + PartialOrd,
     {
-        // TODO → advance to the next buffer if current src is exhausted; replace src in situ
-        // TODO → return Outcome::Finished only if no more buffers remain
-        if src.as_slice().is_empty() {
-            return Outcome::Finished;
+        while src.as_slice().is_empty() {
+            let buffer = match ctx.buffers.next() {
+                Some(buffer) => buffer,
+                None => return Outcome::Finished,
+            };
+            match ctx.bytes(buffer) {
+                Ok(data) => *src = data.iter(),
+                Err(e) => return Outcome::Error(e),
+            }
         }
-        let item = match <Self as Read>::take(src).and_then(Self::deserialize) {
+        let bytes = match Self::take(src.as_slice()) {
+            Ok(bytes) => bytes,
+            Err(error) => {
+                // NOTE: Discard the truncated remainder; resume from the next buffer to avoid loop
+                *src = Default::default();
+                return Outcome::Error(error);
+            }
+        };
+        *src = src.as_slice().get(bytes.len()..).unwrap_or_default().iter();
+        let item = match Self::deserialize(bytes) {
             Ok(item) => item,
             Err(e) => return Outcome::Error(e),
         };
-        match item.filter(filters) {
+        match item.filter(ctx.filters) {
             Ok(true) => Outcome::Success(item),
             Ok(false) => Outcome::Excluded,
             Err(e) => Outcome::Error(e),
@@ -239,5 +253,239 @@ pub trait Read: Sized {
         Self: 'a,
     {
         Ok(Box::new(Self::iter(ctx)?))
+    }
+}
+
+/* ------------------------------------------------------------------- Read Trait Implementation */
+
+/// Blanket [`Read`] implementation for fixed-width primitives.
+impl<I> Read for I
+where
+    I: for<'b> Deserialize<Src<'b> = &'b [u8]> + PartialOrd,
+    Schema: Unfolder<I>,
+{
+    type Ctx<'a> = Column<'a>;
+
+    /// Construct a fixed-width byte pipeline over the retained column [buffers](Buffer); yielding
+    /// one [`Outcome`] wrapping a [deserialized][1] instance of [`Self`] per iteration.
+    ///
+    /// ### Errors
+    ///
+    /// Iterator construction is infallible; this function will never return [`query::Error`].
+    /// [Deserialization][1] failures are surfaced lazily via [`Outcome::Error`].
+    ///
+    /// Refer to the [trait-level documentation](Read::iter) for more details.
+    ///
+    /// [1]: Deserialize::deserialize
+    // TODO → Is the Result return type required by composite readers? Could simplify fn signature?
+    fn iter(mut ctx: Self::Ctx<'_>) -> Result<impl Iterator<Item = Outcome<Self>>, query::Error> {
+        let mut src = Default::default();
+        Ok(from_fn(move || match Self::next(&mut src, &mut ctx) {
+            Outcome::Finished => None,
+            outcome => Some(outcome),
+        }))
+    }
+}
+
+impl Read for bool {
+    type Ctx<'a> = Column<'a>;
+
+    /// Construct a [bit-packed](Column::bits) pipeline over the retained column [buffers](Buffer);
+    /// yielding one [`Outcome`] wrapping a [deserialized][1] instance of [`Self`] per iteration.
+    ///
+    /// ### Errors
+    ///
+    /// Iterator construction is infallible; this function will never return [`query::Error`].
+    /// [Deserialization][1] failures are surfaced lazily via [`Outcome::Error`].
+    ///
+    /// Refer to the [trait-level documentation](Read::iter) for more details.
+    ///
+    /// [1]: Deserialize::deserialize
+    fn iter(mut ctx: Self::Ctx<'_>) -> Result<impl Iterator<Item = Outcome<Self>>, query::Error> {
+        let mut src = BitSlice::empty().iter();
+        Ok(from_fn(move || {
+            loop {
+                if let Some(bit) = src.next() {
+                    return Some(Outcome::Success(*bit));
+                }
+                let buffer = ctx.buffers.next()?;
+                match ctx.bits(buffer) {
+                    Ok(valid) => src = valid.iter(),
+                    Err(error) => return Some(Outcome::Error(error)),
+                }
+            }
+        }))
+    }
+}
+
+/* --------------------------------------------------------------------------------------- Tests */
+
+#[cfg(test)]
+mod tests {
+    use std::fmt::Debug;
+    use std::num::NonZeroU64;
+
+    use bitvec::vec::BitVec;
+    use memmap2::MmapMut;
+
+    use super::*;
+    use crate::accumulate::Serialize;
+    use crate::Sector;
+
+    /// Build a read-only [`Mmap`] from the provided bytes for stream unit tests.
+    fn map(bytes: &[u8]) -> Mmap {
+        let mut mmap = MmapMut::map_anon(bytes.len().max(1)).expect("Anonymous map failed");
+        mmap[..bytes.len()].copy_from_slice(bytes);
+        mmap.make_read_only().expect("Read-only conversion failed")
+    }
+
+    /// Build a single buffer covering `len` bytes from `offset` with the provided row `count`.
+    fn buffer(offset: u64, len: u64, count: u64) -> Buffer {
+        Buffer {
+            sector: Sector {
+                offset,
+                length: NonZeroU64::new(len).expect("Empty buffer"),
+            },
+            count: NonZeroU64::new(count).expect("Zero rows"),
+            min: [0x00; 16],
+            max: [0xFF; 16],
+        }
+    }
+
+    /// Drain a [`Stream`] into a [`Vec`], dropping every [excluded](Outcome::Excluded) row and
+    /// panicking on any [`Error`](Outcome::Error) outcome.
+    fn drain<I>(stream: Stream<'_, I>) -> Vec<I>
+    where
+        I: Debug,
+    {
+        stream
+            .filter_map(|outcome| match outcome {
+                Outcome::Success(item) => Some(item),
+                Outcome::Excluded => None,
+                other => panic!("Unexpected outcome → {other:?}"),
+            })
+            .collect()
+    }
+
+    #[test]
+    fn values_round_trip() {
+        let data: Vec<u32> = vec![10, 20, 30];
+        let bytes = data.serialize().expect("Serialize failed");
+        let mmap = map(&bytes);
+        let buffers = vec![buffer(0, bytes.len() as u64, 3)];
+        let filters = HashSet::new();
+        let ctx = Column {
+            buffers: buffers.iter(),
+            mmap: &mmap,
+            filters: &filters,
+        };
+        assert_eq!(drain(u32::boxed(ctx).expect("Stream failed")), data);
+    }
+
+    #[test]
+    fn values_chains_buffers() {
+        let bytes = vec![1u16, 2].serialize().expect("Serialize failed");
+        let mmap = map(&bytes);
+        let buffers = vec![
+            buffer(0, bytes.len() as u64, 2),
+            buffer(0, bytes.len() as u64, 2),
+        ];
+        let filters = HashSet::new();
+        let ctx = Column {
+            buffers: buffers.iter(),
+            mmap: &mmap,
+            filters: &filters,
+        };
+        assert_eq!(
+            drain(u16::boxed(ctx).expect("Stream failed")),
+            vec![1, 2, 1, 2]
+        );
+    }
+
+    #[test]
+    fn filter_excludes_out_of_range() {
+        let data: Vec<u32> = vec![10, 20, 30, 40];
+        let bytes = data.serialize().expect("Serialize failed");
+        let mmap = map(&bytes);
+        let buffers = vec![buffer(0, bytes.len() as u64, 4)];
+        let filters = HashSet::from([Filter::bounds(&(20u32..40))]);
+        let ctx = Column {
+            buffers: buffers.iter(),
+            mmap: &mmap,
+            filters: &filters,
+        };
+        assert_eq!(drain(u32::boxed(ctx).expect("Stream failed")), vec![20, 30]);
+    }
+
+    #[test]
+    fn bits_round_trip() {
+        let data: BitVec = [true, false, true, true].into_iter().collect();
+        let bytes = data.serialize().expect("Serialize failed");
+        let mmap = map(&bytes);
+        let buffers = vec![buffer(0, bytes.len() as u64, 4)];
+        let filters = HashSet::new();
+        let ctx = Column {
+            buffers: buffers.iter(),
+            mmap: &mmap,
+            filters: &filters,
+        };
+        assert_eq!(
+            drain(bool::boxed(ctx).expect("Stream failed")),
+            vec![true, false, true, true]
+        );
+    }
+
+    #[test]
+    fn next_refills_from_buffers() {
+        let bytes = vec![7u16].serialize().expect("Serialize failed");
+        let mmap = map(&bytes);
+        let buffers = vec![buffer(0, bytes.len() as u64, 1)];
+        let filters = HashSet::new();
+        let mut ctx = Column {
+            buffers: buffers.iter(),
+            mmap: &mmap,
+            filters: &filters,
+        };
+        let mut src = b"".iter(); // Empty source; next must refill from the first buffer.
+        assert!(matches!(u16::next(&mut src, &mut ctx), Outcome::Success(7)));
+        assert!(matches!(u16::next(&mut src, &mut ctx), Outcome::Finished));
+    }
+
+    #[test]
+    fn next_finished_on_empty() {
+        let mmap = map(b"");
+        let buffers: Vec<Buffer> = Vec::new();
+        let filters = HashSet::new();
+        let mut ctx = Column {
+            buffers: buffers.iter(),
+            mmap: &mmap,
+            filters: &filters,
+        };
+        let mut src = b"".iter();
+        assert!(matches!(u32::next(&mut src, &mut ctx), Outcome::Finished));
+    }
+
+    #[test]
+    fn truncated_buffer_errors_then_chains() {
+        // Buffer one carries a dangling byte that cannot encode a second u16; buffer two is intact.
+        let mut bytes = vec![1u16].serialize().expect("Serialize failed");
+        bytes.push(9); // Dangling byte
+        let offset = bytes.len() as u64;
+        let tail = vec![2u16].serialize().expect("Serialize failed");
+        let length = tail.len() as u64;
+        bytes.extend_from_slice(&tail);
+        let mmap = map(&bytes);
+        let buffers = vec![buffer(0, offset, 1), buffer(offset, length, 1)];
+        let filters = HashSet::new();
+        let ctx = Column {
+            buffers: buffers.iter(),
+            mmap: &mmap,
+            filters: &filters,
+        };
+        let outcomes: Vec<Outcome<u16>> = u16::boxed(ctx).expect("Stream failed").collect();
+        assert!(matches!(
+            outcomes[..],
+            [Outcome::Success(1), Outcome::Error(_), Outcome::Success(2)]
+        ));
     }
 }
