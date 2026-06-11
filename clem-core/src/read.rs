@@ -172,38 +172,6 @@ pub trait Read: Sized {
     /// Primitive types read from a [`Column`]; composite types read from a [`Query`](crate::Query).
     type Ctx<'a>;
 
-    /// Pull the exact number of bytes required to [deserialize](Deserialize) one instance of
-    /// [`Self`] from `src`.
-    ///
-    /// Returns a read-only [memory map](Mmap) [slice][1] over the extracted bytes and advances
-    /// `src` by the number of bytes read.
-    ///
-    /// ### Guidance
-    ///
-    /// The default implementation leverages [`size_of`]`::<Self>()` for fixed-size types. Unsized
-    /// types must override this default implementation with type-specific size determination logic
-    /// such as reading an on-disk [`length`][2] prefix.
-    ///
-    /// ### Errors
-    ///
-    /// Returns [`Error::Truncated`](io::Error::Truncated) if `src` contains fewer than the
-    /// requested number of bytes.
-    ///
-    /// [1]: https://doc.rust-lang.org/std/primitive.slice.html
-    /// [2]: std::num::NonZeroU64
-    // TODO → Deserialize::take fulfils a similar function to Read::take.
-    // TODO → Consider adding Read: Deserialize trait bound; then remove Read::take
-    // TODO → Update Deserialize::take to split the source slice (zero copy)
-    fn take<'a>(src: &mut Iter<'a, u8>) -> Result<&'a [u8], io::Error> {
-        let n = size_of::<Self>();
-        let (data, rem) = src
-            .as_slice()
-            .split_at_checked(n)
-            .ok_or(io::Error::Truncated { expected: n, actual: src.len() })?;
-        *src = rem.iter();
-        Ok(data)
-    }
-
     /// Evaluate [`self`](Read) against every [`Filter`]:
     ///
     /// - `true` ← All filters pass
