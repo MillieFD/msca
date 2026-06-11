@@ -8,6 +8,16 @@ Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the conditions of the LICENSE are met.
 */
 
+use std::collections::HashSet;
+use std::iter::from_fn;
+use std::ops::Mul;
+use std::slice::Iter;
+
+use bitvec::order::Lsb0;
+use bitvec::slice::BitSlice;
+use bitvec::view::BitView;
+use memmap2::Mmap;
+
 use crate::io::{self, Deserialize};
 use crate::manifest::Buffer;
 use crate::query::{self, Filter};
