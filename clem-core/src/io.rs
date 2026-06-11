@@ -12,7 +12,7 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //!
 //! ---
 //!
-//! [`clem`](crate) maximises IO performance by separating the data lifecycle into two phases:
+//! [clem](crate) maximises IO performance by separating the data lifecycle into two phases:
 //!
 //! 1. **In-memory** accumulator optimised for high-throughput ingestion.
 //! 2. **On-disk** columnar buffers optimised for range-based querying across arbitrary dimensions.
@@ -295,7 +295,7 @@ impl Deserialize for Header {
     }
 }
 
-/// An exclusive owned file handle for an open [`clem`](crate) dataset.
+/// An exclusive owned file handle for an open [clem](crate) dataset.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug)]
 pub(crate) struct File {
@@ -507,7 +507,7 @@ pub enum Error {
     ///
     /// [1]: https://www.unicode.org/glossary/#unicode_scalar_value
     Utf8(u32),
-    /// File version number is not recognised by this build of [`clem`](crate).
+    /// File version number is not recognised by this build of [clem](crate).
     Version(u8),
 }
 
@@ -595,7 +595,7 @@ where
 
 /* ---------------------------------------------------------------- Deserialize Trait Definition */
 
-/// A **type** that can be deserialized from a canonical [`clem`](crate) binary representation.
+/// A **type** that can be deserialized from a canonical [clem](crate) binary representation.
 pub trait Deserialize {
     /// Byte source from which values of [`Self`] are deserialized.
     type Src<'a>;
