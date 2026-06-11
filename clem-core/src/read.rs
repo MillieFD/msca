@@ -54,14 +54,16 @@ pub struct Column<'a> {
 }
 
 impl<'a> Column<'a> {
-    /// Returns a read-only [memory map](Mmap) slice over the raw bytes of the specified [`Buffer`].
-    /// Excludes the buffer header.
+    /// Returns a read-only [memory map](Mmap) [slice][1] over the raw data bytes of the specified
+    /// [`Buffer`]. Excludes the buffer [`header`](Buffer::HEADER).
     ///
     /// ### Errors
     ///
     /// Returns [`Error::Truncated`](io::Error::Truncated) if the buffer extends beyond the end of
-    /// the [`Mmap`] or is shorter than the fixed-length buffer [`header`](Buffer::HEADER).
-    fn raw(&self, buffer: &Buffer) -> Result<&'a [u8], io::Error> {
+    /// the [`Mmap`] or is shorter than the fixed-length buffer header.
+    ///
+    /// [1]: https://doc.rust-lang.org/std/primitive.slice.html
+    fn bytes(&self, buffer: &Buffer) -> Result<&'a [u8], io::Error> {
         let bytes = buffer.sector.slice(self.mmap)?;
         let actual = bytes.len();
         bytes.get(Buffer::HEADER..).ok_or(io::Error::truncated(Buffer::HEADER, actual))
