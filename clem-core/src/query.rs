@@ -347,7 +347,7 @@ impl Filter {
     }
 
     /// Returns `true` if the [`item`](I) satisfies [`self`](Filter).
-    pub(crate) fn evaluate<I, S>(&self, item: &I) -> Result<bool, io::Error>
+    pub(crate) fn evaluate<I>(&self, item: &I) -> Result<bool, io::Error>
     where
         I: for<'a> Deserialize<Src<'a> = &'a [u8]> + PartialOrd,
     {
