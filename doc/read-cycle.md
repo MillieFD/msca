@@ -36,11 +36,11 @@ query.max < buffer.min  →  All values in segment are above the query range
 
 After pruning, the shared manifest read guard is released and the retained segments are passed to phase three.
 
-##### Phase 3: Lazy Async Zero-Copy Batched Reads
+##### Phase 3: Lazy Zero-Copy Reads
 
-Candidate segments are packaged into a lazy async zero-copy reader that chains across sectors, presenting a flattened
-stream of deserialized rows to the caller. Internally, the reader is batched to reduce syscall overhead; returning one
-row each time `next` is called and only executing batched file IO when the internal buffer is exhausted.
+Candidate segments are packaged into a lazy zero-copy reader that chains across sectors, presenting a flattened stream
+of deserialized rows to the caller. Internally, the reader is batched to reduce syscall overhead; returning one row each
+time `next` is called and only executing batched file IO when the internal buffer is exhausted.
 
 ##### Concurrency Model
 
