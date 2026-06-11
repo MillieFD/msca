@@ -409,7 +409,7 @@ pub enum Error {
 }
 
 impl Error {
-    /// Constructor for [`Error::Column`] wrapping the provided column [`name`]().
+    /// Constructor for [`Error::Column`] wrapping the provided column [`name`](S).
     pub(crate) fn column<S>(name: S) -> Self
     where
         String: From<S>,
