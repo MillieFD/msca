@@ -320,7 +320,8 @@ impl Type {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Encode, Decode, CborLen)]
 #[non_exhaustive] // To accommodate potential future filter types.
-pub(crate) enum Filter {
+#[doc(hidden)] // Reachable through Read::filter and Read::next for manual implementations.
+pub enum Filter {
     /// Retain values within the specified range.
     #[n(0)]
     Range {
