@@ -8,6 +8,61 @@ Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the conditions of the LICENSE are met.
 */
 
+//! Data **streaming** interface for [query] execution.
+//!
+//! ---
+//!
+//! [`clem`](crate) maximises IO performance by storing on-disk data as columnar [buffers](Buffer)
+//! optimised for range-based queries across an arbitrary number of dimensions; however, this
+//! underlying format is generally unsuitable for direct manipulation by end-users.
+//!
+//! This module provides an [iterator-based](Iterator) interface to coordinate the transition from
+//! raw binary data into supported rust types; corresponding to **phase 3** of the [read-cycle](io).
+//! The on-disk layout minimises contention for multiple simultaneous readers.
+//!
+//! ### Segment Composition
+//!
+//! Each [clem](crate) dataset is partitioned into self-describing segments which are immutable once
+//! written. Each segment begins with a minimal header consisting of a [`variant`][1] identifier and
+//! [`length`](NonZeroU64).
+//!
+//! - [`Schema`] segments describe the structure of encoded data.
+//! - [`Data`][2] segments carry columnar [buffers](Buffer) for a specified schema.
+//!
+//! Multimodality and schema evolution are realised by appending additional schema segments. Data
+//! storage and file extensibility are realised by appending additional data segments. Format
+//! extensibility may be achieved via the introduction of new segment variants in future releases.
+//!
+//! ### Lazy Zero-Copy Reads
+//!
+//! Each [`Query`](query::Query) column is packaged into a lazy zero-copy [`Stream`] that:
+//!
+//! 1. Pulls bytes from the retained on-disk [buffers](Buffer).
+//! 2. [Deserializes](Deserialize) bytes into the requested Rust type.
+//! 3. Evaluates query [filters](Filter) on the deserialized item.
+//!
+//! Streams chain transparently across segments, abstracting away the underlying file structure to
+//! provide a seamless interface for end-users.
+//!
+//! ### Concurrency Model
+//!
+//! Segments are immutable once written, meaning readers do not require coordination after
+//! extracting their list of candidate segments. A concurrent writer appending a new segment must
+//! acquire exclusive mutable access to update the [manifest][3] and file [header](io::Header). This
+//! temporarily blocks new readers from accessing the manifest but does not affect in-flight reads.
+//!
+//! This design ensures:
+//!
+//! - **Multiple readers** can build candidate segment lists from the manifest simultaneously.
+//! - **A writer** updating the manifest does not block phase three readers.
+//! - **Segment IO** is fully parallel; readers and writers never contend on segment data regions.
+//!
+//! This module addresses **phase three** of the [read-cycle](io).
+//!
+//! [1]: crate::segment::Variant
+//! [2]: crate::Data
+//! [3]: crate::manifest::Manifest
+
 use std::collections::HashSet;
 use std::iter::from_fn;
 use std::ops::Mul;
