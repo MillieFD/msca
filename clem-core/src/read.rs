@@ -53,6 +53,21 @@ pub struct Column<'a> {
     pub(crate) filters: &'a HashSet<Filter>,
 }
 
+impl<'a> Column<'a> {
+    /// Returns a read-only [memory map](Mmap) slice over the raw bytes of the specified [`Buffer`].
+    /// Excludes the buffer header.
+    ///
+    /// ### Errors
+    ///
+    /// Returns [`Error::Truncated`](io::Error::Truncated) if the buffer extends beyond the end of
+    /// the [`Mmap`] or is shorter than the fixed-length buffer [`header`](Buffer::HEADER).
+    fn raw(&self, buffer: &Buffer) -> Result<&'a [u8], io::Error> {
+        let bytes = buffer.sector.slice(self.mmap)?;
+        let actual = bytes.len();
+        bytes.get(Buffer::HEADER..).ok_or(io::Error::truncated(Buffer::HEADER, actual))
+    }
+}
+
 /* ----------------------------------------------------------------------- Read Trait Definition */
 
 /// A **byte-stream** interface that lazily [deserializes](Deserialize::deserialize) and
