@@ -170,7 +170,8 @@ impl<'a> Column<'a> {
 pub trait Read: Sized {
     /// Additional context required to construct a [`Stream`] of [`Self`].
     ///
-    /// Primitive types read from a [`Column`]; composite types read from a [`Query`](crate::Query).
+    /// Primitive types read from a [`Column`]. Composite types read from a zipped context holding
+    /// one [`Stream`] per field; constructed from a [`Query`](crate::Query) via [`TryFrom`].
     type Ctx<'a>;
 
     /// Evaluate [`self`](Read) against every [`Filter`]:
