@@ -194,7 +194,7 @@ pub trait Read: Sized {
     where
         Self: for<'b> Deserialize<Src<'b> = &'b [u8]> + PartialOrd,
     {
-        filters.iter().try_fold(true, |keep, filter| match keep {
+        filters.iter().try_fold(true, |acc, filter| match acc {
             true => filter.evaluate(self),
             false => Ok(false),
         })
