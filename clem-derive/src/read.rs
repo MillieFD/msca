@@ -65,10 +65,12 @@ pub(crate) fn expand(input: &DeriveInput) -> Result<TokenStream, syn::Error> {
     let fields = &fields(input)?;
     // 3. Generate trait implementations
     let context = context(ctx, fields);
+    let try_from = try_from(ctx, fields);
     // 4. Wrap in an anonymous const block
     Ok(quote! {
         const _: () = {
             #context
+            #try_from
         };
     })
 }
@@ -83,6 +85,33 @@ fn context(ctx: &Ident, fields: &[Field<'_>]) -> TokenStream {
         /// Generated composite context holding one boxed column stream per field.
         struct #ctx<'a> {
             #( #idents: ::clem::Stream<'a, #types>, )*
+        }
+    }
+}
+
+/// Implement [`TryFrom`] for the generated [`context`].
+///
+/// - Each field resolves the corresponding column from a borrowed `Query`.
+/// - The requested type is verified against the on-disk column type exactly once.
+/// - Missing or mismatched columns abort construction eagerly with `query::Error`.
+///
+/// This design allows subsequent stream iteration and item deserialization to progress fearlessly
+/// without additional runtime type checks.
+fn try_from(ctx: &Ident, fields: &[Field<'_>]) -> TokenStream {
+    let idents = Field::idents(fields);
+    let types = Field::types(fields);
+    let names = Field::names(fields);
+    quote! {
+        impl<'a> ::core::convert::TryFrom<&'a ::clem::Query> for #ctx<'a> {
+            type Error = ::clem::query::Error;
+
+            fn try_from(
+                query: &'a ::clem::Query,
+            ) -> ::core::result::Result<Self, Self::Error> {
+                ::core::result::Result::Ok(Self {
+                    #( #idents: query.column::<#types>(#names)?, )*
+                })
+            }
         }
     }
 }
