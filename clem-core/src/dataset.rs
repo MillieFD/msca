@@ -29,9 +29,7 @@ use crate::Error;
 /* ------------------------------------------------------------------------------ Public Exports */
 
 /// A high-level handle to an open [`clem`](crate) dataset.
-///
-/// `Dataset` exposes the public surface for registering [`Record`] types and ingesting data,
-/// delegating low-level IO to an internal [`File`] handle.
+// TODO → Dataset is the main user interaction surface; doc must be comprehensive and clear.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug)]
 pub struct Dataset {
