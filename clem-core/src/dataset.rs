@@ -95,6 +95,21 @@ impl Dataset {
         let mmap = unsafe { file.mmap(file.header.tail)? }.into();
         Ok(Self { file, mmap })
     }
+
+    /// Initialise a new [`Query`] over the named [`Schema`][1].
+    ///
+    /// The query begins with **every** column and **every** buffer from the specified schema.
+    /// [`Filter`] functions are applied subtractively to reduce the result set. No file
+    /// [`IO`][2] occurs until the query is executed via [`Query::read`] or [`Query::column`].
+    ///
+    /// ### Errors
+    ///
+    /// Returns [`Error::Query`] wrapping [`query::Error::Column`] if the requested `name` is not
+    /// found in the [`Manifest`][3].
+    ///
+    /// [1]: crate::manifest::Schema
+    /// [2]: crate::io
+    /// [3]: crate::manifest::Manifest
     pub fn query(&self, name: &str) -> Result<Query, query::Error> {
         let columns = self
             .file
