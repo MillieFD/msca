@@ -68,11 +68,13 @@ pub(crate) fn expand(input: &DeriveInput) -> Result<TokenStream, syn::Error> {
     let accumulator = accumulator(&fields);
     let accumulate = accumulate(name, &fields);
     let serialize = serialize(&fields);
+    let data = data(name, &fields);
     Ok(quote! {
         const _: () = {
             #accumulator
             #accumulate
             #serialize
+            #data
         };
     })
 }
@@ -196,5 +198,62 @@ fn serialize(fields: &[Field<'_>]) -> TokenStream {
                 ::core::result::Result::Ok(buf)
             }
         }
+    }
+}
+
+/// Implement [`Data`](clem::Data) for the annotated external type.
+fn data(name: &Ident, fields: &[Field<'_>]) -> TokenStream {
+    let idents = Field::idents(fields);
+    let types = Field::types(fields);
+    let names = Field::names(fields);
+    quote! {
+        impl ::clem::Data for #name {
+            fn accumulator(
+                schema: &mut ::clem::Schema,
+                _name: &'static str,
+            ) -> ::core::result::Result<::clem::BoxAcc<#name>, ::clem::schema::Error> {
+                ::core::result::Result::Ok(::std::boxed::Box::new(Acc {
+                    #( #idents: schema.column::<#types, _>(#names)?, )*
+                }))
+            }
+        }
+    }
+}
+
+/* --------------------------------------------------------------------------------------- Tests */
+
+#[cfg(test)]
+mod tests {
+    use syn::parse_quote;
+
+    use super::*;
+    use crate::tests::has;
+
+    /// [`expand`] emits the hidden accumulator and one implementation per generated trait.
+    #[test]
+    fn expand_emits_impls() {
+        let input: DeriveInput = parse_quote! { struct Row { a: u32, b: f64 } };
+        let code = expand(&input).expect("Expansion failed").to_string();
+        assert!(has(&code, "struct Acc"));
+        assert!(has(&code, "impl ::clem::Accumulate for Acc"));
+        assert!(has(&code, "impl ::clem::Serialize for Acc"));
+        assert!(has(&code, "impl ::clem::Data for Row"));
+    }
+
+    /// [`expand`] output parses as valid Rust.
+    #[test]
+    fn expand_parses() {
+        let input: DeriveInput = parse_quote! { struct Row { a: u32, b: f64 } };
+        let expanded = expand(&input).expect("Expansion failed");
+        syn::parse2::<syn::File>(expanded).expect("Generated code does not parse");
+    }
+
+    /// [`expand`] rejects inputs without named fields.
+    ///
+    /// Field names are required to generate column names in the [`Schema`](clem::Schema).
+    #[test]
+    fn expand_rejects_tuple() {
+        let input: DeriveInput = parse_quote! { struct Tuple(u32); };
+        assert!(expand(&input).is_err());
     }
 }
