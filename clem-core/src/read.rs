@@ -74,7 +74,7 @@ use memmap2::Mmap;
 
 use crate::io::{self, Deserialize};
 use crate::manifest::Buffer;
-use crate::query::{self, Filter};
+use crate::query::Filter;
 use crate::schema::{Schema, Unfolder};
 
 /* ------------------------------------------------------------------------------ Public Exports */
