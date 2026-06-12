@@ -77,14 +77,14 @@
 - [ ] Design public `Dataset` API with quality-of-life improvements and documentation.
 - [ ] Finish `clem-core` root module (lib) to re-export public API. Check all visibility modifiers.
 - [ ] Finalise `clem-derive` procedural macro design.
-- [ ] Add README.md including:
-    - [ ] What is `clem`; high-level overview with a link to [on-disk-format.md](./doc/on-disk-format.md) for details.
-    - [ ] Cite `clem` in academic work; link to CITATION file and instructions for citing the crate.
-    - [ ] Why use `clem`; motivation and design goals.
-    - [ ] When to use `clem`; ideal use-cases and comparison to alternatives e.g. Apache Parquet or SQL databases.
-    - [ ] How to use `clem`; installation instructions and basic usage examples for writing and reading data.
+- [ ] Add `README.md` including:
+    - [ ] What is clem; high-level overview with a link to [on-disk-format.md](./doc/on-disk-format.md) for details.
+    - [ ] Cite clem in academic work; link to CITATION file and instructions for citing the crate.
+    - [ ] Why use clem; motivation and design goals.
+    - [ ] When to use clem; ideal use-cases and comparison to alternatives e.g. Apache Parquet or SQL databases.
+    - [ ] How to use clem; installation instructions and basic usage examples for writing and reading data.
     - [ ] Contributing guidelines; how to report issues and contribute code.
-- [ ] Add a CITATION file
+- [ ] Add a `CITATION.cff` file
 - [ ] Add [on-disk-format.md](./doc/on-disk-format.md) describing the on-disk layout in detail; include ASCI diagrams.
 - [ ] Search for discrepancies between [doc](./doc) and actual implementations. Update documentation as needed.
 - [ ] Add comprehensive unit tests for core functionalities in each module; cover edge cases.
