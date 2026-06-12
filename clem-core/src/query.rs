@@ -202,7 +202,7 @@ impl Query {
         Schema: Unfolder<I>,
     {
         let col = self.get_mut(name)?;
-        col.ty.verify()?;
+        col.ty.verify::<I>()?;
         // 1. Insert filter for lazy evaluation during deserialization
         let filter = Filter::bounds(&bounds);
         col.filters.insert(filter);
