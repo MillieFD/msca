@@ -10,11 +10,11 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 
 //! Procedural macro expansion logic for `#[derive(Data)]`.
 //!
-//! ### Using `#[derive(Data]`
+//! ### Using `#[derive(Data)]`
 //!
 //! Add the attribute to any algebraic data type.
 //!
-//! ```rust
+//! ```rust,ignore
 //! #[derive(Data)]
 //! struct Record {
 //!     uuid: u8,
@@ -27,7 +27,7 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //!
 //! Field registration is determined by the field [`Type`](syn::Type):
 //!
-//! - Supported primitive types register a corresponding column in the [`Schema`](clem::Schema).
+//! - Supported primitive types register a corresponding column in the `Schema`.
 //! - Algebraic types defer to their own `#[derive(Data)]` implementation
 //!
 //! This design allows for recursive nesting of `#[derive(Data)]` types which flatten into a single
@@ -38,19 +38,15 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //!
 //! Generated code lives inside an anonymous `const` block to avoid collision with user items.
 //!
-//! 1. A hidden composite [accumulator][2] type holding one boxed sub-accumulator per field.
-//! 2. An [`Accumulate`][3] implementation distributing pushed items across the sub-accumulators.
-//! 3. A [`Serialize`][4] implementation chaining sub-accumulators into one contiguous buffer.
-//! 4. A [`Data`][5] implementation to register columns and construct the composite accumulator.
+//! 1. A hidden composite accumulator type holding one boxed sub-accumulator per field.
+//! 2. An `Accumulate` implementation distributing pushed items across the sub-accumulators.
+//! 3. A `Serialize` implementation chaining sub-accumulators into one contiguous buffer.
+//! 4. A `Data` implementation to register columns and construct the composite accumulator.
 //!
 //! [1]: std::collections::BTreeMap
-//! [2]: clem::Accumulate::Acc
-//! [3]: clem::Accumulate
-//! [4]: clem::Serialize
-//! [5]: clem::Data
 
 use proc_macro2::TokenStream;
-use quote::quote;
+use quote::{format_ident, quote};
 use syn::{DeriveInput, Ident};
 
 use crate::{fields, Field};
@@ -63,12 +59,17 @@ use crate::{fields, Field};
 ///
 /// Returns [`syn::Error`] if the input is not a struct, has unnamed fields, or has no fields.
 pub(crate) fn expand(input: &DeriveInput) -> Result<TokenStream, syn::Error> {
-    let name = &input.ident;
-    let fields = fields(input)?;
-    let accumulator = accumulator(&fields);
-    let accumulate = accumulate(name, &fields);
-    let serialize = serialize(&fields);
-    let data = data(name, &fields);
+    // 1. Resolve struct names
+    let src = &input.ident;
+    let acc = &format_ident!("{}Accumulator", src);
+    // 2. Extract and sort fields by name
+    let fields = &fields(input)?;
+    // 3. Generate trait implementations
+    let accumulator = accumulator(acc, fields);
+    let accumulate = accumulate(src, acc, fields);
+    let serialize = serialize(acc, fields);
+    let data = data(acc, src, fields);
+    // 4. Wrap in an anonymous const block
     Ok(quote! {
         const _: () = {
             #accumulator
@@ -81,48 +82,35 @@ pub(crate) fn expand(input: &DeriveInput) -> Result<TokenStream, syn::Error> {
 
 /* ----------------------------------------------------------------------- TokenStream Expansion */
 
-/// Generate the hidden composite [accumulator][1] type holding one [sub-accumulator][2] per field.
-///
-/// [1]: clem::Accumulate::Acc
-/// [2]: clem::BoxAcc
-fn accumulator(fields: &[Field<'_>]) -> TokenStream {
+/// Generate the hidden composite accumulator type holding one boxed sub-accumulator per field.
+fn accumulator(acc: &Ident, fields: &[Field<'_>]) -> TokenStream {
     let idents = Field::idents(fields);
     let types = Field::types(fields);
     quote! {
         /// Generated composite accumulator holding one boxed sub-accumulator per field.
-        struct Acc {
+        struct #acc {
             #( #idents: ::clem::BoxAcc<#types>, )*
         }
     }
 }
 
-/// Implement [`Accumulate`](clem::Accumulate) for the generated [`accumulator`].
+/// Implement `Accumulate` for the generated [`accumulator`].
 ///
-/// - [`push`][1] distributes each incoming field across the sub-accumulators.
+/// - `push` distributes each incoming field across the sub-accumulators.
+/// - `discard` and `buffers` delegate to each sub-accumulator in order.
+/// - `is_empty` and `count` delegate to the first field only.
 ///
-/// - [`push`][1] distributes each incoming item field into the corresponding sub-accumulator;
-/// ensuring all sub-accumulators advance in lockstep.
-///
-/// - [`discard`][2] and [`buffers`][3] delegate to each sub-accumulator in order.
-/// - [`is_empty`][4] and [`count`][5] delegate to the first field only.
-///
-/// This design ensures that all sub-accumulators advance in lockstep. [`buffers`][3] threads the
+/// This design ensures that all sub-accumulators advance in lockstep. `buffers` threads the
 /// `offset` through each delegated call to encode buffers contiguously, returning the final offset.
-///
-/// [1]: clem::Accumulate::push
-/// [2]: clem::Accumulate::discard
-/// [3]: clem::Accumulate::buffers
-/// [4]: clem::Accumulate::is_empty
-/// [5]: clem::Accumulate::count
-fn accumulate(name: &Ident, fields: &[Field<'_>]) -> TokenStream {
+fn accumulate(src: &Ident, acc: &Ident, fields: &[Field<'_>]) -> TokenStream {
     let idents = Field::idents(fields);
     // NOTE: crate::fields rejects empty structs; the first field is guaranteed to exist
     let head = idents[0];
     quote! {
-        impl ::clem::Accumulate for Acc {
-            type Item = #name;
+        impl ::clem::Accumulate for #acc {
+            type Item = #src;
 
-            fn push(&mut self, value: #name) {
+            fn push(&mut self, value: #src) {
                 #( self.#idents.push(value.#idents); )*
             }
 
@@ -150,30 +138,25 @@ fn accumulate(name: &Ident, fields: &[Field<'_>]) -> TokenStream {
     }
 }
 
-/// Implement [`Serialize`](clem::Serialize) for the generated [`accumulator`].
+/// Implement `Serialize` for the generated [`accumulator`].
 ///
-/// - [`size`][1] sums the serialized size of every sub-accumulator.
-/// - [`serialize_into`][2] delegates to each sub-accumulator in order.
-/// - [`serialize`][3] allocates using [`size`][1] and fills via [`serialize_into`][2].
-///
-/// [1]: Serialize::size
-/// [2]: Serialize::serialize_into
-/// [3]: Serialize::serialize
-fn serialize(fields: &[Field<'_>]) -> TokenStream {
+/// - `size` folds the serialized size of every sub-accumulator.
+/// - `serialize_into` delegates to each sub-accumulator in order.
+/// - `serialize` allocates using `size` and fills via `serialize_into`.
+fn serialize(acc: &Ident, fields: &[Field<'_>]) -> TokenStream {
     let idents = Field::idents(fields);
     quote! {
-        impl ::clem::Serialize for Acc {
+        impl ::clem::Serialize for #acc {
             type Buffer = ::std::vec::Vec<u8>;
 
             fn size(
                 &self,
             ) -> ::core::result::Result<::core::num::NonZeroU64, ::clem::schema::number::Error> {
-                let total: u64 = 0;
-                #(
-                    let total = total
-                        .checked_add(self.#idents.size()?.get())
-                        .ok_or(::clem::schema::number::Error::Zero)?;
-                )*
+                let total = [ #( self.#idents.size(), )* ]
+                    .into_iter()
+                    .try_fold(u64::MIN, |acc, size| {
+                        acc.checked_add(size?.get()).ok_or(::clem::schema::number::Error::Zero)
+                    })?;
                 ::core::num::NonZeroU64::new(total).ok_or(::clem::schema::number::Error::Zero)
             }
 
@@ -195,24 +178,26 @@ fn serialize(fields: &[Field<'_>]) -> TokenStream {
                     .map_err(::clem::schema::number::Error::from)?;
                 let mut buf = ::std::vec![0u8; size];
                 self.serialize_into(&mut buf)?;
+                // NOTE: cannot use static assertion; size depends on runtime data accumulation
+                ::core::debug_assert_eq!(buf.len(), size, "actual size ≠ predicted size");
                 ::core::result::Result::Ok(buf)
             }
         }
     }
 }
 
-/// Implement [`Data`](clem::Data) for the annotated external type.
-fn data(name: &Ident, fields: &[Field<'_>]) -> TokenStream {
+/// Implement `Data` for the annotated external type.
+fn data(src: &Ident, acc: &Ident, fields: &[Field<'_>]) -> TokenStream {
     let idents = Field::idents(fields);
     let types = Field::types(fields);
     let names = Field::names(fields);
     quote! {
-        impl ::clem::Data for #name {
+        impl ::clem::Data for #src {
             fn accumulator(
                 schema: &mut ::clem::Schema,
                 _name: &'static str,
-            ) -> ::core::result::Result<::clem::BoxAcc<#name>, ::clem::schema::Error> {
-                ::core::result::Result::Ok(::std::boxed::Box::new(Acc {
+            ) -> ::core::result::Result<::clem::BoxAcc<#src>, ::clem::schema::Error> {
+                ::core::result::Result::Ok(::std::boxed::Box::new(#acc {
                     #( #idents: schema.column::<#types, _>(#names)?, )*
                 }))
             }
@@ -234,9 +219,9 @@ mod tests {
     fn expand_emits_impls() {
         let input: DeriveInput = parse_quote! { struct Row { a: u32, b: f64 } };
         let code = expand(&input).expect("Expansion failed").to_string();
-        assert!(has(&code, "struct Acc"));
-        assert!(has(&code, "impl ::clem::Accumulate for Acc"));
-        assert!(has(&code, "impl ::clem::Serialize for Acc"));
+        assert!(has(&code, "struct RowAccumulator"));
+        assert!(has(&code, "impl ::clem::Accumulate for RowAccumulator"));
+        assert!(has(&code, "impl ::clem::Serialize for RowAccumulator"));
         assert!(has(&code, "impl ::clem::Data for Row"));
     }
 
@@ -250,7 +235,7 @@ mod tests {
 
     /// [`expand`] rejects inputs without named fields.
     ///
-    /// Field names are required to generate column names in the [`Schema`](clem::Schema).
+    /// Field names are required to generate column names in the `Schema`.
     #[test]
     fn expand_rejects_tuple() {
         let input: DeriveInput = parse_quote! { struct Tuple(u32); };
