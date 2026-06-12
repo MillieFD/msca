@@ -201,10 +201,53 @@ pub trait Read: Sized {
     }
 
     /// [`Deserialize`] and [`Filter`] one instance of [`Self`] from `src`.
-    fn next<'a>(src: &mut Iter<'a, u8>, ctx: &mut Column<'a>) -> Outcome<Self>
+    fn next<'a>(src: &mut Self::Src<'a>, ctx: &mut Self::Ctx<'a>) -> Outcome<Self>;
+
+    /// Construct a lazy [`Iterator`] from the provided [`context`](Self::Ctx); yielding one
+    /// [deserialized](Deserialize) [`Outcome`] per candidate [`Item`](Self).
+    ///
+    /// ### Guidance
+    ///
+    /// This function provides the top-level iteration pipeline. Implementations should pull
+    /// successive rows via [`Read::next`] and translate [`Outcome::Finished`] into [`None`] to
+    /// terminate the [`Iterator`].
+    fn iter<'a>(mut ctx: Self::Ctx<'a>) -> impl Iterator<Item = Outcome<Self>> {
+        let mut src = Default::default();
+        from_fn(move || match Self::next(&mut src, &mut ctx) {
+            Outcome::Finished => None,
+            outcome => Some(outcome),
+        })
+    }
+
+    /// Construct a type-erased [`Stream`] of [`Self`] from the provided [`context`](Self::Ctx);
+    /// uses [`Read::iter`] internally.
+    fn boxed<'a>(ctx: Self::Ctx<'a>) -> Stream<'a, Self>
     where
-        Self: for<'b> Deserialize<Src<'b> = &'b [u8]> + PartialOrd,
+        Self: 'a,
     {
+        Box::new(Self::iter(ctx))
+    }
+}
+
+/* ------------------------------------------------------------------- Read Trait Implementation */
+
+/// Blanket [`Read`] implementation for fixed-size primitives.
+impl<I> Read for I
+where
+    I: for<'b> Deserialize<Src<'b> = &'b [u8]> + PartialOrd,
+    Schema: Unfolder<I>,
+{
+    type Ctx<'a> = Column<'a>;
+
+    type Src<'a> = Iter<'a, u8>;
+
+    /// [`Deserialize`] one instance of [`Self`](I) from the [`Read::Src`] cursor; refilling from
+    /// the next [`Buffer`] when `Src` is exhausted.
+    ///
+    /// Returns [`Outcome::Finished`] once every remaining [`Buffer`] is exhausted.
+    ///
+    /// Refer to the [trait-level documentation](Read::next) for more details.
+    fn next<'a>(src: &mut <Self as Read>::Src<'a>, ctx: &mut Self::Ctx<'a>) -> Outcome<Self> {
         while src.as_slice().is_empty() {
             let buffer = match ctx.buffers.next() {
                 Some(buffer) => buffer,
@@ -234,94 +277,34 @@ pub trait Read: Sized {
             Err(e) => Outcome::Error(e),
         }
     }
-
-    /// Construct a lazy [`Iterator`] from the provided [`context`](Self::Ctx); yielding one
-    /// [deserialized](Deserialize) [`Outcome`] per candidate [`Item`](Self).
-    ///
-    /// ### Guidance
-    ///
-    /// This function provides the top-level iteration pipeline. Implementations should pull
-    /// successive rows via [`Read::next`] and translate [`Outcome::Finished`] into [`None`] to
-    /// terminate the [`Iterator`].
-    ///
-    /// ### Errors
-    ///
-    /// Refer to each implementation for a description of the possible error conditions.
-    fn iter(ctx: Self::Ctx<'_>) -> Result<impl Iterator<Item = Outcome<Self>>, query::Error>;
-
-    /// Construct a type-erased [`Stream`] of [`Self`] from the provided [`context`](Self::Ctx);
-    /// uses [`Read::iter`] internally.
-    ///
-    /// ### Errors
-    ///
-    /// See [`Read::iter`] for a description of the possible error conditions.
-    fn boxed<'a>(ctx: Self::Ctx<'a>) -> Result<Stream<'a, Self>, query::Error>
-    where
-        Self: 'a,
-    {
-        Ok(Box::new(Self::iter(ctx)?))
-    }
-}
-
-/* ------------------------------------------------------------------- Read Trait Implementation */
-
-/// Blanket [`Read`] implementation for fixed-width primitives.
-impl<I> Read for I
-where
-    I: for<'b> Deserialize<Src<'b> = &'b [u8]> + PartialOrd,
-    Schema: Unfolder<I>,
-{
-    type Ctx<'a> = Column<'a>;
-
-    /// Construct a fixed-width byte pipeline over the retained column [buffers](Buffer); yielding
-    /// one [`Outcome`] wrapping a [deserialized][1] instance of [`Self`] per iteration.
-    ///
-    /// ### Errors
-    ///
-    /// Iterator construction is infallible; this function will never return [`query::Error`].
-    /// [Deserialization][1] failures are surfaced lazily via [`Outcome::Error`].
-    ///
-    /// Refer to the [trait-level documentation](Read::iter) for more details.
-    ///
-    /// [1]: Deserialize::deserialize
-    // TODO → Is the Result return type required by composite readers? Could simplify fn signature?
-    fn iter(mut ctx: Self::Ctx<'_>) -> Result<impl Iterator<Item = Outcome<Self>>, query::Error> {
-        let mut src = Default::default();
-        Ok(from_fn(move || match Self::next(&mut src, &mut ctx) {
-            Outcome::Finished => None,
-            outcome => Some(outcome),
-        }))
-    }
 }
 
 impl Read for bool {
     type Ctx<'a> = Column<'a>;
 
-    /// Construct a [bit-packed](Column::bits) pipeline over the retained column [buffers](Buffer);
-    /// yielding one [`Outcome`] wrapping a [deserialized][1] instance of [`Self`] per iteration.
+    type Src<'a> = &'a BitSlice<u8, Lsb0>;
+
+    /// Read one bit from the [`Read::Src`] cursor; refilling from the next [`Buffer`] when `Src`
+    /// is exhausted.
     ///
-    /// ### Errors
+    /// Returns [`Outcome::Finished`] once every remaining [`Buffer`] is exhausted.
     ///
-    /// Iterator construction is infallible; this function will never return [`query::Error`].
-    /// [Deserialization][1] failures are surfaced lazily via [`Outcome::Error`].
-    ///
-    /// Refer to the [trait-level documentation](Read::iter) for more details.
-    ///
-    /// [1]: Deserialize::deserialize
-    fn iter(mut ctx: Self::Ctx<'_>) -> Result<impl Iterator<Item = Outcome<Self>>, query::Error> {
-        let mut src = BitSlice::empty().iter();
-        Ok(from_fn(move || {
-            loop {
-                if let Some(bit) = src.next() {
-                    return Some(Outcome::Success(*bit));
-                }
-                let buffer = ctx.buffers.next()?;
-                match ctx.bits(buffer) {
-                    Ok(valid) => src = valid.iter(),
-                    Err(error) => return Some(Outcome::Error(error)),
-                }
+    /// Refer to the [trait-level documentation](Read::next) for more details.
+    fn next<'a>(src: &mut Self::Src<'a>, ctx: &mut Self::Ctx<'a>) -> Outcome<Self> {
+        loop {
+            if let Some((bit, rest)) = src.split_first() {
+                *src = rest;
+                return Outcome::Success(*bit);
             }
-        }))
+            let buffer = match ctx.buffers.next() {
+                Some(buffer) => buffer,
+                None => return Outcome::Finished,
+            };
+            match ctx.bits(buffer) {
+                Ok(bits) => *src = bits,
+                Err(error) => return Outcome::Error(error),
+            }
+        }
     }
 }
 
@@ -386,7 +369,7 @@ mod tests {
             mmap: &mmap,
             filters: &filters,
         };
-        assert_eq!(drain(u32::boxed(ctx).expect("Stream failed")), data);
+        assert_eq!(drain(u32::boxed(ctx)), data);
     }
 
     #[test]
@@ -403,10 +386,7 @@ mod tests {
             mmap: &mmap,
             filters: &filters,
         };
-        assert_eq!(
-            drain(u16::boxed(ctx).expect("Stream failed")),
-            vec![1, 2, 1, 2]
-        );
+        assert_eq!(drain(u16::boxed(ctx)), vec![1, 2, 1, 2]);
     }
 
     #[test]
@@ -421,7 +401,7 @@ mod tests {
             mmap: &mmap,
             filters: &filters,
         };
-        assert_eq!(drain(u32::boxed(ctx).expect("Stream failed")), vec![20, 30]);
+        assert_eq!(drain(u32::boxed(ctx)), vec![20, 30]);
     }
 
     #[test]
@@ -436,10 +416,7 @@ mod tests {
             mmap: &mmap,
             filters: &filters,
         };
-        assert_eq!(
-            drain(bool::boxed(ctx).expect("Stream failed")),
-            vec![true, false, true, true]
-        );
+        assert_eq!(drain(bool::boxed(ctx)), vec![true, false, true, true]);
     }
 
     #[test]
@@ -459,10 +436,34 @@ mod tests {
     }
 
     #[test]
+    fn next_refills_bits_from_buffers() {
+        let data: BitVec = [true, false].into_iter().collect();
+        let bytes = data.serialize().expect("Serialize failed");
+        let mmap = map(&bytes);
+        let buffers = vec![buffer(0, bytes.len() as u64, 2)];
+        let filters = HashSet::new();
+        let mut ctx = Column {
+            buffers: buffers.iter(),
+            mmap: &mmap,
+            filters: &filters,
+        };
+        let mut src = Default::default(); // Empty cursor; next must refill from the first buffer.
+        assert!(matches!(
+            bool::next(&mut src, &mut ctx),
+            Outcome::Success(true)
+        ));
+        assert!(matches!(
+            bool::next(&mut src, &mut ctx),
+            Outcome::Success(false)
+        ));
+        assert!(matches!(bool::next(&mut src, &mut ctx), Outcome::Finished));
+    }
+
+    #[test]
     fn next_finished_on_empty() {
         let mmap = map(b"");
-        let buffers: Vec<Buffer> = Vec::new();
         let filters = HashSet::new();
+        let buffers: Vec<Buffer> = Vec::new();
         let mut ctx = Column {
             buffers: buffers.iter(),
             mmap: &mmap,
@@ -489,7 +490,7 @@ mod tests {
             mmap: &mmap,
             filters: &filters,
         };
-        let outcomes: Vec<Outcome<u16>> = u16::boxed(ctx).expect("Stream failed").collect();
+        let outcomes: Vec<Outcome<u16>> = u16::boxed(ctx).collect();
         assert!(matches!(
             outcomes[..],
             [Outcome::Success(1), Outcome::Error(_), Outcome::Success(2)]
