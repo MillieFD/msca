@@ -444,14 +444,16 @@ where
     }
 
     fn min(&self) -> Option<Self::Item> {
-        self.iter().copied().reduce(|a, b| match a < b {
+        let rm_nan = |item: &I| item.partial_cmp(item).is_some();
+        self.iter().copied().filter(rm_nan).reduce(|a, b| match a < b {
             true => a,
             false => b,
         })
     }
 
     fn max(&self) -> Option<Self::Item> {
-        self.iter().copied().reduce(|a, b| match a > b {
+        let rm_nan = |item: &I| item.partial_cmp(item).is_some();
+        self.iter().copied().filter(rm_nan).reduce(|a, b| match a > b {
             true => a,
             false => b,
         })
