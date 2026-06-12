@@ -16,8 +16,8 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //! [`Filter`] functions are then applied subtractively to reduce the result set. Some filters are
 //! evaluated eagerly **before** file IO; removing individual buffers or entire columns informed by
 //! [manifest] statistics. Other filters are attached to the relevant column and evaluated lazily
-//! **during** [deserialization](Deserialize). No file IO is executed until [`read`](Query::read)
-//! is awaited.
+//! **during** [deserialization](Deserialize). No file IO is executed until the [`Iterator`]
+//! returned by [`read`](Query::read) is polled.
 //!
 //! ```rust,ignore
 //! let results = dataset
@@ -32,7 +32,8 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::fmt::{self, Display};
-use std::num::NonZeroU32;
+use std::iter::from_fn;
+use std::num::{NonZeroU32, TryFromIntError};
 use std::ops::{Bound, RangeBounds};
 use std::sync::Arc;
 
@@ -42,20 +43,19 @@ use minicbor::{CborLen, Decode, Encode};
 use crate::accumulate::Buffer;
 use crate::io::{self, Deserialize, Deserializer};
 use crate::manifest::{self, B};
-use crate::read::{BoxRead, Decoder, Read};
+use crate::read::{self, Outcome, Read, Stream};
 use crate::schema::{number, Schema, Type, Unfolder};
-use crate::{Reader, Serialize};
+use crate::Serialize;
 
 /* ------------------------------------------------------------------------------ Public Exports */
 
 /// A composable query builder to [read](Read) data from any [clem](crate) file; initialised from
-/// [`Dataset::query`][1] and executed when [`read`](Self::read) is [awaited][2].
+/// [`Dataset::query`][1] and executed lazily when [`read`](Self::read) is iterated.
 ///
 /// Refer to the [module-level documentation](self) for implementation details and a list of
 /// supported filters.
 ///
 /// [1]: crate::Dataset::query
-/// [2]: https://doc.rust-lang.org/book/ch17-00-async-await.html
 // TODO → add derive attributes
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone)]
@@ -86,12 +86,24 @@ impl Query {
     /// - [`Error::Type`] if the requested [`Type`] is incompatible with the actual [`Column`] type.
     ///
     /// [1]: Deserialize::deserialize
-    pub fn read<I>(&self) -> Result<impl Iterator<Item = Result<I, io::Error>> + '_, Error>
+    pub fn read<'a, I>(&'a self) -> Result<impl Iterator<Item = Result<I, io::Error>> + 'a, Error>
     where
-        I: Reader + 'static,
+        I: Read + 'a,
+        I::Ctx<'a>: TryFrom<&'a Query, Error = Error>,
     {
-        let read = I::reader(self)?.rows().step_by(self.stride.get() as usize);
-        Ok(read)
+        let mut stream = I::boxed(self.try_into()?);
+        let rows = from_fn(move || {
+            loop {
+                return match stream.next()? {
+                    Outcome::Success(item) => Some(Ok(item)),
+                    Outcome::Excluded => continue,
+                    Outcome::Finished => None,
+                    Outcome::Error(error) => Some(Err(error)),
+                };
+            }
+        })
+        .step_by(self.stride.get().try_into()?);
+        Ok(rows)
     }
 
     /// Drain the [`Query`] result set into an owned [`Vec`] of [`deserialized`][1] [`items`](I).
@@ -104,7 +116,8 @@ impl Query {
     /// [1]: Deserialize::deserialize
     pub async fn collect<I>(self) -> Result<Vec<I>, Error>
     where
-        I: Reader + 'static,
+        I: Read + 'static,
+        for<'a> I::Ctx<'a>: TryFrom<&'a Query, Error = Error>,
     {
         self.read::<I>()?.collect::<Result<Vec<I>, io::Error>>().map_err(Error::from)
     }
@@ -127,21 +140,31 @@ impl Query {
         self.columns.get_mut(name).ok_or_else(|| Error::column(name))
     }
 
-    /// Returns a [reader](BoxRead) that yields [`deserialized`][1] [`items`](I) from the named
-    /// [`Column`].
+    /// Returns a [`Stream`] yielding [`deserialized`][1] [`items`](I) from the named [`Column`].
+    ///
+    /// The requested [`Type`] is verified against the on-disk [`Column`] type exactly once.
+    /// Subsequent deserialization can progress fearlessly without additional runtime checks.
     ///
     /// ### Errors
     ///
-    /// - [`Error::Column`] if a required column is not found in the query [`BTreeMap`].
+    /// - [`Error::Column`] if the requested `name` is not found in the query [`BTreeMap`].
     /// - [`Error::Type`] if the requested [`Type`] is incompatible with the actual [`Column`] type.
     ///
     /// [1]: Deserialize::deserialize
-    pub fn column<I>(&self, name: &str) -> Result<BoxRead<I>, Error>
+    pub fn column<'a, I>(&'a self, name: &str) -> Result<Stream<'a, I>, Error>
     where
+        I: for<'b> Read<Ctx<'b> = read::Column<'b>> + 'a,
         Schema: Unfolder<I>,
-        for<'a> Decoder<'a>: Read<I>,
     {
-        self.get(name)?.reader::<I>(&self.mmap)
+        let column = self.get(name)?;
+        // NOTE: Type::verify exactly once at initialisation (eager); progress fearlessly
+        column.ty.verify::<I>()?;
+        let ctx = read::Column {
+            buffers: column.buffers.iter(),
+            mmap: &self.mmap,
+            filters: &column.filters,
+        };
+        Ok(I::boxed(ctx))
     }
 
     /* --------------------------------------------------------------------------- Query Filters */
@@ -446,4 +469,90 @@ where
 /* --------------------------------------------------------------------------------------- Tests */
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+    use std::num::NonZeroU64;
+
+    use memmap2::MmapMut;
+
+    use super::*;
+    use crate::Sector;
+
+    /// Build a single-segment `u32` [`Column`] descriptor with the given statistics. The `min` and
+    /// `max` statistics are [serialized](Serialize) into their fixed-size [`[u8; B]`](B) arrays.
+    fn column(min: u32, max: u32, count: u64) -> Column {
+        let buffer = manifest::Buffer {
+            sector: Sector {
+                offset: u64::MIN,
+                length: NonZeroU64::MIN,
+            },
+            count: NonZeroU64::new(count).expect("Zero rows"),
+            min: [u8::MIN; B].serialize_push(&min).expect("min"),
+            max: [u8::MAX; B].serialize_push(&max).expect("max"),
+        };
+        Column {
+            ty: Type::U32,
+            buffers: vec![buffer],
+            filters: HashSet::new(),
+        }
+    }
+
+    /// Build a single-column [`Query`] named `v` over the provided serialized bytes.
+    fn query(bytes: &[u8], ty: Type, count: u64) -> Query {
+        let mut mmap = MmapMut::map_anon(bytes.len().max(1)).expect("Anonymous map failed");
+        mmap[..bytes.len()].copy_from_slice(bytes);
+        let buffer = manifest::Buffer {
+            sector: Sector {
+                offset: u64::MIN,
+                length: NonZeroU64::new(bytes.len() as u64).expect("Empty buffer"),
+            },
+            count: NonZeroU64::new(count).expect("Zero rows"),
+            min: [u8::MIN; B],
+            max: [u8::MAX; B],
+        };
+        let column = Column {
+            ty,
+            buffers: vec![buffer],
+            filters: HashSet::new(),
+        };
+        Query {
+            mmap: Arc::new(mmap.make_read_only().expect("Read-only conversion failed")),
+            columns: BTreeMap::from([(String::from("v"), column)]),
+            stride: NonZeroU32::MIN,
+        }
+    }
+
+    #[test]
+    fn disjoint_below_and_above() {
+        let column = column(10, 20, 3);
+        let buffer = &column.buffers[0];
+        // SAFETY: the descriptor and bounds are both `u32`, matching the column type.
+        // Segment [10, 20] is disjoint from 30.. and from ..5
+        assert!(unsafe { buffer.disjoint(&(30u32..)) }.expect("ok"));
+        assert!(unsafe { buffer.disjoint(&(..5u32)) }.expect("ok"));
+        // Segment [10, 20] overlaps 15..25
+        assert!(!unsafe { buffer.disjoint(&(15u32..25)) }.expect("ok"));
+    }
+
+    #[test]
+    fn column_round_trip() {
+        let data: Vec<u32> = vec![10, 20, 30];
+        let bytes = data.serialize().expect("Serialize failed");
+        let query = query(&bytes, Type::U32, 3);
+        let rows: Vec<u32> = query
+            .column::<u32>("v")
+            .expect("Column failed")
+            .map(|outcome| match outcome {
+                Outcome::Success(item) => item,
+                other => panic!("Unexpected outcome → {other:?}"),
+            })
+            .collect();
+        assert_eq!(rows, data);
+    }
+
+    #[test]
+    fn column_type_mismatch_errors() {
+        let bytes = vec![1u32].serialize().expect("Serialize failed");
+        let query = query(&bytes, Type::U32, 1);
+        assert!(matches!(query.column::<u16>("v"), Err(Error::Type { .. })));
+    }
+}
