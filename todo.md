@@ -86,7 +86,7 @@
     - [ ] Contributing guidelines; how to report issues and contribute code.
 - [ ] Add a CITATION file
 - [ ] Add [on-disk-format.md](./doc/on-disk-format.md) describing the on-disk layout in detail; include ASCI diagrams.
-- [ ] Resolve discrepancies between [doc](./doc) and actual implementations. Update documentation as needed.
+- [ ] Search for discrepancies between [doc](./doc) and actual implementations. Update documentation as needed.
 - [ ] Add comprehensive unit tests for core functionalities in each module; cover edge cases.
 - [ ] Add round-trip integration tests for `#[derive(Data)]` and `#[derive(Read)]` in "tests" directory.
 - [ ] Remove all references to concurrency model `RwLock<Manifest>` in documentation; concurrency is deferred.
