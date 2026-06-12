@@ -174,6 +174,12 @@ pub trait Read: Sized {
     /// one [`Stream`] per field; constructed from a [`Query`](crate::Query) via [`TryFrom`].
     type Ctx<'a>;
 
+    /// Data **source cursor** from which values of [`Self`] are [deserialized](Deserialize).
+    ///
+    /// `Src` is initialised by [`Read::iter`], advanced by [`Read::next`], and refilled from
+    /// [`Read::Ctx`] when exhausted.
+    type Src<'a>: Default;
+
     /// Evaluate [`self`](Read) against every [`Filter`]:
     ///
     /// - `true` ← All filters pass
