@@ -428,6 +428,12 @@ impl From<number::Error> for Error {
     }
 }
 
+impl From<TryFromIntError> for Error {
+    fn from(e: TryFromIntError) -> Self {
+        number::Error::from(e).into()
+    }
+}
+
 //noinspection DuplicatedCode → Conversion is implemented for error types in different modules.
 impl<T, E> From<Error> for Result<T, E>
 where
