@@ -20,9 +20,13 @@
         - [x] Implemented **by each storable type**; mirrors `Data` on the write side and subsumes the `Reader` trait.
         - [x] Type-erased `Stream` trait object hides the concrete reader type; mirror the `BoxAcc` accumulator design.
             - `Ctx<'a>` GATs are not dyn-compatible (E0038), so the boxed object erases to `Iterator` directly.
-        - [x] `Read::Ctx<'a>` associated type carries per-type construction context (mirrors `Write::Ctx`):
-            - [x] Primitive types read from a column `Source` (buffers + mmap + filters)
-            - [x] Composite types read from `&Query`.
+        - [x] Add `Read::Ctx<'a>` GAT to carry per-type streaming context (mirrors `Write::Ctx`):
+            - [x] Primitive types read from a `read::Column` (buffer cursor + mmap + filters).
+            - [x] Composite types read from a generated context struct holding one `Stream` per external type field.
+        - [x] Add `Read::Src<'a>: Default` GAT stateful stream cursor:
+            - [x] Byte iterator for fixed-width primitives
+            - [x] `&BitSlice` for `bool`
+            - [x] Unit type `()` for composites.
         - [x] `Read::filter` evaluates a deserialized value against every column filter.
         - [x] `Read::next` returns an `Outcome` wrapping the next deserialized item.
         - [x] `Read::iter` builds an unboxed stream via `iter::from_fn`:
