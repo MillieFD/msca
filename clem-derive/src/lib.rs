@@ -21,6 +21,31 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 mod data;
 mod read;
 
+use proc_macro::TokenStream;
+use syn::{parse_macro_input, Data, DataStruct, DeriveInput, Fields, Ident, Type};
+
+/* ------------------------------------------------------------------------------ Public Exports */
+
+/// Implement the `Data` trait and supporting machinery.
+///
+/// Refer to the [module-level documentation](data) for more details.
+#[proc_macro_derive(Data)]
+pub fn data(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+    data::expand(&input).unwrap_or_else(syn::Error::into_compile_error).into()
+}
+
+/// Implement the `Read` trait and supporting machinery.
+///
+/// Refer to the [module-level documentation](read) for more details.
+#[proc_macro_derive(Read)]
+pub fn read(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+    read::expand(&input).unwrap_or_else(syn::Error::into_compile_error).into()
+}
+
+/* ---------------------------------------------------------------------------- Field Extraction */
+
 /// A single field from the external struct; borrows from [`DeriveInput`].
 #[derive(Clone, Copy)]
 struct Field<'a> {
