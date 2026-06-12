@@ -20,6 +20,7 @@ members = ["clem-core", "clem-derive"]
 
 [dependencies.clem-derive]
 path = "clem-derive"
+optional = true
 
 [dependencies.clem-core]
 path = "clem-core"
@@ -28,7 +29,8 @@ path = "clem-core"
 smol = "2.0"
 
 [features]
-default = []
+default = ["derive"]
+derive = ["dep:clem-derive"]
 dictionary = ["clem-core/dictionary"]
 index = ["clem-core/index"]
 log = ["clem-core/log"] # TODO Implement logging.
