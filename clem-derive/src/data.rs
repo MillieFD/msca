@@ -67,10 +67,12 @@ pub(crate) fn expand(input: &DeriveInput) -> Result<TokenStream, syn::Error> {
     let fields = fields(input)?;
     let accumulator = accumulator(&fields);
     let accumulate = accumulate(name, &fields);
+    let serialize = serialize(&fields);
     Ok(quote! {
         const _: () = {
             #accumulator
             #accumulate
+            #serialize
         };
     })
 }
@@ -141,6 +143,57 @@ fn accumulate(name: &Ident, fields: &[Field<'_>]) -> TokenStream {
             ) -> ::core::result::Result<u64, ::clem::schema::number::Error> {
                 #( let offset = self.#idents.buffers(offset, columns)?; )*
                 ::core::result::Result::Ok(offset)
+            }
+        }
+    }
+}
+
+/// Implement [`Serialize`](clem::Serialize) for the generated [`accumulator`].
+///
+/// - [`size`][1] sums the serialized size of every sub-accumulator.
+/// - [`serialize_into`][2] delegates to each sub-accumulator in order.
+/// - [`serialize`][3] allocates using [`size`][1] and fills via [`serialize_into`][2].
+///
+/// [1]: Serialize::size
+/// [2]: Serialize::serialize_into
+/// [3]: Serialize::serialize
+fn serialize(fields: &[Field<'_>]) -> TokenStream {
+    let idents = Field::idents(fields);
+    quote! {
+        impl ::clem::Serialize for Acc {
+            type Buffer = ::std::vec::Vec<u8>;
+
+            fn size(
+                &self,
+            ) -> ::core::result::Result<::core::num::NonZeroU64, ::clem::schema::number::Error> {
+                let total: u64 = 0;
+                #(
+                    let total = total
+                        .checked_add(self.#idents.size()?.get())
+                        .ok_or(::clem::schema::number::Error::Zero)?;
+                )*
+                ::core::num::NonZeroU64::new(total).ok_or(::clem::schema::number::Error::Zero)
+            }
+
+            fn serialize_into<'a>(
+                &self,
+                buf: &'a mut [u8],
+            ) -> ::core::result::Result<&'a mut [u8], ::clem::schema::number::Error> {
+                #( let buf = self.#idents.serialize_into(buf)?; )*
+                ::core::result::Result::Ok(buf)
+            }
+
+            fn serialize(
+                &self,
+            ) -> ::core::result::Result<::std::vec::Vec<u8>, ::clem::schema::number::Error> {
+                let size = self
+                    .size()?
+                    .get()
+                    .try_into()
+                    .map_err(::clem::schema::number::Error::from)?;
+                let mut buf = ::std::vec![0u8; size];
+                self.serialize_into(&mut buf)?;
+                ::core::result::Result::Ok(buf)
             }
         }
     }
