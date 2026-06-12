@@ -55,7 +55,7 @@ pub trait NonZeroUInt: Copy + Ord + Sized {
     ///
     /// ### Example
     ///
-    /// ```norun
+    /// ```rust,ignore
     /// fn noop<T: NonZeroUInt>(value: T) {
     ///     assert_eq!(T::ONE * value, value);
     ///     assert_eq!(value * T::ONE, value);
