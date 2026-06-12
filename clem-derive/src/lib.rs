@@ -21,3 +21,12 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 mod data;
 mod read;
 
+/// A single field from the external struct; borrows from [`DeriveInput`].
+#[derive(Clone, Copy)]
+struct Field<'a> {
+    /// Field identifier; used to generate the corresponding schema column name.
+    ident: &'a Ident,
+    /// Field type; parameterises the generated per-column accumulator or stream.
+    ty: &'a Type,
+}
+
