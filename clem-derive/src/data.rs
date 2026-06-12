@@ -51,3 +51,97 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 
 use proc_macro2::TokenStream;
 use quote::quote;
+use syn::{DeriveInput, Ident};
+
+use crate::{fields, Field};
+
+/* ------------------------------------------------------------------------------ Public Exports */
+
+/// Expand `#[derive(Data)]` according to the [module-level documentation](self).
+///
+/// ### Errors
+///
+/// Returns [`syn::Error`] if the input is not a struct, has unnamed fields, or has no fields.
+pub(crate) fn expand(input: &DeriveInput) -> Result<TokenStream, syn::Error> {
+    let name = &input.ident;
+    let fields = fields(input)?;
+    let accumulator = accumulator(&fields);
+    let accumulate = accumulate(name, &fields);
+    Ok(quote! {
+        const _: () = {
+            #accumulator
+            #accumulate
+        };
+    })
+}
+
+/* ----------------------------------------------------------------------- TokenStream Expansion */
+
+/// Generate the hidden composite [accumulator][1] type holding one [sub-accumulator][2] per field.
+///
+/// [1]: clem::Accumulate::Acc
+/// [2]: clem::BoxAcc
+fn accumulator(fields: &[Field<'_>]) -> TokenStream {
+    let idents = Field::idents(fields);
+    let types = Field::types(fields);
+    quote! {
+        /// Generated composite accumulator holding one boxed sub-accumulator per field.
+        struct Acc {
+            #( #idents: ::clem::BoxAcc<#types>, )*
+        }
+    }
+}
+
+/// Implement [`Accumulate`](clem::Accumulate) for the generated [`accumulator`].
+///
+/// - [`push`][1] distributes each incoming field across the sub-accumulators.
+///
+/// - [`push`][1] distributes each incoming item field into the corresponding sub-accumulator;
+/// ensuring all sub-accumulators advance in lockstep.
+///
+/// - [`discard`][2] and [`buffers`][3] delegate to each sub-accumulator in order.
+/// - [`is_empty`][4] and [`count`][5] delegate to the first field only.
+///
+/// This design ensures that all sub-accumulators advance in lockstep. [`buffers`][3] threads the
+/// `offset` through each delegated call to encode buffers contiguously, returning the final offset.
+///
+/// [1]: clem::Accumulate::push
+/// [2]: clem::Accumulate::discard
+/// [3]: clem::Accumulate::buffers
+/// [4]: clem::Accumulate::is_empty
+/// [5]: clem::Accumulate::count
+fn accumulate(name: &Ident, fields: &[Field<'_>]) -> TokenStream {
+    let idents = Field::idents(fields);
+    // NOTE: crate::fields rejects empty structs; the first field is guaranteed to exist
+    let head = idents[0];
+    quote! {
+        impl ::clem::Accumulate for Acc {
+            type Item = #name;
+
+            fn push(&mut self, value: #name) {
+                #( self.#idents.push(value.#idents); )*
+            }
+
+            fn discard(&mut self) {
+                #( self.#idents.discard(); )*
+            }
+
+            fn is_empty(&self) -> bool {
+                self.#head.is_empty()
+            }
+
+            fn count(&self) -> u64 {
+                self.#head.count()
+            }
+
+            fn buffers(
+                &self,
+                offset: u64,
+                columns: &mut ::clem::Columns,
+            ) -> ::core::result::Result<u64, ::clem::schema::number::Error> {
+                #( let offset = self.#idents.buffers(offset, columns)?; )*
+                ::core::result::Result::Ok(offset)
+            }
+        }
+    }
+}
