@@ -76,7 +76,7 @@
 
 - [ ] Design public `Dataset` API with quality-of-life improvements and documentation.
 - [ ] Finish `clem-core` root module (lib) to re-export public API. Check all visibility modifiers.
-- [ ] Finalise `clem-derive` procedural macro design.
+- [x] Finalise `clem-derive` procedural macro design.
 - [ ] Add `README.md` including:
     - [ ] What is clem; high-level overview with a link to [on-disk-format.md](./doc/on-disk-format.md) for details.
     - [ ] Cite clem in academic work; link to CITATION file and instructions for citing the crate.
