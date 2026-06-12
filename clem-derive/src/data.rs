@@ -57,18 +57,18 @@ use crate::{fields, Field};
 ///
 /// ### Errors
 ///
-/// Returns [`syn::Error`] if the input is not a struct, has unnamed fields, or has no fields.
+/// Returns [`syn::Error`] if the input is not supported, has unnamed fields, or has no fields.
 pub(crate) fn expand(input: &DeriveInput) -> Result<TokenStream, syn::Error> {
     // 1. Resolve struct names
     let src = &input.ident;
-    let acc = &format_ident!("{}Accumulator", src);
+    let acc = &format_ident!("{src}Accumulator");
     // 2. Extract and sort fields by name
     let fields = &fields(input)?;
     // 3. Generate trait implementations
     let accumulator = accumulator(acc, fields);
     let accumulate = accumulate(src, acc, fields);
     let serialize = serialize(acc, fields);
-    let data = data(acc, src, fields);
+    let data = data(src, acc, fields);
     // 4. Wrap in an anonymous const block
     Ok(quote! {
         const _: () = {
@@ -82,7 +82,7 @@ pub(crate) fn expand(input: &DeriveInput) -> Result<TokenStream, syn::Error> {
 
 /* ----------------------------------------------------------------------- TokenStream Expansion */
 
-/// Generate the hidden composite accumulator type holding one boxed sub-accumulator per field.
+/// Generate the hidden composite **accumulator** type holding one boxed sub-accumulator per field.
 fn accumulator(acc: &Ident, fields: &[Field<'_>]) -> TokenStream {
     let idents = Field::idents(fields);
     let types = Field::types(fields);
