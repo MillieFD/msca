@@ -24,9 +24,27 @@ mod read;
 /// A single field from the external struct; borrows from [`DeriveInput`].
 #[derive(Clone, Copy)]
 struct Field<'a> {
-    /// Field identifier; used to generate the corresponding schema column name.
+    /// Field [identifier](Ident); used to generate the corresponding schema column name.
     ident: &'a Ident,
-    /// Field type; parameterises the generated per-column accumulator or stream.
+    /// Field [type](Type); parameterises the generated column accumulator or stream.
     ty: &'a Type,
+}
+
+impl<'a> Field<'a> {
+    /// Returns the [identifier](Ident) for each [`Field`].
+    fn idents(fields: &[Self]) -> Vec<&'a Ident> {
+        fields.iter().map(|field| field.ident).collect()
+    }
+
+    /// Returns the [`Type`] for each [`Field`].
+    fn types(fields: &[Self]) -> Vec<&'a Type> {
+        fields.iter().map(|field| field.ty).collect()
+    }
+
+    /// Returns the column [`name`](String) for each [`Field`].
+    fn names(fields: &[Self]) -> Vec<String> {
+        let name = |field: &Self| field.ident.to_string();
+        fields.iter().map(name).collect()
+    }
 }
 
