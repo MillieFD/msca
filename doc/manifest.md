@@ -30,6 +30,8 @@ buffer descriptor includes:
 1. `Sector` containing the contiguous buffer (subset of the data segment)
 2. Data statistics such as `min` and `max` for predicate pruning
 
+Unordered values – such as IEEE-754 `NaN` – are excluded from the `min` and `max` statistics.
+
 An optional feature-gated [dictionaries][2] map allows implementors to leverage the manifest to amortise storage costs
 for large types with repetitive values.
 
