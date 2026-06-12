@@ -8,4 +8,16 @@ Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the conditions of the LICENSE are met.
 */
 
-//! Derive macros for the [`clem`] storage engine.
+//! Procedural macros for the `clem` storage engine.
+//!
+//! ---
+//!
+//! Each macro expansion is implemented in the corresponding submodule; refer to the module-level
+//! documentation for more details. Generated code resolves all paths via the `clem` facade which
+//! re-exports this crate. Standalone use of `clem-derive` is not supported.
+
+#![doc = include_str!("../../doc/derive.md")]
+
+mod data;
+mod read;
+
