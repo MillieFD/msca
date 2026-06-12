@@ -211,6 +211,7 @@ impl Query {
         let mut keep = col
             .buffers
             .iter()
+            // SAFETY: Type::verify guarantees that bounds match the on-disk column type
             .try_fold(Vec::with_capacity(n), |mut acc, buf| unsafe {
                 acc.push(buf.disjoint(&bounds)?);
                 Ok::<Vec<bool>, Error>(acc)
