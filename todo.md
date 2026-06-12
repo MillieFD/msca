@@ -62,6 +62,7 @@
     - [ ] Refactor all buffer offset calculations to reflect this change.
         - [x] `Push for Accumulator` records buffer offsets relative to the mmap (excludes the file header).
         - [ ] `Header::tail`, segment sectors, and manifest sectors still use absolute file offsets.
+        - [ ] Search for other buffer offset uses and calculations that require refactoring.
 - [ ] Manifest rebuild function
     - [ ] Triggered automatically during `File::open` if corruption is detected.
     - [ ] Ensure the on-disk layout is sufficiently self-describing to support rebuild.
