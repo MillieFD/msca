@@ -16,8 +16,7 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //! [`Filter`] functions are then applied subtractively to reduce the result set. Some filters are
 //! evaluated eagerly **before** file IO; removing individual buffers or entire columns informed by
 //! [manifest] statistics. Other filters are attached to the relevant column and evaluated lazily
-//! **during** [deserialization](Deserialize). No file IO is executed until the [`Iterator`]
-//! returned by [`read`](Query::read) is polled.
+//! **during** [deserialization](Deserialize).
 //!
 //! ```rust,ignore
 //! let results = dataset
@@ -27,6 +26,8 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //!     .eq("active", true)?
 //!     .read()?;
 //! ```
+//!
+//! No file IO is executed until the [`Iterator`] returned by [`read`](Query::read) is polled.
 
 #![doc = include_str!("../../doc/query-filters.md")]
 
