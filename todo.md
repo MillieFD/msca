@@ -29,7 +29,7 @@
             - [x] Unit type `()` for composites.
         - [x] `Read::filter` evaluates a deserialized value against every column filter.
         - [x] `Read::next` returns an `Outcome` wrapping the next deserialized item.
-        - [x] `Read::iter` builds an unboxed stream via `iter::from_fn`:
+        - [x] `Read::iter` is a provided method translating `Read::next` into the `Option` items expected by iterators
             - [x] `Outcome::Success(item)` yields `Some(item)`.
             - [x] `Outcome::Excluded` continues to the next item; loops until `Outcome::Success` or `Outcome::Finished`.
             - [x] `Outcome::Finished` yields `None`.
@@ -41,12 +41,12 @@
     - [x] Generalise `Deserialize` trait w/ a source
         - [x] Add an associated `&'a Src` type to the `Deserialize` trait (mirror Write::Ctx)
         - [x] Primitives deserialize from `&[u8]`
-        - [ ] External types deserialize from a composite reader
+        - [x] External types deserialize from a composite reader
     - [x] Users can add `#[derive(Read)]` to their external types:
-        - [x] Generates an `impl Read for T` where `Read::iter` zips one column `Stream` per field.
+        - [x] Generates a hidden `Ctx` struct w/ one column `Stream` per field; `Read::next` pulls each in lockstep.
         - [x] Rejects the entire item if any sub-stream returns `Outcome::Excluded`.
         - [x] Surfaces `Outcome::Error` eagerly.
-        - [x] `Read::boxed` hides the closure type from users behind the type-erased `Stream` trait object.
+        - [x] `Read::boxed` hides the generated context from users behind the type-erased `Stream` trait object.
         - [x] `Query::read::<I>` reads the composite stream for `I`; mirrors `Data::accumulator`.
     - [x] Fix inverted buffer pruning in `Query::range`; overlapping buffers are retained, disjoint buffers removed.
     - [ ] Implement optional and unsized readers: `OptBitVec` + `OptInSitu` + `Seq` + `OptSeq` + `Flatten`
@@ -98,7 +98,7 @@
 
 ### Crate Features (Priority IV)
 
-- [ ] Add `derive` feature (ON by default) to enable `clem-derive` sub-crate.
+- [x] Add `derive` feature (ON by default) to enable `clem-derive` sub-crate.
 - [ ] Add `no-std` feature (OFF by default).
 - [ ] Add `async` feature (ON by default) to use `smol::fs` instead of `std::fs`.
 
