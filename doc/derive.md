@@ -3,7 +3,7 @@
 The feature-gated `clem-derive` sub-crate exports procedural macros that allow reading and writing external types from
 and to datasets respectively.
 
-```rust
+```rust,ignore
 #[derive(Data, Read)]
 struct Record {
     uuid: u8,
