@@ -2,10 +2,18 @@
 name = "clem-core"
 version = "0.1.0"
 edition = "2024"
-description = "Core library for the clem storage engine."
+description = "A high-throughput storage engine for multidimensional analytical data, written in Rust."
 license = "BSD-3-Clause"
 authors = ["Amelia Fraser-Dale"]
 repository = "https://github.com/MillieFD/clem"
+
+# See a full list of keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lints.clippy]
+missing_const_for_fn = "deny"
+unwrap_used = "deny"
+
+# See a full list of keys and their definitions at https://rust-lang.github.io/rust-clippy/stable/index.html
 
 [dependencies]
 smol = "2.0"
@@ -35,5 +43,5 @@ default = []
 dictionary = []
 index = ["dictionary"]
 log = ["dep:log"] # TODO Implement logging.
-metadata = ["dep:toml"]
+metadata = ["dep:toml"] # TODO Remove TOML dependency
 serde = ["dep:serde"]
