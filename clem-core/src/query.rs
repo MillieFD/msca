@@ -23,10 +23,9 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //! let results = dataset
 //!     .query("schema_name")?
 //!     .select(["latitude", "longitude", "temperature"])
-//!     .range("temperature", 10.0..=20.0)
-//!     .eq("active", true)
-//!     .read()
-//!     .await?;
+//!     .range("temperature", 10.0..=20.0)?
+//!     .eq("active", true)?
+//!     .read()?;
 //! ```
 
 #![doc = include_str!("../../doc/query-filters.md")]
