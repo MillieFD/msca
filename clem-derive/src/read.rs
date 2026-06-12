@@ -66,11 +66,13 @@ pub(crate) fn expand(input: &DeriveInput) -> Result<TokenStream, syn::Error> {
     // 3. Generate trait implementations
     let context = context(ctx, fields);
     let try_from = try_from(ctx, fields);
+    let read = read(src, ctx, fields);
     // 4. Wrap in an anonymous const block
     Ok(quote! {
         const _: () = {
             #context
             #try_from
+            #read
         };
     })
 }
@@ -113,5 +115,83 @@ fn try_from(ctx: &Ident, fields: &[Field<'_>]) -> TokenStream {
                 })
             }
         }
+    }
+}
+
+/// Implement `Read` for the external type.
+///
+/// - `next` pulls one outcome per field from the generated [`context`] in lockstep.
+/// - Errors surface eagerly, rejecting the whole item.
+/// - An exhausted column terminates the composite stream.
+/// - The item is rebuilt only if every field succeeds; any excluded field excludes the item.
+///
+/// The unit `Src` carries no state; each boxed column stream owns its own source internally.
+fn read(src: &Ident, ctx: &Ident, fields: &[Field<'_>]) -> TokenStream {
+    let idents = Field::idents(fields);
+    quote! {
+        impl ::clem::Read for #src {
+            type Ctx<'a> = #ctx<'a>;
+
+            type Src<'a> = ();
+
+            fn next<'a>(
+                _: &mut Self::Src<'a>,
+                ctx: &mut Self::Ctx<'a>,
+            ) -> ::clem::Outcome<#src> {
+                #(
+                    let #idents = match ctx.#idents.next() {
+                        ::core::option::Option::Some(::clem::Outcome::Error(error)) => {
+                            return ::clem::Outcome::Error(error);
+                        }
+                        ::core::option::Option::Some(outcome) => outcome,
+                        ::core::option::Option::None => return ::clem::Outcome::Finished,
+                    };
+                )*
+                match ( #( #idents, )* ) {
+                    ( #( ::clem::Outcome::Success(#idents), )* ) => {
+                        ::clem::Outcome::Success(#src { #( #idents, )* })
+                    }
+                    _ => ::clem::Outcome::Excluded,
+                }
+            }
+        }
+    }
+}
+
+/* --------------------------------------------------------------------------------------- Tests */
+
+#[cfg(test)]
+mod tests {
+    use syn::parse_quote;
+
+    use super::*;
+    use crate::tests::has;
+
+    /// [`expand`] emits the hidden context and one implementation per generated trait.
+    #[test]
+    fn expand_emits_impls() {
+        let input: DeriveInput = parse_quote! { struct Row { a: u32, b: f64 } };
+        let code = expand(&input).expect("Expansion failed").to_string();
+        assert!(has(&code, "struct RowContext<'a>"));
+        assert!(has(&code, "TryFrom<&'a ::clem::Query> for RowContext<'a>"));
+        assert!(has(&code, "impl ::clem::Read for Row"));
+    }
+
+    /// [`expand`] output parses as valid Rust.
+    #[test]
+    fn expand_parses() {
+        let input: DeriveInput = parse_quote! { struct Row { a: u32, b: f64 } };
+        let expanded = expand(&input).expect("Expansion failed");
+        syn::parse2::<syn::File>(expanded).expect("Generated code does not parse");
+    }
+
+    /// [`expand`] rejects inputs without named fields.
+    ///
+    /// Field names are required to resolve column streams from the `Query`.
+    #[test]
+    // TODO → add enum support via variant discriminate (existing support for numerical primitives)
+    fn expand_rejects_enum() {
+        let input: DeriveInput = parse_quote! { enum Level { Low } };
+        assert!(expand(&input).is_err());
     }
 }
