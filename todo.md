@@ -52,7 +52,8 @@
     - [ ] Implement optional and unsized readers: `OptBitVec` + `OptInSitu` + `Seq` + `OptSeq` + `Flatten`
     - [ ] Add remaining query filters: `eq` + `one_of` + `none_of` + `is_some` + `is_none` + `mask` + `limit` + `offset`
     - [ ] `Query::read` and other supporting functions are no longer async; update documentation.
-        - [x] Remove async references from [read-cycle.msd](./doc/read-cycle.md)
+        - [x] Remove async references from [read-cycle.msd](./doc/read-cycle.md).
+        - [ ] Search for other `async` references in existing documentation.
 - [ ] SIMD alignment on all critical data fields.
     - `align` function already exists (unused) in [segment.rs](./clem-core/src/segment.rs).
     - Critical fields are described in [simd-alignment.md](./doc/simd-alignment.md).
