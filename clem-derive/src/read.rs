@@ -45,3 +45,44 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //! [1]: std::collections::BTreeMap
 
 use proc_macro2::TokenStream;
+use quote::{format_ident, quote};
+use syn::{DeriveInput, Ident};
+
+use crate::{fields, Field};
+
+/* ------------------------------------------------------------------------------ Public Exports */
+
+/// Expand `#[derive(Read)]` according to the [module-level documentation](self).
+///
+/// ### Errors
+///
+/// Returns [`syn::Error`] if the input is not supported, has unnamed fields, or has no fields.
+pub(crate) fn expand(input: &DeriveInput) -> Result<TokenStream, syn::Error> {
+    // 1. Resolve struct names
+    let src = &input.ident;
+    let ctx = &format_ident!("{src}Context");
+    // 2. Extract and sort fields by name
+    let fields = &fields(input)?;
+    // 3. Generate trait implementations
+    let context = context(ctx, fields);
+    // 4. Wrap in an anonymous const block
+    Ok(quote! {
+        const _: () = {
+            #context
+        };
+    })
+}
+
+/* ----------------------------------------------------------------------- TokenStream Expansion */
+
+/// Generate the hidden composite **context** type holding one boxed sub-stream per field.
+fn context(ctx: &Ident, fields: &[Field<'_>]) -> TokenStream {
+    let idents = Field::idents(fields);
+    let types = Field::types(fields);
+    quote! {
+        /// Generated composite context holding one boxed column stream per field.
+        struct #ctx<'a> {
+            #( #idents: ::clem::Stream<'a, #types>, )*
+        }
+    }
+}
