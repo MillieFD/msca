@@ -48,3 +48,62 @@ impl<'a> Field<'a> {
     }
 }
 
+/// Extract [fields](Field) from an external type in **name-sorted** order to match the
+/// platform-invariant deterministic [`BTreeMap`][1] column order used throughout [clem](crate).
+///
+/// ### Errors
+///
+/// Returns [`syn::Error`] if the input is not supported, has unnamed fields, or has no fields.
+///
+/// [1]: std::collections::BTreeMap
+fn fields(input: &'_ DeriveInput) -> Result<Vec<Field<'_>>, syn::Error> {
+    let error = |msg| Err(syn::Error::new_spanned(input, msg));
+    let named = match &input.data {
+        Data::Struct(DataStruct { fields: Fields::Named(named), .. }) => &named.named,
+        Data::Struct(_) => return error("clem requires named fields to generate a schema"),
+        other => return error("clem does not currently support this type"),
+    };
+    let mut fields: Vec<Field> = named
+        .iter()
+        .filter_map(|field| field.ident.as_ref().map(|ident| Field { ident, ty: &field.ty }))
+        .collect();
+    match fields.is_empty() {
+        true => return error("this type has no fields"),
+        false => fields.sort_by_key(|field| field.ident.to_string()),
+    }
+    Ok(fields)
+}
+
+/* --------------------------------------------------------------------------------------- Tests */
+
+#[cfg(test)]
+mod tests {
+    use syn::parse_quote;
+
+    use super::*;
+
+    /// Space-insensitive containment check; tolerant of generated token spacing.
+    pub(crate) fn has(code: &str, needle: &str) -> bool {
+        code.replace(' ', "").contains(&needle.replace(' ', ""))
+    }
+
+    /// [`fields`] returns the named fields sorted by identifier.
+    #[test]
+    fn fields_sorted() {
+        let input: DeriveInput = parse_quote! { struct Row { b: u8, a: u16, c: u32 } };
+        let fields = fields(&input).expect("Named struct was rejected");
+        assert_eq!(Field::names(&fields), ["a", "b", "c"]);
+    }
+
+    /// [`fields`] rejects enums, tuple structs, unit structs, and empty structs.
+    #[test]
+    fn fields_rejects_unsupported() {
+        let inputs: [DeriveInput; 4] = [
+            parse_quote! { enum Level { Low } },
+            parse_quote! { struct Tuple(u8); },
+            parse_quote! { struct Unit; },
+            parse_quote! { struct Empty {} },
+        ];
+        assert!(inputs.iter().all(|input| fields(input).is_err()));
+    }
+}
