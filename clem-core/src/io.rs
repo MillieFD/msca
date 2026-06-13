@@ -99,11 +99,20 @@ const MAGIC: [u8; 4] = *b"clem";
 /// version numbers is not guaranteed. Implementers must reject any unrecognised version number.
 const VERSION: u8 = 1;
 
-/// Total length of the file header in bytes. Includes the [magic bytes][1] and [version number][2].
+/// Total length of the file header in bytes. Includes the [magic][1] bytes, [version][2] number,
+/// and [SIMD alignment][3] bytes.
 ///
 /// [1]: MAGIC
 /// [2]: VERSION
-pub const HEADER: usize = size_of_val(&MAGIC) + size_of_val(&VERSION) + size_of::<Header>();
+/// [3]: crate::Align
+pub const HEADER: usize = size_of_val(&MAGIC) + size_of_val(&VERSION) + size_of::<Header>() + ALIGN;
+
+/// Number of trailing zero bytes required to pad the [`File`](File) [`Header`] to the next 64-bit
+/// SIMD [alignment boundary](crate::segment).
+const ALIGN: usize = {
+    let n = size_of_val(&MAGIC) + size_of_val(&VERSION) + size_of::<Header>() & 7;
+    (8 - n) & 7
+};
 
 /// A contiguous byte region within the [clem](crate) file.
 ///
