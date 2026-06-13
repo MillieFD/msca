@@ -36,6 +36,7 @@ pub use self::io::{Deserialize, Sector};
 pub use self::query::Query;
 pub use self::read::{Column, Outcome, Read, Stream};
 pub use self::schema::Schema;
+pub use self::segment::Align;
 
 /* ----------------------------------------------------------------------------- Private Modules */
 
