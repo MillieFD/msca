@@ -692,42 +692,43 @@ pub trait Buffer: AsRef<[u8]> + AsMut<[u8]> + Into<Vec<u8>> {
     ///
     /// Writing always begins at the **start** of the buffer; chained calls overwrite. Chain
     /// sequential writes through [`Serialize::serialize_into`], which returns the advanced slice.
-    fn serialize_push<I>(self, item: &I) -> Result<Self, Error>
-    where
-        I: Serialize,
-        Self: Sized;
+    fn serialize_push<I: Serialize>(self, item: &I) -> Result<Self, Error>;
+
+    fn serialize_push_aligned<I: Serialize>(self, item: &I) -> Result<Self, Error>;
 }
 
 /* ----------------------------------------------------------------- Buffer Trait Implementation */
 
 impl Buffer for &mut [u8] {
-    fn serialize_push<I>(self, item: &I) -> Result<Self, Error>
-    where
-        I: Serialize,
-        Self: Sized,
-    {
+    fn serialize_push<I: Serialize>(self, item: &I) -> Result<Self, Error> {
         item.serialize_into(self)
+    }
+
+    fn serialize_push_aligned<I: Serialize>(self, item: &I) -> Result<Self, Error> {
+        item.serialize_into_aligned(self)
     }
 }
 
 impl<const N: usize> Buffer for [u8; N] {
-    fn serialize_push<I>(mut self, item: &I) -> Result<Self, Error>
-    where
-        I: Serialize,
-        Self: Sized,
-    {
+    fn serialize_push<I: Serialize>(mut self, item: &I) -> Result<Self, Error> {
         item.serialize_into(&mut self)?;
+        Ok(self)
+    }
+
+    fn serialize_push_aligned<I: Serialize>(mut self, item: &I) -> Result<Self, Error> {
+        item.serialize_into_aligned(&mut self)?;
         Ok(self)
     }
 }
 
 impl Buffer for Vec<u8> {
-    fn serialize_push<I>(self, item: &I) -> Result<Self, Error>
-    where
-        I: Serialize,
-        Self: Sized,
-    {
+    fn serialize_push<I: Serialize>(self, item: &I) -> Result<Self, Error> {
         item.extend(self)
+    }
+
+    fn serialize_push_aligned<I: Serialize>(mut self, item: &I) -> Result<Self, Error> {
+        item.serialize_into_aligned(&mut self)?;
+        Ok(self)
     }
 }
 
@@ -1498,7 +1499,7 @@ where
         let prefix: u64 = size_of::<NonZeroU64>().try_into()?;
         // NOTE: Self::size returns Error if Σ overflows u64 (not expected in production)
         let buf = self.size()?.get().sub(prefix).to_le_bytes().serialize_into(buf)?;
-        buf.serialize_push(&self.mask)?.serialize_push(&self.data)
+        buf.serialize_push_aligned(&self.mask)?.serialize_push_aligned(&self.data)
     }
 
     fn serialize(&self) -> Result<Self::Buffer, Error> {
@@ -1534,7 +1535,7 @@ where
         let prefix: u64 = size_of::<NonZeroU64>().try_into()?;
         // NOTE: Self::size returns Error if Σ overflows u64 (not expected in production)
         let buf = self.size()?.get().sub(prefix).to_le_bytes().serialize_into(buf)?;
-        buf.serialize_push(&self.offsets)?.serialize_push(&self.data)
+        buf.serialize_push_aligned(&self.offsets)?.serialize_push_aligned(&self.data)
     }
 
     fn serialize(&self) -> Result<Self::Buffer, Error> {
@@ -1570,7 +1571,7 @@ where
         let prefix: u64 = size_of::<NonZeroU64>().try_into()?;
         // NOTE: Self::size returns Error if Σ overflows u64 (not expected in production)
         let buf = self.size()?.get().sub(prefix).to_le_bytes().serialize_into(buf)?;
-        buf.serialize_push(&self.offsets)?.serialize_push(&self.data)
+        buf.serialize_push_aligned(&self.offsets)?.serialize_push_aligned(&self.data)
     }
 
     fn serialize(&self) -> Result<Self::Buffer, Error> {
@@ -1619,10 +1620,10 @@ impl<I> Serialize for Accumulator<I> {
         let buf = self.data.size()?.align()?.serialize_into(buf)?;
         let buf = self.schema.offset.serialize_into(buf)?;
         let buf = self.data.count().serialize_into(buf)?;
-        self.data.serialize_into(buf)
         // 2. Align to the next 64-bit boundary
         buf[..Self::ALIGN].fill(u8::MIN);
         // 3. Serialize columnar data buffers
+        self.data.serialize_into_aligned(&mut buf[Self::ALIGN..])
     }
 
     fn serialize(&self) -> Result<Self::Buffer, Error> {
@@ -1639,6 +1640,7 @@ impl<I> Serialize for Accumulator<I> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::schema::Schema;
 
     /// [`Accumulate::min`] and [`Accumulate::max`] return [`Some`] for populated [`Vec`].
     #[test]
