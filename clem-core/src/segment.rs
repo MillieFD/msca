@@ -57,7 +57,7 @@ pub use self::variant::Variant;
 /// See the [module level documentation](self) for more details.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode, CborLen)]
-struct Header {
+pub(crate) struct Header {
     /// Segment [`Variant`] identifier carried in the first byte of every segment header.
     #[n(0)]
     variant: Variant,
@@ -72,7 +72,7 @@ impl Header {
     /// The rust compiler may add padding bytes to the **in-memory** header struct to improve field
     /// alignment and access efficiency. However, the **on-disk** segment header requires a strict
     /// compact layout without padding to minimise storage overhead.
-    const SIZE: usize = size_of::<u8>() + size_of::<NonZeroU64>();
+    pub(crate) const SIZE: usize = size_of::<u8>() + size_of::<NonZeroU64>();
 }
 
 impl Serialize for Header {
@@ -243,36 +243,6 @@ mod variant {
 pub trait Segment: Serialize {
     /// On-disk variant identifier for [`Self`]. Stored in the first byte of the segment header.
     const VARIANT: Variant;
-}
-
-/* ---------------------------------------------------------------- Segment Trait Implementation */
-
-impl Serialize for Schema {
-    type Buffer = Vec<u8>;
-
-    fn size(&self) -> Result<NonZeroU64, number::Error> {
-        let size = { Header::SIZE + minicbor::len(self) }.align()?;
-        size.try_into().map_err(number::Error::Convert)
-    }
-
-    fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], number::Error> {
-        let pad = { Header::SIZE + minicbor::len(self) }.pad()?;
-        let buf = buf.serialize_push(&{ Variant::Schema as u8 })?;
-        // NOTE: Self::size returns Error if usize overflows u64 (not expected in production)
-        let mut buf = self.size()?.get().to_le_bytes().serialize_into(buf)?;
-        // SAFETY: minicbor::encode is infallible when writing to Vec<u8>
-        minicbor::encode(self, &mut buf).expect("Infallible encode failed");
-        buf[..pad].fill(u8::MIN);
-        Ok(&mut buf[pad..])
-    }
-
-    fn serialize(&self) -> Result<Self::Buffer, number::Error> {
-        let size = self.size()?.get().try_into()?;
-        let buf = vec![0u8; size].serialize_push(self)?;
-        // NOTE: cannot use static assertion as size is dependent on runtime data accumulation.
-        debug_assert_eq!(buf.len(), size, "actual size ≠ predicted size");
-        Ok(buf)
-    }
 }
 
 /* --------------------------------------------------------------------------- Alignment Helpers */

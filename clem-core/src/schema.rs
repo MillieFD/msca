@@ -71,15 +71,17 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 use std::collections::btree_map::{BTreeMap, Entry};
 use std::fmt::{self, Display};
 use std::num;
+use std::num::NonZeroU64;
 
 use bitvec::vec::BitVec;
 use minicbor::{CborLen, Decode, Encode};
 use static_assertions::{assert_eq_size, const_assert_ne};
 
 use self::number::Number;
-use crate::accumulate::{Accumulate, BoxAcc, Flatten, OptBitVec, OptInSitu, OptSeq, Seq};
+use crate::accumulate::{Accumulate, BoxAcc, Buffer, Flatten, OptBitVec, OptInSitu, OptSeq, Seq};
 use crate::io::{File, Write};
-use crate::{manifest, Serialize};
+use crate::segment::Variant;
+use crate::{manifest, Align, Serialize};
 
 /* ------------------------------------------------------------------------------ Public Exports */
 
@@ -170,6 +172,34 @@ impl Schema {
     /// Map the provided [`Key`](String) to a new empty [`manifest::Column`]
     fn map(entry: (String, Column)) -> (String, manifest::Column) {
         (entry.0, entry.1.ty.into())
+    }
+}
+
+impl Serialize for Schema {
+    type Buffer = Vec<u8>;
+
+    fn size(&self) -> Result<NonZeroU64, number::Error> {
+        let size = { crate::segment::Header::SIZE + minicbor::len(self) }.align()?;
+        size.try_into().map_err(number::Error::Convert)
+    }
+
+    fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], number::Error> {
+        let pad = { crate::segment::Header::SIZE + minicbor::len(self) }.pad()?;
+        let buf = buf.serialize_push(&{ Variant::Schema as u8 })?;
+        // NOTE: Self::size returns Error if usize overflows u64 (not expected in production)
+        let mut buf = self.size()?.get().to_le_bytes().serialize_into(buf)?;
+        // SAFETY: minicbor::encode is infallible when writing to Vec<u8>
+        minicbor::encode(self, &mut buf).expect("Infallible encode failed");
+        buf[..pad].fill(u8::MIN);
+        Ok(&mut buf[pad..])
+    }
+
+    fn serialize(&self) -> Result<Self::Buffer, number::Error> {
+        let size = self.size()?.get().try_into()?;
+        let buf = vec![0u8; size].serialize_push(self)?;
+        // NOTE: cannot use static assertion as size is dependent on runtime data accumulation.
+        debug_assert_eq!(buf.len(), size, "actual size ≠ predicted size");
+        Ok(buf)
     }
 }
 
