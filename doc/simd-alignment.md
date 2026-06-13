@@ -6,14 +6,15 @@ on-disk storage efficiency.
 
 ##### Aligned Fields
 
-| Location     | Type    | Field           | Reason                                                               |
-|--------------|---------|-----------------|----------------------------------------------------------------------|
-| Data Segment | All     | Serialized Data | Primary SIMD target; misalignment silently degrades vectorised reads |
-| Data Segment | Option  | Null Bitmap     | Iterated alongside serialized data; must be cache-line paired        |
-| Data Segment | Unsized | Offsets         | Lookup hot-path; alignment benefits traversal efficiency             |
+| Location     | Type    | Field           | Reason                                                                |
+|--------------|---------|-----------------|-----------------------------------------------------------------------|
+| File Header  | Global  | Whole Header    | Memory map is page-aligned; in-memory and on-disk alignment are equal |
+| Data Segment | All     | Serialized Data | Primary SIMD target; misalignment silently degrades vectorised reads  |
+| Data Segment | Option  | Null Bitmap     | Iterated alongside serialized data; must be cache-line paired         |
+| Data Segment | Unsized | Offsets         | Lookup hot-path; alignment benefits traversal efficiency              |
 
 Exactly one padding region is inserted per critical region; only required following regions which do not terminate at
-the 64-bit alignment boundary.
+the 64-bit alignment boundary. Padding is zero-filled and carries no meaning.
 
 ##### Unaligned Fields
 
