@@ -25,19 +25,14 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //! storage and file extensibility are realised by appending additional data segments. Format
 //! extensibility may be achieved via the introduction of new segment variants in future releases.
 //!
-//! ### Alignment
-//!
-//! [`clem`](crate) uses **targeted 64-bit alignment** on critical data to ensure SIMD vectorisation
-//! and cache-line efficiency. Alignment is not enforced for small or non-performance-critical
-//! fields to improve on-disk space efficiency.
-// TODO → Link to separate .md document for more details regarding aligned and unaligned fields.
-//!
 //! ### Module Boundary
 //!
 //! This module performs in-memory ⇄ byte-buffer transformations **only**. See the
 //! [IO module](crate::io) for interaction with the underlying [`File`][1].
 //!
 //! [1]: crate::io::File
+
+#![doc = include_str!("../../doc/simd-alignment.md")]
 
 use std::convert::Infallible;
 use std::fmt::{Display, Formatter};
