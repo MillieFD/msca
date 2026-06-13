@@ -366,6 +366,7 @@ impl File {
         file.write_all(&MAGIC).await?;
         file.write_all(&[VERSION]).await?;
         file.write_all(&header.serialize()?).await?;
+        file.write_all(&[u8::MIN; ALIGN]).await?;
         file.write_all(&manifest.serialize()?).await?;
         file.flush().await?;
         Ok(Self { file, header, manifest, path })
@@ -1021,5 +1022,12 @@ mod tests {
         let a = Sector::new(10, 5).expect("Sector::new failed");
         let b = a;
         assert_eq!(a, b);
+    }
+
+    /// File [`HEADER`] is rounded up ↑ to the next 64-bit alignment boundary.
+    #[test]
+    fn header_aligned() {
+        assert_eq!(HEADER % 8, 0);
+        assert!(ALIGN < 8);
     }
 }
