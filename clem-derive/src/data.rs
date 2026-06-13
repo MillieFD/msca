@@ -140,7 +140,7 @@ fn accumulate(src: &Ident, acc: &Ident, fields: &[Field<'_>]) -> TokenStream {
 
 /// Implement `Serialize` for the generated [`accumulator`].
 ///
-/// - `size` folds the serialized size of every sub-accumulator.
+/// - `size` folds the aligned serialized size of every sub-accumulator.
 /// - `serialize_into` delegates to each sub-accumulator in order.
 /// - `serialize` allocates using `size` and fills via `serialize_into`.
 fn serialize(acc: &Ident, fields: &[Field<'_>]) -> TokenStream {
@@ -155,7 +155,8 @@ fn serialize(acc: &Ident, fields: &[Field<'_>]) -> TokenStream {
                 let total = [ #( self.#idents.size(), )* ]
                     .into_iter()
                     .try_fold(u64::MIN, |acc, size| {
-                        acc.checked_add(size?.get()).ok_or(::clem::schema::number::Error::Zero)
+                        let size = ::clem::Align::align(size?)?;
+                        acc.checked_add(size).ok_or(::clem::schema::number::Error::Zero)
                     })?;
                 ::core::num::NonZeroU64::new(total).ok_or(::clem::schema::number::Error::Zero)
             }
@@ -164,7 +165,7 @@ fn serialize(acc: &Ident, fields: &[Field<'_>]) -> TokenStream {
                 &self,
                 buf: &'a mut [u8],
             ) -> ::core::result::Result<&'a mut [u8], ::clem::schema::number::Error> {
-                #( let buf = self.#idents.serialize_into(buf)?; )*
+                #( let buf = self.#idents.serialize_into_aligned(buf)?; )*
                 ::core::result::Result::Ok(buf)
             }
 
@@ -223,6 +224,15 @@ mod tests {
         assert!(has(&code, "impl ::clem::Accumulate for RowAccumulator"));
         assert!(has(&code, "impl ::clem::Serialize for RowAccumulator"));
         assert!(has(&code, "impl ::clem::Data for Row"));
+    }
+
+    /// [`expand`] chains sub-accumulators through the aligned serialization surface.
+    #[test]
+    fn expand_pads_columns() {
+        let input: DeriveInput = parse_quote! { struct Row { a: u32, b: f64 } };
+        let code = expand(&input).expect("Expansion failed").to_string();
+        assert!(has(&code, "Align"));
+        assert!(has(&code, "serialize_into_aligned"));
     }
 
     /// [`expand`] output parses as valid Rust.
