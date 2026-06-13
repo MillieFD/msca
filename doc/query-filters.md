@@ -153,4 +153,4 @@ pass across the candidate segments.
 | `.stride(n)`          | —               | ✓                | Decimation; no segment-level skip.      |
 
 [1]: read-cycle.md#phase-2-segment-pruning
-[2]: read-cycle.md#phase-3-lazy-async-zero-copy-batched-reads
+[2]: read-cycle.md#phase-3-lazy-zero-copy-reads
