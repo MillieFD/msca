@@ -50,6 +50,7 @@ pub use clem_core::{
     schema,
     Accumulate,
     Accumulator,
+    Align,
     BoxAcc,
     Column,
     Columns,
