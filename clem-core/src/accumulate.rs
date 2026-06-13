@@ -730,6 +730,15 @@ pub trait Serialize {
         self.serialize_into(buf)?;
         Ok(sink)
     }
+
+    /// Serialize `self` into the provided [`Buffer`] and [`Align`] to the next 64-bit boundary.
+    fn serialize_into_aligned<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
+        let pad = self.size()?.pad()?;
+        let buf = self.serialize_into(buf)?;
+        debug_assert!(buf.len() >= pad, "actual size < aligned size");
+        buf[..pad].fill(u8::MIN);
+        Ok(&mut buf[pad..])
+    }
 }
 
 /* -------------------------------------------------------------- Serialize Trait Implementation */
