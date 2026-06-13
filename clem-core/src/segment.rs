@@ -251,7 +251,7 @@ impl Serialize for Schema {
     type Buffer = Vec<u8>;
 
     fn size(&self) -> Result<NonZeroU64, number::Error> {
-        let size: u64 = { Header::SIZE + minicbor::len(self) }.try_into()?;
+        let size = { Header::SIZE + minicbor::len(self) }.align()?;
         size.try_into().map_err(number::Error::Convert)
     }
 
