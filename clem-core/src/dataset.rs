@@ -253,6 +253,27 @@ mod tests {
         });
     }
 
+    /// Each committed buffer [`Sector`](crate::Sector) begins at a 64-bit alignment boundary.
+    #[test]
+    fn round_trip_aligns_buffers() {
+        smol::block_on(async {
+            let path = scratch("align");
+            write(&path, &[&[1, 2, 3], &[4, 5, 6, 7]]).await;
+            let file = File::open(&path).await.expect("open failed");
+            let offsets: Vec<u64> = file
+                .manifest
+                .schemas
+                .values()
+                .flat_map(|schema| schema.columns.values())
+                .flat_map(|column| column.buffers.iter())
+                .map(|buffer| buffer.sector.offset)
+                .collect();
+            std::fs::remove_file(&path).ok();
+            assert_eq!(offsets.len(), 2);
+            offsets.iter().for_each(|offset| assert_eq!(offset % 8, 0));
+        });
+    }
+
     #[test]
     fn query_unknown_schema_errors() {
         smol::block_on(async {
