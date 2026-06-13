@@ -115,7 +115,7 @@ impl Query {
     /// Returns [`Error::Io`] if a file IO or deserialization error occurs during iteration.
     ///
     /// [1]: Deserialize::deserialize
-    pub async fn collect<I>(self) -> Result<Vec<I>, Error>
+    pub fn collect<I>(self) -> Result<Vec<I>, Error>
     where
         I: Read + 'static,
         for<'a> I::Ctx<'a>: TryFrom<&'a Query, Error = Error>,
