@@ -32,7 +32,7 @@ use static_assertions::const_assert;
 use crate::manifest::{self, Column, B};
 use crate::number::Error;
 use crate::schema::{size_of_opt, Unfold};
-use crate::segment::Variant;
+use crate::segment::{Align, Variant};
 use crate::Sector;
 
 /// Shorthand type-erased stack-allocated [pointer](Box) to an [`Accumulate`] trait object backed by
@@ -66,7 +66,8 @@ pub type Columns<'a> = dyn Iterator<Item = &'a mut Column> + 'a;
 /// │  ├─ variant: u8
 /// │  ├─ length: NonZeroU64
 /// │  ├─ schema: NonZeroU64
-/// │  └─ count: NonZeroU64
+/// │  ├─ count: NonZeroU64
+/// │  └─ alignment padding
 /// ├─ buffer 0
 /// ⋮
 /// └─ buffer N
@@ -427,7 +428,7 @@ impl Accumulate for BitVec {
             min: Accumulate::min(self).map(u128::from).unwrap_or(u128::MIN).serialize()?,
             max: Accumulate::min(self).map(u128::from).unwrap_or(u128::MAX).serialize()?,
         };
-        let next = buf.sector.next().ok_or(Error::Zero)?.get();
+        let next = buf.sector.next().ok_or(Error::Zero)?.align()?;
         columns.next().map(|column| column.buffers.push(buf));
         Ok(next)
     }
@@ -486,7 +487,7 @@ where
                 None => max,
             },
         };
-        let next = buf.sector.next().ok_or(Error::Zero)?.get();
+        let next = buf.sector.next().ok_or(Error::Zero)?.align()?;
         columns.next().map(|column| column.buffers.push(buf));
         Ok(next)
     }
@@ -552,7 +553,13 @@ where
     }
 
     fn buffers(&self, offset: u64, columns: &mut Columns) -> Result<u64, Error> {
-        self.data.buffers(offset, columns)
+        let prefix: u64 = size_of::<NonZeroU64>().try_into()?;
+        let start = offset
+            .checked_add(prefix)
+            .ok_or(Error::Zero)?
+            .checked_add(self.mask.size()?.align()?)
+            .ok_or(Error::Zero)?;
+        self.data.buffers(start, columns)
     }
 }
 
@@ -585,7 +592,13 @@ where
     }
 
     fn buffers(&self, offset: u64, columns: &mut Columns) -> Result<u64, Error> {
-        self.data.buffers(offset, columns)
+        let prefix: u64 = size_of::<NonZeroU64>().try_into()?;
+        let start = offset
+            .checked_add(prefix)
+            .ok_or(Error::Zero)?
+            .checked_add(self.offsets.size()?.align()?)
+            .ok_or(Error::Zero)?;
+        self.data.buffers(start, columns)
     }
 }
 
@@ -621,7 +634,13 @@ where
     }
 
     fn buffers(&self, offset: u64, columns: &mut Columns) -> Result<u64, Error> {
-        self.data.buffers(offset, columns)
+        let prefix: u64 = size_of::<NonZeroU64>().try_into()?;
+        let start = offset
+            .checked_add(prefix)
+            .ok_or(Error::Zero)?
+            .checked_add(self.offsets.size()?.align()?)
+            .ok_or(Error::Zero)?;
+        self.data.buffers(start, columns)
     }
 }
 
@@ -1463,10 +1482,16 @@ where
     type Buffer = Vec<u8>;
 
     fn size(&self) -> Result<NonZeroU64, Error> {
-        let mask = self.mask.size()?;
-        let data = self.data.size()?.get();
-        // 8 byte NonZeroU64 length prefix
-        mask.checked_add(data).ok_or(Error::Zero)?.checked_add(8).ok_or(Error::Zero)
+        let data = self.data.size()?.align()?;
+        let prefix = size_of::<NonZeroU64>().try_into()?; // Length prefix
+        self.mask
+            .size()?
+            .align()?
+            .checked_add(data)
+            .ok_or(Error::Zero)?
+            .checked_add(prefix)
+            .and_then(NonZeroU64::new)
+            .ok_or(Error::Zero)
     }
 
     fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
@@ -1493,10 +1518,16 @@ where
     type Buffer = Vec<u8>;
 
     fn size(&self) -> Result<NonZeroU64, Error> {
-        let offsets = self.offsets.size()?;
-        let data = self.data.size()?.get();
+        let data = self.data.size()?.align()?;
         let prefix = size_of::<NonZeroU64>().try_into()?; // Length prefix
-        offsets.checked_add(data).ok_or(Error::Zero)?.checked_add(prefix).ok_or(Error::Zero)
+        self.offsets
+            .size()?
+            .align()?
+            .checked_add(data)
+            .ok_or(Error::Zero)?
+            .checked_add(prefix)
+            .and_then(NonZeroU64::new)
+            .ok_or(Error::Zero)
     }
 
     fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
@@ -1523,10 +1554,16 @@ where
     type Buffer = Vec<u8>;
 
     fn size(&self) -> Result<NonZeroU64, Error> {
-        let offsets = self.offsets.size()?;
-        let data = self.data.size()?.get();
-        // 8 byte NonZeroU64 length prefix
-        offsets.checked_add(data).ok_or(Error::Zero)?.checked_add(8).ok_or(Error::Zero)
+        let data = self.data.size()?.align()?;
+        let prefix = size_of::<NonZeroU64>().try_into()?; // Length prefix
+        self.offsets
+            .size()?
+            .align()?
+            .checked_add(data)
+            .ok_or(Error::Zero)?
+            .checked_add(prefix)
+            .and_then(NonZeroU64::new)
+            .ok_or(Error::Zero)
     }
 
     fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
@@ -1573,17 +1610,19 @@ impl<I> Serialize for Accumulator<I> {
 
     fn size(&self) -> Result<NonZeroU64, Error> {
         let header = Self::HEADER.try_into()?;
-        self.data.size()?.get().checked_add(header).and_then(NonZeroU64::new).ok_or(Error::Zero)
+        self.data.size()?.align()?.checked_add(header).and_then(NonZeroU64::new).ok_or(Error::Zero)
     }
 
     fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
-        // 1. Header fields (see accumulator documentation)
+        // 1. Serialize header fields (see accumulator documentation)
         let buf = { Variant::Data as u8 }.serialize_into(buf)?;
-        let buf = self.data.size()?.get().serialize_into(buf)?;
+        let buf = self.data.size()?.align()?.serialize_into(buf)?;
         let buf = self.schema.offset.serialize_into(buf)?;
         let buf = self.data.count().serialize_into(buf)?;
-        // 2. Columnar data buffers
         self.data.serialize_into(buf)
+        // 2. Align to the next 64-bit boundary
+        buf[..Self::ALIGN].fill(u8::MIN);
+        // 3. Serialize columnar data buffers
     }
 
     fn serialize(&self) -> Result<Self::Buffer, Error> {
