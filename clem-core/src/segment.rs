@@ -256,12 +256,14 @@ impl Serialize for Schema {
     }
 
     fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], number::Error> {
-        buf.serialize_push(&{ Variant::Schema as u8 })?;
+        let pad = { Header::SIZE + minicbor::len(self) }.pad()?;
+        let buf = buf.serialize_push(&{ Variant::Schema as u8 })?;
         // NOTE: Self::size returns Error if usize overflows u64 (not expected in production)
         let mut buf = self.size()?.get().to_le_bytes().serialize_into(buf)?;
         // SAFETY: minicbor::encode is infallible when writing to Vec<u8>
         minicbor::encode(self, &mut buf).expect("Infallible encode failed");
-        Ok(buf)
+        buf[..pad].fill(u8::MIN);
+        Ok(&mut buf[pad..])
     }
 
     fn serialize(&self) -> Result<Self::Buffer, number::Error> {
@@ -275,9 +277,45 @@ impl Serialize for Schema {
 
 /* --------------------------------------------------------------------------- Alignment Helpers */
 
-/// Round `n` up to the next multiple of eight; the unit of [critical-field alignment](self).
-pub(crate) const fn align(n: usize) -> usize {
-    (n + 7) & !7
+/// A **numeric type** that can be rounded up to the next 64-bit SIMD [alignment boundary](self).
+#[doc(hidden)] // Reachable through Serialize::serialize_into_aligned
+pub trait Align {
+    /// Round up `self` to the next 64-bit SIMD [alignment boundary](self).
+    ///
+    /// ### Errors
+    ///
+    /// Returns [`number::Error`] if `self` overflows `u64` or conversion into `u64` fails. Refer to
+    /// each implementation for specific error cases.
+    // NOTE: all on-disk sizes and offsets use u64; usize would truncate on 32-bit targets.
+    fn align(self) -> Result<u64, number::Error>;
+
+    /// Calculate the number of trailing zero bytes required to align `self` to the next 64-bit SIMD
+    /// [alignment boundary](self).
+    ///
+    /// ### Errors
+    ///
+    /// Returns [`number::Error`] if `self` overflows `u64` or conversion into `u64` fails. Refer to
+    /// each implementation for specific error cases.
+    fn pad(self) -> Result<usize, number::Error>;
+}
+
+/// Blanket implementation covering all types that fallibly convert to [`u64`], enabling chained
+/// alignment arithmetic such as `sector.next().ok_or(Error::Zero)?.align()?`.
+impl<I> Align for I
+where
+    I: TryInto<u64>,
+    number::Error: From<I::Error>,
+{
+    fn align(self) -> Result<u64, number::Error> {
+        let n: u64 = self.try_into()? + 7;
+        Ok(n & !7)
+    }
+
+    fn pad(self) -> Result<usize, number::Error> {
+        let n: u64 = self.try_into()? & 7;
+        // NOTE: pad ≤ seven bytes; conversion to usize is infallible in practice.
+        { (8 - n) & 7 }.try_into().map_err(number::Error::Convert)
+    }
 }
 
 /* ------------------------------------------------------------------------------ Specific Error */
