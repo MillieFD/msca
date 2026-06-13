@@ -54,9 +54,13 @@
     - [ ] `Query::read` and other supporting functions are no longer async; update documentation.
         - [x] Remove async references from [read-cycle.msd](./doc/read-cycle.md).
         - [ ] Search for other `async` references in existing documentation.
-- [ ] SIMD alignment on all critical data fields.
-    - `align` function already exists (unused) in [segment.rs](./clem-core/src/segment.rs).
-    - Critical fields are described in [simd-alignment.md](./doc/simd-alignment.md).
+- [x] SIMD alignment on all critical data fields.
+    - [x] Remove static `align` fn in favour of `Align` trait; blanket impl over `TryInto<u64>`.
+    - [x] Enhance `Serialize` trait with new `serialize_into_aligned` function.
+    - [x] Enhance `Buffer` trait with new `serialize_push_aligned` function.
+    - [x] Update constants for file header and segment header lengths.
+    - [x] Extend procedural macro to generated and use the new trait alignment functions.
+    - [x] Length prefixes record exact sizes; the read path is unaffected (no phantom rows).
 - [ ] Standardise buffer sector offset is relative to the immutable segment region excluding the file header:
     - [x] Update `Serialize::sector` and `Header::tail` documentation.
     - [ ] Refactor all buffer offset calculations to reflect this change.
