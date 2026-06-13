@@ -46,6 +46,7 @@ use crate::Serialize;
 
 /* ------------------------------------------------------------------------------ Public Exports */
 
+#[rustfmt::skip] // pub exports grouped separately from private imports
 pub use self::variant::Variant;
 
 /// A minimal segment header containing:
