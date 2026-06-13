@@ -374,4 +374,47 @@ where
 /* --------------------------------------------------------------------------------------- Tests */
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+    use super::*;
+
+    /// [`Align::align`] rounds up ↑ to the next multiple of **eight**; idempotent at boundaries.
+    #[test]
+    fn align_rounds_up() {
+        assert_eq!(0u64.align().expect("Align failed"), 0);
+        assert_eq!(1u64.align().expect("Align failed"), 8);
+        assert_eq!(7u64.align().expect("Align failed"), 8);
+        assert_eq!(8u64.align().expect("Align failed"), 8);
+        assert_eq!(9u64.align().expect("Align failed"), 16);
+        assert_eq!(64u64.align().expect("Align failed"), 64);
+    }
+
+    /// [`Align::pad`] counts the number of bytes required to reach the next alignment boundary.
+    #[test]
+    fn pad_counts_bytes() {
+        assert_eq!(0u64.pad().expect("Pad failed"), 0);
+        assert_eq!(1u64.pad().expect("Pad failed"), 7);
+        assert_eq!(8u64.pad().expect("Pad failed"), 0);
+        assert_eq!(14u64.pad().expect("Pad failed"), 2);
+    }
+
+    /// [`Align`] is implemented for types that convert into [`u64`].
+    #[test]
+    fn align_converts() {
+        assert_eq!(7u8.align().expect("Align failed"), 8);
+        assert_eq!(9u32.align().expect("Align failed"), 16);
+        assert_eq!(33usize.align().expect("Align failed"), 40);
+        assert_eq!(NonZeroU64::MIN.align().expect("Align failed"), 8);
+    }
+
+    /// [`Schema`] segments are padded to a multiple of **eight** bytes; keeping `tail` aligned.
+    #[test]
+    fn schema_serialize_pads() {
+        let mut schema = Schema::new("t");
+        schema.column::<u32, _>("v").expect("Column failed");
+        let bytes = schema.serialize().expect("Serialize failed");
+        assert_eq!(bytes.len() % 8, 0);
+        assert_eq!(bytes[0], Variant::Schema as u8);
+        let length = u64::from_le_bytes(bytes[1..9].try_into().expect("Slice is 8 bytes"));
+        assert_eq!(length, bytes.len() as u64); // Length field spans the padded segment
+    }
+}
