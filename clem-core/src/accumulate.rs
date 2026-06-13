@@ -1699,4 +1699,82 @@ mod tests {
         assert_eq!(Accumulate::min(&data), None);
         assert_eq!(Accumulate::max(&data), None);
     }
+
+    /// [`Align::align`] rounds [`size`](Serialize::size) up ↑ to the next 64-bit boundary.
+    #[test]
+    fn aligned_rounds_size() {
+        let data: Vec<u16> = vec![1, 2, 3]; // 8 byte prefix + 6 byte payload
+        let size = data.size().expect("Size failed");
+        assert_eq!(size.get(), 14);
+        assert_eq!(size.align().expect("Align failed"), 16);
+    }
+
+    /// [`Serialize::serialize_into_aligned`] adds zero-bytes up to the next 64-bit boundary.
+    #[test]
+    fn serialize_into_aligned_pads() {
+        let data: Vec<u16> = vec![1, 2, 3];
+        let mut buf = [0xFFu8; 16];
+        let rest = data.serialize_into_aligned(&mut buf).expect("Align failed");
+        assert!(rest.is_empty());
+        assert_eq!(buf[..8], 6u64.to_le_bytes()); // Length prefix excludes padding
+        assert_eq!(buf[14..], [u8::MIN; 2]); // Trailing bytes are zero-filled
+    }
+
+    /// [`OptBitVec`] aligns the data buffer to the boundary following the validity mask.
+    #[test]
+    fn opt_bit_vec_layout() {
+        let mut acc: OptBitVec<u32> = OptBitVec::default();
+        [Some(1u32), None, Some(3)].into_iter().for_each(|v| acc.push(v));
+        let bytes = acc.serialize().expect("Serialize failed");
+        assert_eq!(bytes.len(), 48); // [prefix 8][mask 9 → 16][data 20 → 24]
+        assert_eq!(acc.size().expect("Size failed").get(), 48); // Composite is self-padded
+        assert_eq!(bytes[..8], 40u64.to_le_bytes()); // Outer prefix spans padded interior
+        assert_eq!(bytes[8..16], 1u64.to_le_bytes()); // Mask length prefix records exact size
+        assert_eq!(bytes[16], 0b101); // Mask bits in Lsb0 order
+        assert_eq!(bytes[17..24], [u8::MIN; 7]); // Mask padding bytes are zero-filled
+        assert_eq!(bytes[24..32], 12u64.to_le_bytes()); // Data length prefix records exact size
+        assert_eq!(bytes[32..36], 1u32.to_le_bytes());
+        assert_eq!(bytes[40..44], 3u32.to_le_bytes());
+        assert_eq!(bytes[44..48], [u8::MIN; 4]); // Data padding bytes are zero-filled
+    }
+
+    /// [`Seq`] offsets terminate on the boundary; data follows without intermediate padding.
+    #[test]
+    fn seq_layout() {
+        let mut acc: Seq<u8> = Seq::default();
+        acc.push(vec![97, 98, 99]);
+        acc.push(vec![100, 101]);
+        let bytes = acc.serialize().expect("Serialize failed");
+        assert_eq!(bytes.len(), 48); // [prefix 8][offsets 24][data 13 → 16]
+        assert_eq!(bytes[..8], 40u64.to_le_bytes()); // Outer prefix spans padded interior
+        assert_eq!(bytes[8..16], 16u64.to_le_bytes()); // Offsets length prefix records exact size
+        assert_eq!(bytes[16..24], 4u64.to_le_bytes());
+        assert_eq!(bytes[24..32], 6u64.to_le_bytes());
+        assert_eq!(bytes[32..40], 5u64.to_le_bytes()); // Data length prefix records exact size
+        assert_eq!(bytes[40..45], [97, 98, 99, 100, 101]);
+        assert_eq!(bytes[45..48], [u8::MIN; 3]); // Data padding bytes are zero-filled
+    }
+
+    /// [`Accumulate::buffers`] records exact sector lengths and returns aligned offsets.
+    #[test]
+    fn buffers_align_offsets() {
+        let data: Vec<u16> = vec![1, 2, 3];
+        let mut col = Column::from(u16::with_unfolder::<Schema>());
+        let next = data.buffers(0, &mut std::iter::once(&mut col)).expect("Buffers failed");
+        assert_eq!(next, 16); // Next buffer begins at 64-bit alignment boundary
+        assert_eq!(col.buffers[0].sector.offset, 0);
+        assert_eq!(col.buffers[0].sector.length.get(), 14); // Exact size excludes padding
+    }
+
+    /// [`OptBitVec`] records the data buffer at its aligned offset inside the composite region.
+    #[test]
+    fn opt_bit_vec_buffers_offset() {
+        let mut acc: OptBitVec<u32> = OptBitVec::default();
+        [Some(1u32), None, Some(3)].into_iter().for_each(|v| acc.push(v));
+        let mut col = Column::from(u32::with_unfolder::<Schema>());
+        let next = acc.buffers(0, &mut std::iter::once(&mut col)).expect("Buffers failed");
+        assert_eq!(next, 48); // Aligned end of the composite region
+        assert_eq!(col.buffers[0].sector.offset, 24); // Prefix + padded mask precede the data
+        assert_eq!(col.buffers[0].sector.length.get(), 20); // Exact size excludes padding
+    }
 }
