@@ -97,13 +97,25 @@ pub struct Accumulator<I> {
 }
 
 impl<I> Accumulator<I> {
-    /// Total length of the data segment header in bytes.
+    /// Total length of the data segment header in bytes, including [SIMD alignment](Align) padding.
     ///
     /// Refer to the [`Accumulator`] documentation for more details regarding header layout.
     pub(crate) const HEADER: usize = size_of::<Variant>()
         + size_of::<NonZeroU64>()
         + size_of::<NonZeroU64>()
-        + size_of::<NonZeroU64>();
+        + size_of::<NonZeroU64>()
+        + Self::ALIGN; // align to 64-bit boundary
+
+    /// Number of trailing zero bytes required to pad the data segment [`header`](Self::HEADER) to
+    /// the next 64-bit SIMD [alignment boundary](crate::segment).
+    const ALIGN: usize = {
+        let n = size_of::<Variant>()
+            + size_of::<NonZeroU64>()
+            + size_of::<NonZeroU64>()
+            + size_of::<NonZeroU64>()
+            & 7;
+        (8 - n) & 7
+    };
 }
 
 /* --------------------------------------------------------------------------- Data Accumulators */
