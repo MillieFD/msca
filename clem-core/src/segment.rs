@@ -250,7 +250,7 @@ pub trait Segment: Serialize {
 /// A **numeric type** that can be rounded up to the next 64-bit SIMD [alignment boundary](self).
 #[doc(hidden)] // Reachable through Serialize::serialize_into_aligned
 pub trait Align {
-    /// Round up `self` to the next 64-bit SIMD [alignment boundary](self).
+    /// Round `self` up ↑ to the next 64-bit SIMD [alignment boundary](self).
     ///
     /// ### Errors
     ///
