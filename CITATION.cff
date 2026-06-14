@@ -1,0 +1,22 @@
+# This CITATION.cff file provides machine-readable citation metadata for clem.
+
+cff-version: 1.2.0
+message: If you use this software, please cite it using the metadata from this file.
+
+# See a full list of keys and their definitions at https://citation-file-format.github.io
+
+title: clem
+type: software
+abstract: A high-throughput storage engine for multidimensional analytical data.
+authors:
+  - given-names: Amelia
+    family-names: Fraser-Dale
+    orcid: 'https://orcid.org/0009-0005-1160-1367'
+    affiliation: Imperial College London
+repository-code: 'https://github.com/MillieFD/clem'
+keywords:
+  - data-storage
+  - columnar
+  - analytical-data
+  - edge-computing
+license: BSD-3-Clause
