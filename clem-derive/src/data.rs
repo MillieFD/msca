@@ -198,7 +198,7 @@ fn data(src: &Ident, acc: &Ident, fields: &[Field<'_>]) -> TokenStream {
                 schema: &mut ::clem::Schema,
             ) -> ::core::result::Result<::clem::BoxAcc<#src>, ::clem::schema::Error> {
                 ::core::result::Result::Ok(::std::boxed::Box::new(#acc {
-                    #( #idents: schema.column::<#types, _>(#names)?, )*
+                    #( #idents: schema.column::<#types, &'static str>(#names)?, )*
                 }))
             }
         }
