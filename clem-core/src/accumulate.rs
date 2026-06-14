@@ -367,6 +367,10 @@ pub trait Accumulate: Serialize {
 impl<I> Accumulate for Accumulator<I> {
     type Item = I;
 
+    fn boxed(&self) -> BoxAcc<Self::Item> {
+        self.data.boxed()
+    }
+
     fn push(&mut self, value: Self::Item) {
         self.data.push(value);
     }
@@ -398,6 +402,10 @@ impl<I> Accumulate for Accumulator<I> {
 
 impl Accumulate for BitVec {
     type Item = bool;
+
+    fn boxed(&self) -> BoxAcc<Self::Item> {
+        Box::new(Self::default())
+    }
 
     fn push(&mut self, value: Self::Item) {
         BitVec::push(self, value);
@@ -440,9 +448,13 @@ impl Accumulate for BitVec {
 
 impl<I> Accumulate for Vec<I>
 where
-    I: Serialize + Copy + PartialOrd,
+    I: Serialize + Copy + PartialOrd + 'static,
 {
     type Item = I;
+
+    fn boxed(&self) -> BoxAcc<Self::Item> {
+        Box::new(Self::default())
+    }
 
     fn push(&mut self, value: Self::Item) {
         Vec::push(self, value);
@@ -500,9 +512,13 @@ where
 impl<I> Accumulate for OptInSitu<I>
 where
     Option<I>: Serialize,
-    I: Copy + PartialOrd,
+    I: Copy + PartialOrd + 'static,
 {
     type Item = Option<I>;
+
+    fn boxed(&self) -> BoxAcc<Self::Item> {
+        Box::new(Self::default())
+    }
 
     fn push(&mut self, value: Self::Item) {
         self.data.push(value);
@@ -535,9 +551,13 @@ where
 
 impl<I> Accumulate for OptBitVec<I>
 where
-    I: Unfold + Default,
+    I: Unfold + Default + 'static,
 {
     type Item = Option<I>;
+
+    fn boxed(&self) -> BoxAcc<Self::Item> {
+        Box::new(Self::default())
+    }
 
     fn push(&mut self, value: Self::Item) {
         self.mask.push(value.is_some());
@@ -570,9 +590,13 @@ where
 
 impl<I> Accumulate for Seq<I>
 where
-    I: Unfold,
+    I: Unfold + Default + 'static,
 {
     type Item = Vec<I>;
+
+    fn boxed(&self) -> BoxAcc<Self::Item> {
+        Box::new(Self::default())
+    }
 
     fn push(&mut self, value: Self::Item) {
         // 1. Calculate offset
@@ -609,9 +633,13 @@ where
 
 impl<I> Accumulate for OptSeq<I>
 where
-    I: Unfold,
+    I: Unfold + Default + 'static,
 {
     type Item = Option<Vec<I>>;
+
+    fn boxed(&self) -> BoxAcc<Self::Item> {
+        Box::new(Self::default())
+    }
 
     fn push(&mut self, value: Self::Item) {
         let prev = self.offsets.last().copied().flatten().unwrap_or(NonZeroU64::MIN);
@@ -651,9 +679,13 @@ where
 
 impl<A, B> Accumulate for Flatten<A>
 where
-    A: Accumulate<Item = Option<B>>,
+    A: Accumulate<Item = Option<B>> + Default + Serialize<Buffer = Vec<u8>> + 'static,
 {
     type Item = Option<Option<B>>;
+
+    fn boxed(&self) -> BoxAcc<Self::Item> {
+        Box::new(Self::default())
+    }
 
     fn push(&mut self, value: Self::Item) {
         self.0.push(value.flatten());
