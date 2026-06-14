@@ -22,7 +22,7 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //! further enhanced via domain-specific optimisations.
 //!
 //! Files are organised as a sequence of self-describing **segments** followed by a **manifest** and
-//! optional **metadata**. See the [`FORMAT.md`](FORMAT.md) specification for more details.
+//! optional **metadata**. Refer to `on-disk-format.md` for more details.
 //!
 //! ### Sector vs Segment
 //!
