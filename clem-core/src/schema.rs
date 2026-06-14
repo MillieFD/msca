@@ -148,7 +148,7 @@ impl Schema {
             Entry::Occupied(entry) if entry.get() == &col => entry.into_mut(),
             Entry::Occupied(entry) => return Error::Collision { name: entry.key().clone() }.into(),
         };
-        Ok(A::RawAcc::boxed())
+        Ok(Box::new(A::RawAcc::default()))
     }
 
     /// Consumes [`self`](Schema) and adds to the provided [`file`](File)` `[`manifest`](Manifest).
@@ -312,7 +312,10 @@ impl Type {
     pub const NZI8: Self = Self::Number(Number { kind: number::Kind::NonZeroInt, size: 1 });
 
     /// A [`Number`](Number) descriptor for the [`NonZeroU128`](num::NonZeroU128) type.
-    pub const NZU128: Self = Self::Number(Number { kind: number::Kind::NonZeroUInt, size: 16 });
+    pub const NZU128: Self = Self::Number(Number {
+        kind: number::Kind::NonZeroUInt,
+        size: 16,
+    });
 
     /// A [`Number`](Number) descriptor for the [`NonZeroU16`](num::NonZeroU16) type.
     pub const NZU16: Self = Self::Number(Number { kind: number::Kind::NonZeroUInt, size: 2 });
