@@ -21,6 +21,7 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //! handling in-memory value accumulation.
 
 use std::collections::BTreeMap;
+use std::fmt::{self, Debug};
 use std::num::*;
 use std::ops::Sub;
 
@@ -38,7 +39,6 @@ use crate::Sector;
 /// Shorthand type-erased stack-allocated [pointer](Box) to an [`Accumulate`] trait object backed by
 /// a heap-allocated growable [`Buffer`](Serialize::Buffer).
 // NOTE: Buffer must be a growable Vec; compiler cannot predict the number of accumulated items
-// TODO → Impl Debug + Display + Clone (empty accumulator via Accumulate::boxed).
 pub type BoxAcc<I> = Box<dyn Accumulate<Item = I, Buffer = Vec<u8>>>;
 
 /// Shorthand type-erased [`Iterator`] over mutable [`Column`] descriptors.
@@ -117,6 +117,37 @@ impl<I> Accumulator<I> {
             & 7;
         (8 - n) & 7
     };
+}
+
+/// Returns a new empty [`Accumulator`] for the same [`Schema`][1] and [`Item`](I) type.
+///
+/// Prefer to [`Clone`] an existing valid accumulator to bypass schema lookup and [`Type`][2]
+/// verification compared to [`Dataset::schema`][3].
+///
+/// [1]: manifest::Schema
+/// [2]: crate::schema::Type
+/// [3]: crate::Dataset::schema
+impl<I> Clone for Accumulator<I>
+where
+    I: 'static,
+{
+    fn clone(&self) -> Self {
+        Self {
+            data: self.data.boxed(),
+            name: self.name.clone(),
+            schema: self.schema,
+        }
+    }
+}
+
+impl<I> Debug for Accumulator<I> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Accumulator")
+            .field("item", &std::any::type_name::<I>())
+            .field("name", &self.name)
+            .field("schema", &self.schema)
+            .finish()
+    }
 }
 
 /* --------------------------------------------------------------------------- Data Accumulators */
