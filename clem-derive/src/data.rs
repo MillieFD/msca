@@ -196,7 +196,6 @@ fn data(src: &Ident, acc: &Ident, fields: &[Field<'_>]) -> TokenStream {
         impl ::clem::Data for #src {
             fn accumulator(
                 schema: &mut ::clem::Schema,
-                _name: &'static str,
             ) -> ::core::result::Result<::clem::BoxAcc<#src>, ::clem::schema::Error> {
                 ::core::result::Result::Ok(::std::boxed::Box::new(#acc {
                     #( #idents: schema.column::<#types, _>(#names)?, )*
