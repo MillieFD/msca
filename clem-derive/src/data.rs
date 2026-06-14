@@ -96,6 +96,7 @@ fn accumulator(acc: &Ident, fields: &[Field<'_>]) -> TokenStream {
 
 /// Implement `Accumulate` for the generated [`accumulator`].
 ///
+/// - `boxed` returns a new empty composite accumulator.
 /// - `push` distributes each incoming field across the sub-accumulators.
 /// - `discard` and `buffers` delegate to each sub-accumulator in order.
 /// - `is_empty` and `count` delegate to the first field only.
@@ -109,6 +110,12 @@ fn accumulate(src: &Ident, acc: &Ident, fields: &[Field<'_>]) -> TokenStream {
     quote! {
         impl ::clem::Accumulate for #acc {
             type Item = #src;
+
+            fn boxed(&self) -> ::clem::BoxAcc<#src> {
+                ::std::boxed::Box::new(#acc {
+                    #( #idents: self.#idents.boxed(), )*
+                })
+            }
 
             fn push(&mut self, value: #src) {
                 #( self.#idents.push(value.#idents); )*
@@ -221,6 +228,7 @@ mod tests {
         let code = expand(&input).expect("Expansion failed").to_string();
         assert!(has(&code, "struct RowAccumulator"));
         assert!(has(&code, "impl ::clem::Accumulate for RowAccumulator"));
+        assert!(has(&code, "fn boxed(&self) -> ::clem::BoxAcc<Row>"));
         assert!(has(&code, "impl ::clem::Serialize for RowAccumulator"));
         assert!(has(&code, "impl ::clem::Data for Row"));
     }
