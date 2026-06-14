@@ -502,11 +502,12 @@ where
     }
 }
 
-impl<T> Accumulate for OptInSitu<T>
+impl<I> Accumulate for OptInSitu<I>
 where
-    Option<T>: Serialize + Copy + PartialOrd,
+    Option<I>: Serialize,
+    I: Copy + PartialOrd,
 {
-    type Item = Option<T>;
+    type Item = Option<I>;
 
     fn push(&mut self, value: Self::Item) {
         self.data.push(value);
@@ -537,11 +538,11 @@ where
     }
 }
 
-impl<T> Accumulate for OptBitVec<T>
+impl<I> Accumulate for OptBitVec<I>
 where
-    T: Unfold + Default,
+    I: Unfold + Default,
 {
-    type Item = Option<T>;
+    type Item = Option<I>;
 
     fn push(&mut self, value: Self::Item) {
         self.mask.push(value.is_some());
@@ -572,11 +573,11 @@ where
     }
 }
 
-impl<T> Accumulate for Seq<T>
+impl<I> Accumulate for Seq<I>
 where
-    T: Unfold,
+    I: Unfold,
 {
-    type Item = Vec<T>;
+    type Item = Vec<I>;
 
     fn push(&mut self, value: Self::Item) {
         // 1. Calculate offset
@@ -611,11 +612,11 @@ where
     }
 }
 
-impl<T> Accumulate for OptSeq<T>
+impl<I> Accumulate for OptSeq<I>
 where
-    T: Unfold,
+    I: Unfold,
 {
-    type Item = Option<Vec<T>>;
+    type Item = Option<Vec<I>>;
 
     fn push(&mut self, value: Self::Item) {
         let prev = self.offsets.last().copied().flatten().unwrap_or(NonZeroU64::MIN);
