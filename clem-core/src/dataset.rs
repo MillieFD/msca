@@ -59,7 +59,7 @@ impl Dataset {
     ///
     /// Returns [`Error::Zero`] if a `u64` overflow occurs while calculating `size` or `offset` for
     /// the relevant file regions.
-    pub async fn new<P>(path: P) -> Result<Self, Error>
+    pub async fn new<P>(path: P) -> Result<Self, io::Error>
     where
         P: AsRef<Path>,
     {
@@ -85,7 +85,7 @@ impl Dataset {
     ///
     /// Returns [`Error::Zero`] if a `u64` overflow occurs while calculating `size` or `offset` for
     /// the relevant file regions.
-    pub async fn open<P>(path: P) -> Result<Self, Error>
+    pub async fn open<P>(path: P) -> Result<Self, io::Error>
     where
         P: AsRef<Path>,
     {
@@ -98,16 +98,15 @@ impl Dataset {
     ///
     /// The query begins with **every** column and **every** buffer from the specified schema.
     /// [`Filter`] functions are applied subtractively to reduce the result set. No file
-    /// [`IO`][2] occurs until the query is executed via [`Query::read`] or [`Query::column`].
+    /// [`IO`](io) occurs until the query is executed via [`Query::read`] or [`Query::column`].
     ///
     /// ### Errors
     ///
     /// Returns [`Error::Query`] wrapping [`query::Error::Column`] if the requested `name` is not
-    /// found in the [`Manifest`][3].
+    /// found in the [`Manifest`][2].
     ///
     /// [1]: crate::manifest::Schema
-    /// [2]: crate::io
-    /// [3]: crate::manifest::Manifest
+    /// [2]: crate::manifest::Manifest
     pub fn query(&self, name: &str) -> Result<Query, query::Error> {
         let columns = self
             .file
