@@ -119,7 +119,8 @@ impl From<io::Error> for Error {
         match error {
             io::Error::Number(e) => Self::Number(e),
             io::Error::Slice(e) => Self::Slice(e),
-            other => Self::Io(other), // Some variants do not map to specific error types
+            io::Error::Schema(e) => Self::Schema(e),
+            other => Self::Io(other),
         }
     }
 }
@@ -138,7 +139,10 @@ impl From<query::Error> for Error {
 
 impl From<schema::Error> for Error {
     fn from(error: schema::Error) -> Self {
-        Self::Schema(error)
+        match error {
+            schema::Error::Number(e) => Self::Number(e),
+            other => Self::Schema(other),
+        }
     }
 }
 

@@ -504,6 +504,8 @@ pub enum Error {
     Magic,
     /// Underlying [`Error`](number::Error) from a numerical operation or conversion.
     Number(number::Error),
+    /// Underlying [`Error`](schema::Error) from schema registration or validation.
+    Schema(schema::Error),
     /// Underlying [`TryFromSliceError`] while parsing a slice into a fixed-size array.
     Slice(TryFromSliceError),
     /// A read operation attempted to access bytes beyond the end of the input slice.
@@ -547,6 +549,7 @@ impl fmt::Display for Error {
             Self::Io(e) => write!(f, "File IO error → {e}"),
             Self::Magic => f.write_str("File is not a valid clem dataset"),
             Self::Number(e) => write!(f, "Number error → {e}"),
+            Self::Schema(e) => write!(f, "Schema error → {e}"),
             Self::Slice(e) => write!(f, "Try from slice error → {e}"),
             Self::Truncated { .. } => write!(f, "Read was truncated → {self:?}"),
             Self::Utf8(e) => write!(f, "Invalid UTF8 scalar value → {e}"),
@@ -584,6 +587,15 @@ impl From<minicbor::decode::Error> for Error {
 impl From<number::Error> for Error {
     fn from(e: number::Error) -> Self {
         Self::Number(e)
+    }
+}
+
+impl From<schema::Error> for Error {
+    fn from(e: schema::Error) -> Self {
+        match e {
+            schema::Error::Number(err) => Self::Number(err),
+            other => Self::Schema(other),
+        }
     }
 }
 
