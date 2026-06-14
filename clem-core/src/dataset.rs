@@ -24,7 +24,7 @@ use memmap2::Mmap;
 
 use crate::io::File;
 use crate::query::{self, Query};
-use crate::Error;
+use crate::{io, schema, Accumulate, Accumulator, Data, Schema};
 
 /* ------------------------------------------------------------------------------ Public Exports */
 
@@ -94,6 +94,29 @@ impl Dataset {
         Ok(Self { file, mmap })
     }
 
+    /// Register the [`Schema`] for [`I`] under `name` and return an empty [`Accumulator`].
+    ///
+    /// No file [`IO`](io) occurs until the accumulated data is [written](Self::write) to disk.
+    ///
+    /// ### Errors
+    ///
+    /// Returns [`Error::Collision`][1] if a schema is already registered with the requested `name`
+    /// but an incompatible column layout.
+    ///
+    /// [1]: schema::Error::Collision
+    pub fn schema<I>(&mut self, name: &str) -> Result<Accumulator<I>, schema::Error>
+    where
+        I: Data,
+    {
+        let mut schema = Schema::new(name);
+        let boxed = I::accumulator(&mut schema)?;
+        let sector = schema.finish(&mut self.file)?.sector;
+        Ok(Accumulator {
+            data: boxed,
+            name: name.to_string(),
+            schema: sector,
+        })
+    }
     /// Initialise a new [`Query`] over the named [`Schema`][1].
     ///
     /// The query begins with **every** column and **every** buffer from the specified schema.
