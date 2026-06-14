@@ -325,12 +325,7 @@ pub trait Accumulate: Serialize {
 
     /// Returns a new empty instance of [`Self`] boxed as a [`BoxAcc`] trait object.
     // NOTE: Buffer must be a growable Vec; compiler cannot predict the number of accumulated items
-    fn boxed() -> BoxAcc<Self::Item>
-    where
-        Self: Default + Serialize<Buffer = Vec<u8>> + 'static,
-    {
-        Box::new(Self::default())
-    }
+    fn boxed(&self) -> BoxAcc<Self::Item>;
 
     /// Append an [`Item`](Self::Item) to the [accumulator](Self)
     fn push(&mut self, value: Self::Item);
