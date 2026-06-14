@@ -62,7 +62,7 @@ pub trait Data: Sized {
     /// Returns [`schema::Error`] if a field name collides with an incompatible existing column.
     ///
     /// [1]: Serialize::Buffer
-    fn accumulator(schema: &mut Schema, name: &'static str) -> Result<BoxAcc<Self>, schema::Error>;
+    fn accumulator(schema: &mut Schema) -> Result<BoxAcc<Self>, schema::Error>;
 }
 
 /* ---------------------------------------------------------------- NonZeroUInt Trait Definition */
