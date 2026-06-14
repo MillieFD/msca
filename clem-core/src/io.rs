@@ -432,11 +432,11 @@ impl File {
     /// - Only the immutable segment region is mapped
     ///
     /// The [`Arc`][2]`<`[`Mmap`](Mmap)`>` is updated after each [write-cycle](self) to include the
-    /// newly appended segment. New readers must await a [read lock](RwLock) on the [dataset][3]
-    /// before cloning the [`Arc`][2]. Existing mmaps are released only when their reference count
-    /// drops to zero. In-flight reader mmaps remain valid because existing segments are unaltered.
-    /// Buffer [`Sector`] offsets are recorded relative to the immutable segment region and index
-    /// the [`Mmap`] directly; no runtime offset arithmetic.
+    /// newly appended segment. New readers [`Clone`] the [`Arc`][2] to increment its reference
+    /// count. Existing mmaps are released only when their reference count drops to zero; in-flight
+    /// reader mmaps remain valid because existing segments are never altered. Buffer [`Sector`]
+    /// offsets are recorded relative to the immutable segment region and index the [`Mmap`]
+    /// directly; no runtime offset arithmetic.
     ///
     /// Refer to the [memmap](memmap2) crate for more details.
     ///
