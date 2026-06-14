@@ -41,7 +41,7 @@ use std::num::NonZeroU64;
 use minicbor::{CborLen, Decode, Encode};
 
 use crate::accumulate::Buffer;
-use crate::schema::{number, Schema};
+use crate::schema::number;
 use crate::Serialize;
 
 /* ------------------------------------------------------------------------------ Public Exports */
@@ -346,6 +346,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::schema::Schema;
 
     /// [`Align::align`] rounds up ↑ to the next multiple of **eight**; idempotent at boundaries.
     #[test]
