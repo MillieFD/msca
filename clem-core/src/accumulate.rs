@@ -306,6 +306,15 @@ where
 #[doc(hidden)]
 pub struct Flatten<T>(#[n(0)] pub T);
 
+impl<A, B> From<A> for Flatten<A>
+where
+    A: Accumulate<Item = Option<B>>,
+{
+    fn from(value: A) -> Self {
+        Self(value)
+    }
+}
+
 /* ----------------------------------------------------------------- Accumulate Trait Definition */
 
 /// An in-memory **data accumulator** that ingests values of the specified [`type`](Self::Item) and
@@ -668,15 +677,6 @@ where
 
     fn buffers(&self, offset: u64, columns: &mut Columns) -> Result<u64, Error> {
         self.0.buffers(offset, columns)
-    }
-}
-
-impl<A, B> From<A> for Flatten<A>
-where
-    A: Accumulate<Item = Option<B>>,
-{
-    fn from(value: A) -> Self {
-        Self(value)
     }
 }
 
