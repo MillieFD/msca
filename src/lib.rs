@@ -91,7 +91,7 @@ mod tests {
     #[test]
     fn derive_data_accumulates() {
         let mut schema = Schema::new("readings");
-        let mut acc = Reading::accumulator(&mut schema, "readings").expect("accumulator failed");
+        let mut acc = Reading::accumulator(&mut schema).expect("accumulator failed");
         assert!(acc.is_empty());
         acc.push(Reading {
             sensor: 1,
