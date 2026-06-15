@@ -153,6 +153,7 @@
             - [ ] Initialised via `Dataset::index`.
         - [ ] Duplicate items are allowed; uniqueness is not guaranteed.
         - [ ] Stored using the manifest `schemas` field; no new manifest machinery or segment types.
+- [ ] Expand `#[derive(Data)]` to support enums.
 - [ ] Fix `serde` crate feature; requires `bitvec` dependency `serde` feature.
 - [ ] Add support for free-form metadata written after the manifest. Feature-gated. Ignored if the feature is disabled.
 - [ ] Add `bin` segment variant for immutable binary data in any format (e.g. TOML); add manifest `bins` field.
