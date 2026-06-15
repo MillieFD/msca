@@ -1,6 +1,5 @@
 ### Foundational Functionality (Priority I)
 
-- [ ] Implement `dictionary` and `index` abstractions without adding new segment types.
 - [ ] Add a query builder with an async file reader.
     - [x] New query instance via `Dataset::query(&self, name: &str) -> Result<Query, Error>`:
         - [x] Add `query::Column` struct which holds buffers and filters.
