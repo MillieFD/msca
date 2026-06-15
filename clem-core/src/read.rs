@@ -404,6 +404,22 @@ mod tests {
         assert_eq!(drain(u32::boxed(ctx)), vec![20, 30]);
     }
 
+    /// A [`Filter`] disjoint from every item returns an empty result set.
+    #[test]
+    fn disjoint_filter_excludes_all() {
+        let data: Vec<u32> = vec![10, 20, 30];
+        let bytes = data.serialize().expect("Serialize failed");
+        let mmap = map(&bytes);
+        let buffers = vec![buffer(0, bytes.len() as u64, 3)];
+        let filters = HashSet::from([Filter::bounds(&(100u32..200))]);
+        let ctx = Column {
+            buffers: buffers.iter(),
+            mmap: &mmap,
+            filters: &filters,
+        };
+        assert!(drain(u32::boxed(ctx)).is_empty());
+    }
+
     #[test]
     fn bits_round_trip() {
         let data: BitVec = [true, false, true, true].into_iter().collect();
