@@ -79,9 +79,9 @@ use static_assertions::{assert_eq_size, const_assert_ne};
 
 use self::number::Number;
 use crate::accumulate::{Accumulate, BoxAcc, Buffer, Flatten, OptBitVec, OptInSitu, OptSeq, Seq};
-use crate::io::{File, Write};
+use crate::io::{self, Write};
 use crate::segment::Variant;
-use crate::{manifest, Align, Serialize};
+use crate::{manifest, Align, Dataset, Sector, Serialize};
 
 /* ------------------------------------------------------------------------------ Public Exports */
 
@@ -151,22 +151,32 @@ impl Schema {
         Ok(Box::new(A::RawAcc::default()))
     }
 
-    /// Consumes [`self`](Schema) and adds to the provided [`file`](File)` `[`manifest`](Manifest).
+    /// [`Write`](Write) [`self`](Schema) to the provided [`File`](io::File) and return the on-disk
+    /// schema segment [`Sector`].
     ///
-    /// Resolves name conflicts by comparing the new and existing schema definitions; returning
-    /// [`Ok`] if the underlying definitions are identical (deduplication) or [`Error::Collision`]
-    /// if the underlying definitions differ.
+    /// ### Deduplication
     ///
-    /// Returns an immutable reference to the inserted or existing [`manifest::Schema`] on success.
-    // TODO → Impl Push<Schema> for Manifest. Then finish can delegate to file.manifest.push(self)
-    pub(crate) fn finish(self, file: &mut File) -> Result<&manifest::Schema, Error> {
-        let sector = self.sector(&file.header)?;
-        let columns = self.columns.into_iter().map(Schema::map).collect();
-        match file.manifest.schemas.entry(self.name) {
-            Entry::Vacant(entry) => Ok(&*entry.insert(manifest::Schema { columns, sector })),
-            Entry::Occupied(entry) if entry.get().columns == columns => Ok(&*entry.into_mut()),
-            Entry::Occupied(entry) => Error::Collision { name: entry.key().clone() }.into(),
-        }
+    /// Name conflicts are resolved by comparing the new and existing column layouts; returning the
+    /// existing [`Sector`] without file [`IO`](io) if both underlying definitions are identical or
+    /// [`Error::Collision`] if the underlying definitions differ. New schemas are written eagerly
+    /// to disk.
+    ///
+    /// ### Errors
+    ///
+    /// - [`Error::Collision`] if a different schema is already registered with the requested `name`
+    /// - [`io::Error::Io`] if the underlying [write-cycle](io) fails.
+    /// - [`io::Error::Number`] if the [aligned](Align) [size](Serialize::size) overflows `u64`.
+    pub(crate) async fn finish(self, dataset: &mut Dataset) -> Result<Sector, io::Error> {
+        let sector = self.sector(&dataset.file.header)?;
+        let columns = self.columns.iter().map(Schema::map).collect();
+        let name = self.name.clone();
+        match dataset.file.manifest.schemas.entry(name) {
+            Entry::Vacant(e) => e.insert(manifest::Schema { columns, sector }),
+            Entry::Occupied(e) if e.get().columns == columns => return Ok(e.get().sector),
+            Entry::Occupied(e) => return Error::Collision { name: e.key().clone() }.into(),
+        };
+        dataset.mmap = dataset.file.write(self, &sector).await?.into();
+        Ok(sector)
     }
 
     /// Map the provided [`Key`](String) to a new empty [`manifest::Column`]
