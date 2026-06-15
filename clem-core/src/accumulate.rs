@@ -1725,6 +1725,16 @@ mod tests {
         assert_eq!(Accumulate::max(&data), Some(3.0));
     }
 
+    /// [`Accumulate::discard`] empties the buffer and resets [`Accumulate::count`] to zero.
+    #[test]
+    fn accumulate_discard_resets_count() {
+        let mut data = vec![1, 2, 3];
+        assert_eq!(Accumulate::count(&data), 3);
+        data.discard();
+        assert!(Accumulate::is_empty(&data));
+        assert_eq!(Accumulate::count(&data), 0);
+    }
+
     /// [`Accumulate::min`] and [`Accumulate::max`] return [`Some`] for populated [`BitVec`].
     #[test]
     fn bit_vec_min_max() {
