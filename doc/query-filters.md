@@ -97,29 +97,27 @@ Sample every nth row from the result set. Useful for decimation and preview read
 
 ##### Execution and Output
 
-`.read().await` executes the query and returns a lazy async zero-copy batched reader. Each call to `.next().await`
-yields one deserialized row; no row is deserialized before being requested. The reader chains across segments
-transparently, meaning callers observe a flat sequence regardless of the underlying segment structure.
+`.read()?` executes the query and returns a lazy zero-copy `Iterator` with each call to `.next()` yielding one
+deserialized item. No items are deserialized before being requested. The reader chains across segments transparently,
+meaning callers observe a flat sequence regardless of the underlying segment structure.
 
 ```rust,ignore
-let mut cursor = dataset
-.query("schema_name")
-.select(["latitude", "longitude"])
-.range("altitude", 0.0..=1000.0)
-.read()
-.await?;
-while let Some(row) = cursor.next().await { process(row?); }
+let cursor = dataset
+    .query("schema_name")?
+    .select(["latitude", "longitude"])
+    .range("altitude", 0.0..=1000.0)?
+    .read()?;
+for row in cursor { process(row?); }
 ```
 
-A `.collect().await` convenience method collects the full result into an owned `Vec` for callers that require random
+A `.collect::<I>()` convenience method drains the full result into an owned `Vec<I>` for callers that require random
 access over the result set.
 
 ```rust,ignore
-let result: Vec<R> = dataset
-.query("schema_name")
-.eq("active", true)
-.collect()
-.await?;
+let result: Vec<I> = dataset
+    .query("schema_name")?
+    .eq("active", true)?
+    .collect()?;
 ```
 
 ##### Evaluation Order
@@ -132,9 +130,9 @@ Filters are evaluated in two stages to minimise IO:
 | During IO | Single Row    | Evaluate remaining predicates row-by-row during binary decode.          |
 
 Filters that can be fully satisfied by manifest statistics never cause unnecessary file IO. Filters that require
-individual row values are combined and lazily evaluated during iteration; each `.next().await` applies stage-two filters
-until the next matching row is found or the result set is exhausted. This design minimises file IO by ensuring a single
-pass across the candidate segments.
+individual row values are combined and lazily evaluated during iteration; each `.next()` applies stage-two filters until
+the next matching row is found or the result set is exhausted. This design minimises file IO by ensuring a single pass
+across the candidate segments.
 
 ##### Filter Summary
 
