@@ -17,7 +17,7 @@ use std::ops::RangeBounds;
 use minicbor::{CborLen, Decode, Encode};
 use smol::io::{AsyncRead, AsyncReadExt, AsyncSeek};
 
-use crate::io::{Header, Push, Write};
+use crate::io::{Header, Write};
 use crate::schema::number::Error;
 use crate::schema::Type;
 use crate::{io, Deserialize, Sector, Serialize};
