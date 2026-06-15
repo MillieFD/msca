@@ -50,9 +50,11 @@
     - [x] Fix inverted buffer pruning in `Query::range`; overlapping buffers are retained, disjoint buffers removed.
     - [ ] Implement optional and unsized readers: `OptBitVec` + `OptInSitu` + `Seq` + `OptSeq` + `Flatten`
     - [ ] Add remaining query filters: `eq` + `one_of` + `none_of` + `is_some` + `is_none` + `mask` + `limit` + `offset`
-    - [ ] `Query::read` and other supporting functions are no longer async; update documentation.
-        - [x] Remove async references from [read-cycle.msd](./doc/read-cycle.md).
-        - [ ] Search for other `async` references in existing documentation.
+    - [x] `Query::read` and `Query::collect` are no longer async; update documentation.
+        - [x] Remove async references from [read-cycle.md](./doc/read-cycle.md).
+        - [x] Remove async references from [query-filters.md](./doc/query-filters.md).
+        - [x] Remove async references from [query-joins.md](./doc/query-joins.md).
+        - Write path remains async e.g. `Dataset::write` and `Dataset::schema` because they perform file IO.
 - [x] SIMD alignment on all critical data fields.
     - [x] Remove static `align` fn in favour of `Align` trait; blanket impl over `TryInto<u64>`.
     - [x] Enhance `Serialize` trait with new `serialize_into_aligned` function.
