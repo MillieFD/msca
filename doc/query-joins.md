@@ -12,7 +12,7 @@ Retain only rows where the key is present in both legs.
 ```rust,ignore
 let readings = dataset.query("readings").select(["time", "sensor", "value"]).range("value", 10.0..=20.0);
 let sensors = dataset.query("sensors").select(["id", "location"]);
-let result = readings.join(sensors, "sensor", "id").read().await?
+let result = readings.join(sensors, "sensor", "id").read()?
 ```
 
 ##### Semi-Join
@@ -48,21 +48,20 @@ filtered or joined.
 
 ```rust,ignore
 let result = dataset
-.query("measurements")
-.range("time", t0..t1)
-.join(
-dataset.query("sensors").eq("online", true),
-"sensor_id",
-"sensor_id",
-)
-.join(
-dataset.query("locations_dictionary").select(["id", "region", "timezone"]),
-"sensor_id",
-"id",
-)
-.select(["time", "value", "region"])
-.read()
-.await?
+    .query("measurements")
+    .range("time", t0..t1)
+    .join(
+        dataset.query("sensors").eq("online", true),
+        "sensor_id",
+        "sensor_id",
+    )
+    .join(
+        dataset.query("locations_dictionary").select(["id", "region", "timezone"]),
+        "sensor_id",
+        "id",
+    )
+    .select(["time", "value", "region"])
+    .read()?
 ```
 
 Filters after a join apply to the combined output. Filters before a join apply only to the calling `Query` instance.
