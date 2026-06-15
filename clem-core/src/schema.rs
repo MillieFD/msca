@@ -170,8 +170,10 @@ impl Schema {
     }
 
     /// Map the provided [`Key`](String) to a new empty [`manifest::Column`]
-    fn map(entry: (String, Column)) -> (String, manifest::Column) {
-        (entry.0, entry.1.ty.into())
+    fn map(entry: (&String, &Column)) -> (String, manifest::Column) {
+        let name = entry.0.clone();
+        let column = entry.1.ty.clone().into();
+        (name, column)
     }
 }
 
