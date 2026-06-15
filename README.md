@@ -7,3 +7,7 @@
 ### Citation
 
 Please cite `clem` in your academic work using the provided [`citation`](CITATION.cff) metadata.
+
+### License
+
+Licensed under the [BSD 3-Clause Licence](LICENSE). Copyright © 2026 Amelia Fraser-Dale.
