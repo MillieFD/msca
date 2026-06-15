@@ -15,7 +15,7 @@ applications. Implementers can enhance the minimal high-performance core library
 
 ### Citation
 
-Please cite `clem` in your academic work using the provided [`citation`](CITATION.cff) metadata.
+Please cite `clem` in your academic work using the provided [citation](CITATION.cff) metadata.
 
 ### License
 
