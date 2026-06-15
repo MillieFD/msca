@@ -97,11 +97,6 @@ impl Manifest {
     pub fn rebuild(data: &[u8], tail: NonZeroU64) -> Self {
         unimplemented!("Manifest::rebuild is not yet implemented")
     }
-
-    /// Build a descriptor for the provided [`Segment`](S) and register to the [`Manifest`].
-    pub fn push<S: Push>(&mut self, seg: &S, sec: Sector) -> Result<Sector, Error> {
-        S::push_to_manifest(seg, self, sec)
-    }
 }
 
 /// [`Write`] [`Context`](Write::Ctx) for the [`Manifest`]; carries the file [`Header`] and
