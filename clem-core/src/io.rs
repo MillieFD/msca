@@ -918,7 +918,7 @@ pub(crate) trait Write: Serialize {
     /// Returns the written [`Sector`] for subsequent function chaining.
     async fn write_to_file<F>(&self, file: &mut F, ctx: Self::Ctx<'_>) -> Result<Sector, Error>
     where
-        F: AsyncSeek + AsyncWrite + Unpin + ?Sized,
+        F: AsyncSeek + AsyncWrite + Unpin,
     {
         let sector = self.sector(ctx)?;
         sector.seek_to_start(file).await?;
