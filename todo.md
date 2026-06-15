@@ -98,10 +98,10 @@
 - [x] Add a `CITATION.cff` file (CFF 1.2.0; author Amelia Fraser-Dale, ORCID 0009-0005-1160-1367, BSD-3-Clause).
 - [ ] Add [on-disk-format.md](./doc/on-disk-format.md) describing the on-disk layout in detail; include ASCI diagrams.
 - [ ] Search for discrepancies between [doc](./doc) and actual implementations. Update documentation as needed.
-- [ ] Full test coverage:
-    - [ ] Add comprehensive unit tests for core functionalities in each module; cover edge cases.
-    - [ ] Add round-trip integration tests for `#[derive(Data)]` and `#[derive(Read)]` in "tests" directory.
-    - [ ] Remove all round-trip tests from `clem-core` and `clem-derive` crates; move to "tests" directory.
+- [x] Full test coverage:
+    - [x] Add comprehensive unit tests for core functionalities in each module; cover edge cases.
+    - [x] Add round-trip integration tests for `#[derive(Data)]` and `#[derive(Read)]` in "tests" directory.
+    - [x] Remove all round-trip tests from `clem-core` and `clem-derive` crates; move to "tests" directory.
 - [x] Remove all references to concurrency model `RwLock<Manifest>` in documentation; concurrency is deferred.
 
 ### Extend Functionality (Priority III)
