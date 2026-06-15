@@ -80,6 +80,10 @@
 ### Path to Prototype (Priority II)
 
 - [ ] Design public `Dataset` API with quality-of-life improvements and documentation.
+    - [x] Add `Dataset::create` and `Dataset::open` to manage the underlying file.
+    - [x] Add `Dataset::schema` to register a schema and return an empty `Accumulator`.
+    - [x] Add `Dataset::write` to commit one data segment.
+    - [x] Implement `Clone` for `Accumulator` to bypass schema and type revalidation.
 - [ ] Finish `clem-core` root module (lib) to re-export public API. Check all visibility modifiers.
 - [x] Finalise `clem-derive` procedural macro design.
 - [ ] Add `README.md` including:
