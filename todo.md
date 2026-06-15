@@ -154,7 +154,13 @@
             - [ ] Initialised via `Dataset::index`.
         - [ ] Duplicate items are allowed; uniqueness is not guaranteed.
         - [ ] Stored using the manifest `schemas` field; no new manifest machinery or segment types.
-- [ ] Expand `#[derive(Data)]` to support enums.
+- [ ] Support compact encoding for buffers with a single repeated value e.g. all `true` or all `None`.
+    - [ ] Compact buffers on-disk are indicated by a `count` of one in the buffer header.
+    - Breaks the current assumption that all buffers in a data segment contain the same number of items.
+    - [ ] Refactor `manifest::Buffer` struct into enum:
+        - [ ] Current buffer becomes `Buffer::Full` variant with fields.
+        - [ ] Add `Buffer::Lite` variant with a single `item: [u8; B]` field containing the single serialized value.
+    - [ ] Query readers can deserialize directly from `Buffer::Lite` without file IO.
 - [ ] Fix `serde` crate feature; requires `bitvec` dependency `serde` feature.
 - [ ] Add support for free-form metadata written after the manifest. Feature-gated. Ignored if the feature is disabled.
 - [ ] Add `bin` segment variant for immutable binary data in any format (e.g. TOML); add manifest `bins` field.
