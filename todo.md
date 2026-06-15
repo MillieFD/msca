@@ -89,7 +89,7 @@
 - [x] Finalise `clem-derive` procedural macro design.
 - [x] Add `README.md` including:
     - [x] What is clem; high-level overview with a link to [on-disk-format.md](./doc/on-disk-format.md) for details.
-    - [ ] Cite clem in academic work; link to `CITATION.cff` file and instructions for citing the crate.
+    - [x] Cite clem in academic work; link to `CITATION.cff` file and instructions for citing the crate.
     - [ ] Why use clem; motivation and design goals.
     - [ ] When to use clem; ideal use-cases and comparison to alternatives e.g. Apache Parquet or SQL databases.
     - [ ] How to use clem; installation instructions and basic usage examples for writing and reading data.
@@ -122,11 +122,11 @@
         - [ ] All lookup and insertion operations use existing `query` and `write` machinery; no new segment types.
         - [ ] Add feature-gated `sets` field to the manifest:
             - [ ] Sets are not duplicated in the manifest `schemas` field.
-            - [ ] CBOR encoding ignores on-disk `sets` field if the feature is disabled.
+            - [ ] CBOR decoding ignores on-disk `sets` field if present when the feature is disabled.
+            - [ ] CBOR encoding adds on-disk `sets` field if absent when the feature is enabled.
         - [ ] Order is not guaranteed; sorting would require mutation of existing segments (explicitly disallowed).
     - [ ] Add feature-gated `Map` abstraction to amortise the cost of large repetitive values:
         - [ ] Shape described by `schema` segment, entries (keys + items) stored in `data` segments.
-        - [ ] Key type must be single-column fixed-sized primitive for fast lookups; value types can be composite.
         - [ ] Key uniqueness guaranteed across all data segments.
         - [ ] Abstraction coordinated via the `Map` struct:
             - [ ] Contains an `Accumulator` to store new entries and an `Arc<Mmap>` to read existing entries.
@@ -144,9 +144,11 @@
         - [ ] All lookup and insertion operations use existing `query` and `write` machinery; no new segment types.
         - [ ] Add feature-gated `maps` field to the manifest:
             - [ ] Maps are not duplicated in the manifest `schemas` field.
-            - [ ] CBOR encoding ignores on-disk `maps` field if the feature is disabled.
+            - [ ] CBOR decoding ignores on-disk `maps` field if present when the feature is disabled.
+            - [ ] CBOR encoding adds on-disk `maps` field if absent when the feature is enabled.
         - [ ] Order is not guaranteed; sorting would require mutation of existing segments (explicitly disallowed).
     - [ ] Add feature-gated `Index` abstraction for items sorted by insertion order:
+        - [ ] Insertion index is calculated across all data segments corresponding to the specified schema.
         - [ ] Shape described by `schema` segment, items stored in `data` segments.
         - [ ] Abstraction coordinated via the `Index` struct:
             - [ ] Contains an `Accumulator` to store new entries.
@@ -161,9 +163,12 @@
         - [ ] Current buffer becomes `Buffer::Full` variant with fields.
         - [ ] Add `Buffer::Lite` variant with a single `item: [u8; B]` field containing the single serialized value.
     - [ ] Query readers can deserialize directly from `Buffer::Lite` without file IO.
-- [ ] Fix `serde` crate feature; requires `bitvec` dependency `serde` feature.
-- [ ] Add support for free-form metadata written after the manifest. Feature-gated. Ignored if the feature is disabled.
-- [ ] Add `bin` segment variant for immutable binary data in any format (e.g. TOML); add manifest `bins` field.
+- [ ] Fix `serde` crate feature; requires `bitvec` dependency to activate the `serde` feature.
+- [ ] Add feature-gated free-form metadata binary blob written after the manifest.
+    - [ ] CBOR decoding ignores on-disk `metadata: Sector` field if present when the feature is disabled.
+    - [ ] CBOR encoding adds on-disk `metadata: Sector` field if absent when the feature is enabled.
+- [ ] Add `bin` segment variant for immutable binary data in any format (e.g. TOML):
+    - [ ] Add manifest `bins: BTreeSet<String, Sector>` field.
 - [ ] Implement logging macros gated via the `log` feature.
 
 ### Crate Features (Priority IV)
