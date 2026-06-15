@@ -3,21 +3,19 @@
 The read cycle is built upon two complementary principles:
 
 1. **Manifest-driven random access** with predicate pruning to minimise unnecessary IO.
-2. **Granular cooperative locking** to operate **multiple** parallel readers concurrently alongside up to **one** active
-   writer without contention.
+2. **Lazy zero-copy streaming** directly from an immutable memory-mapped segment region.
 
 Reading data from the file – across an arbitrary number of segments – requires up to three phases:
 
 ##### Phase 1: Manifest Resolution
 
-The `Dataset` contains a `RwLock<Manifest>` field which is lazily initialised from disk on first access by:
+The `Dataset` holds an in-memory `Manifest` deserialized from disk when the file is opened:
 
-1. Reading the file header to determine manifest `offset` and `length`.
-2. Deserializing the on-disk CBOR manifest into an in-memory `Manifest` instance.
-3. Downgrading access to read guard to minimise contention.
+1. Read the file header to determine the manifest `offset` and `length`.
+2. Deserialize the on-disk CBOR manifest into an in-memory `Manifest` instance.
 
-All `write` operations update the manifest in-memory before commiting to disk. All subsequent `read` operations acquire
-a shared read guard and return the manifest immediately without any file IO.
+All `write` operations update the in-memory manifest before committing it to disk, enabling subsequent `read` operations
+to resolve the manifest immediately without any additional file IO.
 
 ##### Phase 2: Segment Pruning
 
@@ -34,27 +32,26 @@ query.min > buffer.max  →  All values in segment are below the query range
 query.max < buffer.min  →  All values in segment are above the query range
 ```
 
-After pruning, the shared manifest read guard is released and the retained segments are passed to phase three.
+After pruning, the immutable manifest borrow is released and the retained segments are passed to phase three.
 
 ##### Phase 3: Lazy Zero-Copy Reads
 
 Candidate segments are packaged into a lazy zero-copy reader that chains across sectors, presenting a flattened stream
-of deserialized rows to the caller. Internally, the reader is batched to reduce syscall overhead; returning one row each
-time `next` is called and only executing batched file IO when the internal buffer is exhausted.
+of deserialized items to the caller. The reader pulls bytes directly from the read-only memory map and returns one item
+each time `next` is called; no item is deserialized before being requested.
 
-##### Concurrency Model
+##### Immutable Segments
 
-Segments are immutable once written, meaning readers do not require coordination after extracting their list of
-candidate segments in phase two. A concurrent writer appending a new segment must acquire an exclusive write-guard to
-update the manifest and file header. This temporarily blocks new readers from accessing the manifest, but does not
-affect in-flight reads.
+Segments are immutable once written. A reader extracts its list of candidate segments during phase two and then
+deserializes directly from the read-only memory map; segment data regions are never mutated in place. New data is always
+appended as additional segments, leaving existing segments – and any in-flight reads over them – untouched.
 
-| Operation                              | Lock mode   | Duration                                   |
-|----------------------------------------|-------------|--------------------------------------------|
-| First manifest load                    | Write       | File header read + CBOR decode.            |
-| Subsequent manifest access (all reads) | Shared read | Extracting the list of candidate segments. |
-| Writer updating header + manifest      | Write       | Phases 2 and 4 of the write cycle only.    |
-| Reading segment data from disk         | **None**    | Segments are immutable; no lock required.  |
+| Operation                                       | Access    | Duration                         |
+|-------------------------------------------------|-----------|----------------------------------|
+| Manifest deserialization during `Dataset::open` | Mutable   | File header read + CBOR decode.  |
+| Resolving candidates during `Dataset::query`    | Immutable | Schema lookup + Columns copy.    |
+| Writer updating in-memory manifest              | Mutable   | Phase 1 of the write cycle only. |
+| Reading segment data from disk                  | **None**  | No manifest access required.     |
 
 This design ensures:
 
