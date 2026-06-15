@@ -49,6 +49,7 @@
         - [x] `Query::read::<I>` reads the composite stream for `I`; mirrors `Data::accumulator`.
     - [x] Fix inverted buffer pruning in `Query::range`; overlapping buffers are retained, disjoint buffers removed.
     - [ ] Implement optional and unsized readers: `OptBitVec` + `OptInSitu` + `Seq` + `OptSeq` + `Flatten`
+    - [ ] Expand `#[derive(Data)]` to support enums by encoding the discriminant.
     - [ ] Add remaining query filters: `eq` + `one_of` + `none_of` + `is_some` + `is_none` + `mask` + `limit` + `offset`
     - [x] `Query::read` and `Query::collect` are no longer async; update documentation.
         - [x] Remove async references from [read-cycle.md](./doc/read-cycle.md).
