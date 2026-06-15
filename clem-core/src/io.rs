@@ -458,14 +458,14 @@ impl File {
     where
         S: for<'a> Write<Ctx<'a> = &'a Header>,
     {
-        // Phase 1: Append the new manifest; updated in-memory before File::write
+        // Phase 2: Append the new manifest; updated in-memory before File::write
         let pending = Pending { header: &self.header, size: seg.size()? };
         self.header.manifest = self.manifest.write_to_file(&mut self.file, pending).await?;
-        // Phase 2: Overwrite the file header manifest sector
+        // Phase 3: Overwrite the file header manifest sector
         self.header.write_to_file(&mut self.file, ()).await?;
-        // Phase 3: Append the new segment
+        // Phase 4: Append the new segment
         self.header.tail = seg.write_at_sector(&mut self.file, sector).await?;
-        // Phase 4: Overwrite the file header tail pointer
+        // Phase 5: Overwrite the file header tail pointer
         self.header.write_to_file(&mut self.file, ()).await?;
         self.file.flush().await?;
         // SAFETY: Undefined behaviour if mapped region is modified (refer to mmap documentation)
