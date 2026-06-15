@@ -969,3 +969,48 @@ where
         Type::sequence(Self::unfold())
     }
 }
+
+/* --------------------------------------------------------------------------------------- Tests */
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Reusing a [`Column`] name with an incompatible type is rejected as a [`Error::Collision`].
+    #[test]
+    fn column_collision() {
+        let mut schema = Schema::new("test");
+        schema.column::<u32, &str>("a").expect("failed to initialise test column a");
+        let matches = matches!(
+            schema.column::<u64, &str>("a"),
+            Err(Error::Collision { .. })
+        );
+        assert!(matches);
+    }
+
+    /// Adding a [`Column`] with an identical type is deduplicated rather than rejected.
+    #[test]
+    fn column_dedup() {
+        let mut schema = Schema::new("test");
+        schema.column::<u32, &str>("a").expect("failed to initialise test column a");
+        assert!(schema.column::<u32, &str>("a").is_ok());
+        assert_eq!(schema.columns.len(), 1);
+    }
+
+    /// [`Type::option`] collapses a nested [`Option`] into a single validity layer.
+    #[test]
+    fn option_flattens_nested() {
+        let once = Type::option(Type::U32);
+        let twice = Type::option(once.clone());
+        assert_eq!(once, twice);
+    }
+
+    /// [`Type::sequence`] wraps the provided subtype in a [`Type::Sequence`] descriptor.
+    #[test]
+    fn sequence_wraps() {
+        assert_eq!(
+            Type::sequence(Type::U8),
+            Type::Sequence { subtype: Box::new(Type::U8) }
+        );
+    }
+}
