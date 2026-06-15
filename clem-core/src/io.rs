@@ -86,7 +86,7 @@ use smol::fs::{self, OpenOptions};
 use smol::io::{AsyncRead, AsyncReadExt, AsyncSeek, AsyncSeekExt, AsyncWrite, AsyncWriteExt};
 
 use crate::accumulate::{Accumulator, Buffer};
-use crate::manifest::{self, Manifest, Pending};
+use crate::manifest::{Manifest, Pending};
 use crate::{number, schema, Serialize};
 
 /* ------------------------------------------------------------------------------ Public Exports */
@@ -454,25 +454,18 @@ impl File {
     ///
     /// Returns a read-only [`Mmap`] covering the immutable segment region.
     // TODO → Add error list & mmap safety section to fn doc comment
-    pub(crate) async fn write<S>(&mut self, seg: S) -> Result<Mmap, Error>
+    pub(crate) async fn write<S>(&mut self, seg: S, sector: &Sector) -> Result<Mmap, Error>
     where
-        S: Push + for<'a> Write<Ctx<'a> = &'a Header>,
+        S: for<'a> Write<Ctx<'a> = &'a Header>,
     {
-        // Phase 1: Update the in-memory manifest
-        let sector = seg.sector(&self.header)?;
-        self.manifest.push(&seg, sector)?;
-        // Phase 2: Append the new manifest
+        // Phase 1: Append the new manifest; updated in-memory before File::write
         let pending = Pending { header: &self.header, size: seg.size()? };
         self.header.manifest = self.manifest.write_to_file(&mut self.file, pending).await?;
-        // Phase 3: Overwrite the file header manifest sector
+        // Phase 2: Overwrite the file header manifest sector
         self.header.write_to_file(&mut self.file, ()).await?;
-        // Phase 4: Append the new segment
-        self.header.tail = seg
-            .write_to_file(&mut self.file, &self.header)
-            .await?
-            .next()
-            .ok_or(number::Error::Zero)?;
-        // Phase 5: Overwrite the file header tail pointer
+        // Phase 3: Append the new segment
+        self.header.tail = seg.write_at_sector(&mut self.file, sector).await?;
+        // Phase 4: Overwrite the file header tail pointer
         self.header.write_to_file(&mut self.file, ()).await?;
         self.file.flush().await?;
         // SAFETY: Undefined behaviour if mapped region is modified (refer to mmap documentation)
