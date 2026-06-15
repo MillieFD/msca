@@ -38,7 +38,7 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //!
 //! Generated code lives inside an anonymous `const` block to avoid collision with user items.
 //!
-//! 1. A hidden composite context type holding one boxed sub-stream per field.
+//! 1. A composite context type holding one boxed sub-stream per field.
 //! 2. A [`TryFrom`] implementation to construct the composite context from a borrowed `Query`.
 //! 3. A `Read` implementation pulling one item per sub-stream in lockstep.
 //!
@@ -46,7 +46,7 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
-use syn::{DeriveInput, Ident};
+use syn::{DeriveInput, Ident, Visibility};
 
 use crate::{fields, Field};
 
@@ -58,13 +58,14 @@ use crate::{fields, Field};
 ///
 /// Returns [`syn::Error`] if the input is not supported, has unnamed fields, or has no fields.
 pub(crate) fn expand(input: &DeriveInput) -> Result<TokenStream, syn::Error> {
-    // 1. Resolve struct names
+    // 1. Resolve struct names and visibility
     let src = &input.ident;
     let ctx = &format_ident!("{src}Context");
+    let vis = &input.vis;
     // 2. Extract and sort fields by name
     let fields = &fields(input)?;
     // 3. Generate trait implementations
-    let context = context(ctx, fields);
+    let context = context(vis, ctx, fields);
     let try_from = try_from(ctx, fields);
     let read = read(src, ctx, fields);
     // 4. Wrap in an anonymous const block
@@ -79,13 +80,13 @@ pub(crate) fn expand(input: &DeriveInput) -> Result<TokenStream, syn::Error> {
 
 /* ----------------------------------------------------------------------- TokenStream Expansion */
 
-/// Generate the hidden composite **context** type holding one boxed sub-stream per field.
-fn context(ctx: &Ident, fields: &[Field<'_>]) -> TokenStream {
+/// Generate the composite **context** type holding one boxed sub-stream per field.
+fn context(vis: &Visibility, ctx: &Ident, fields: &[Field<'_>]) -> TokenStream {
     let idents = Field::idents(fields);
     let types = Field::types(fields);
     quote! {
         /// Generated composite context holding one boxed column stream per field.
-        struct #ctx<'a> {
+        #vis struct #ctx<'a> {
             #( #idents: ::clem::Stream<'a, #types>, )*
         }
     }
@@ -175,6 +176,17 @@ mod tests {
         assert!(has(&code, "struct RowContext<'a>"));
         assert!(has(&code, "TryFrom<&'a ::clem::Query> for RowContext<'a>"));
         assert!(has(&code, "impl ::clem::Read for Row"));
+    }
+
+    /// [`expand`] propagates the source visibility to the generated context.
+    ///
+    /// The context appears in the public `Read::Ctx` GAT. A `pub` source must therefore yield a
+    /// `pub` context to avoid leaking a private type through the public interface.
+    #[test]
+    fn expand_context_inherits_visibility() {
+        let input: DeriveInput = parse_quote! { pub struct Row { a: u32, b: f64 } };
+        let code = expand(&input).expect("Expansion failed").to_string();
+        assert!(has(&code, "pub struct RowContext<'a>"));
     }
 
     /// [`expand`] output parses as valid Rust.
