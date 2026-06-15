@@ -147,7 +147,7 @@
         - [ ] Stored using the manifest `schemas` field; no new manifest machinery or segment types.
 - [ ] Fix `serde` crate feature; requires `bitvec` dependency `serde` feature.
 - [ ] Add support for free-form metadata written after the manifest. Feature-gated. Ignored if the feature is disabled.
-- [ ] Add a feature-gated `bin` segment variant for immutable binary data in any format (e.g. TOML) like the manifest.
+- [ ] Add `bin` segment variant for immutable binary data in any format (e.g. TOML); add manifest `bins` field.
 - [ ] Implement logging macros gated via the `log` feature.
 
 ### Crate Features (Priority IV)
