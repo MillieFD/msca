@@ -925,6 +925,18 @@ pub(crate) trait Write: Serialize {
         file.write_all(self.serialize()?.as_ref()).await?;
         Ok(sector)
     }
+
+    /// Write [`Self`] to the file at the specified [`Sector`](Self::sector).
+    ///
+    /// Returns the [`next`](Sector::next) offset for subsequent function chaining.
+    async fn write_at_sector<F>(&self, file: &mut F, sector: &Sector) -> Result<NonZeroU64, Error>
+    where
+        F: AsyncSeek + AsyncWrite + Unpin,
+    {
+        sector.seek_to_start(file).await?;
+        file.write_all(self.serialize()?.as_ref()).await?;
+        sector.next().ok_or(number::Error::Zero).map_err(Error::from)
+    }
 }
 
 /* ------------------------------------------------------------------ Write Trait Implementation */
