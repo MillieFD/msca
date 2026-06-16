@@ -4,6 +4,7 @@
     - Search the [/doc](/doc) directory for markdown files relevant to your task.
     - Add a markdown file to the [/doc](/doc) directory before implementing any substantial new feature.
     - Update existing documentation if you alter the behaviour of an existing feature.
+    - Uncommitted docs are not authoritative; decisions based on uncommitted docs must be verified with the user.
 2. Committed code is authoritative; only alter if absolutely necessary. Explain why the change is necessary.
 3. Uncommitted code represents work-in-progress and can be readily updated.
 
@@ -49,3 +50,4 @@
     - Mark tasks as complete in [todo.md](../todo.md) when finished; add bullet points w/ relevant details.
     - Unmark completed tasks if your edit removes previously implemented functionality.
     - The [todo.md](../todo.md) file must always accurately reflect the current state of the project.
+4. File layout is described in [on-disk-format.md](../doc/on-disk-format.md); update this file if you alter the layout.
