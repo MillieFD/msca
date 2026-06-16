@@ -12,9 +12,9 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //!
 //! ---
 //!
-//! [`Dataset`] is the primary entry-point for working with a [`clem`](crate) file; providing a
-//! high-level surface for registering [`Data`](crate::Data) types and [querying](query) stored data
-//! while delegating low-level IO to an internal [`File`] handle.
+//! [`Dataset`] is the primary entry-point for working with a [clem](crate) file; providing a
+//! high-level surface for registering [`Data`] types and [querying](query) stored data while
+//! delegating low-level IO to an internal [`File`] handle.
 
 use std::num::NonZeroU32;
 use std::path::Path;
