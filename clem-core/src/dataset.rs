@@ -96,25 +96,26 @@ impl Dataset {
 
     /// Register the [`Schema`] for [`I`] under `name` and return an empty [`Accumulator`].
     ///
-    /// No file [`IO`](io) occurs until the accumulated data is [written](Self::write) to disk.
+    /// Unseen [`Schema`] are eagerly written to disk. Existing [`Schema`] are deduplicated without
+    /// file [`IO`](io).
     ///
     /// ### Errors
     ///
-    /// Returns [`Error::Collision`][1] if a schema is already registered with the requested `name`
-    /// but an incompatible column layout.
+    /// - [`io::Error::Schema`] wrapping [`Error::Collision`][1] if a schema is already registered
+    ///   with the requested `name` but an incompatible column layout.
+    /// - [`io::Error::Io`] if the underlying [write-cycle](io) fails.
     ///
-    /// [1]: schema::Error::Collision
-    pub fn schema<I>(&mut self, name: &str) -> Result<Accumulator<I>, schema::Error>
+    /// [1]: crate::schema::Error::Collision
+    pub async fn schema<I>(&mut self, name: &str) -> Result<Accumulator<I>, io::Error>
     where
         I: Data,
     {
         let mut schema = Schema::new(name);
         let boxed = I::accumulator(&mut schema)?;
-        let sector = schema.finish(&mut self.file)?.sector;
         Ok(Accumulator {
             data: boxed,
             name: name.to_string(),
-            schema: sector,
+            schema: schema.finish(self).await?,
         })
     }
     /// Initialise a new [`Query`] over the named [`Schema`][1].
