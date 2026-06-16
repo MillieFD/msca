@@ -90,17 +90,17 @@
 - [x] Add `README.md` including:
     - [x] What is clem; high-level overview with a link to [on-disk-format.md](./doc/on-disk-format.md) for details.
     - [x] Cite clem in academic work; link to `CITATION.cff` file and instructions for citing the crate.
-    - [ ] Why use clem; motivation and design goals.
-    - [ ] When to use clem; ideal use-cases and comparison to alternatives e.g. Apache Parquet or SQLite.
-    - [ ] How to use clem; installation instructions and link to [user-guide.md](./doc/user-guide.md) for details.
-    - [ ] Describe the optional crate features; when should each feature be enabled / disabled and why.
+    - [x] Why use clem; motivation and design goals.
+    - [x] When to use clem; ideal use-cases and comparison to Parquet + Arrow IPC + HDF5 + SQLite
+    - [x] How to use clem; installation instructions and link to [user-guide.md](./doc/user-guide.md) for details.
+    - [x] Describe the optional crate features; when should each feature be enabled / disabled and why.
 - [x] Add a `CITATION.cff` file (CFF 1.2.0; author Amelia Fraser-Dale, ORCID 0009-0005-1160-1367, BSD-3-Clause).
 - [ ] Add [user-guide.md](./doc/user-guide.md) with basic usage examples:
     - [ ] Create a new dataset
     - [ ] Register a schema for external composite types; explains `#[derive(Data)]` and `Dataset::schema`.
     - [ ] Write a data segment; explains `Accumulator` and `Dataset::write` with multithreaded accumulation via `Clone`.
     - [ ] Query data; explains `Dataset::query` and the `Query` API with filters and iterators.
-- [ ] Add [on-disk-format.md](./doc/on-disk-format.md) describing the on-disk layout in detail; include ASCI diagrams.
+- [x] Add [on-disk-format.md](./doc/on-disk-format.md) describing the on-disk layout in detail.
 - [ ] Search for discrepancies between [doc](./doc) and actual implementations. Update documentation as needed.
 - [x] Full test coverage:
     - [x] Add comprehensive unit tests for core functionalities in each module; cover edge cases.
@@ -161,7 +161,10 @@
         - [ ] Duplicate items are allowed; uniqueness is not guaranteed.
         - [ ] Stored using the manifest `schemas` field; no new manifest machinery or segment types.
 - [ ] Support compact encoding for buffers with a single repeated value e.g. all `true` or all `None`.
-    - [ ] Indicate compact buffers via a bit-packed mask in the data segment header; use existing serialize for `BitVec`
+    - [ ] Indicate compact buffers via a bit-packed mask in the data segment header:
+        - Use existing `BitVec` serialization implementation.
+        - The current data segment header includes seven bytes of zero-filled padding which can contain the mask.
+        - Schemas with ≤ 56 buffers would not increase the data segment header size.
     - Breaks the current assumption that all buffers in a data segment contain the same number of items.
     - [ ] Refactor `manifest::Buffer` struct into enum:
         - [ ] Current buffer becomes `Buffer::Full` variant with fields.
