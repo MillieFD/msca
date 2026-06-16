@@ -26,6 +26,30 @@ To achieve these design goals, clem decouples **logical structure** (types and s
 
 ### When to use clem
 
+`clem` is a strong fit for any workload that writes once and queries many times. The rapid ingestion append-only design
+is ideally suited to high-throughput sensor streams, experimental runs, telemetry, and time-series data. Clem is **not**
+a transactional database and deliberately omits support for in-situ mutation, deletions, or ad-hoc SQL queries.
+
+The table below compares clem against several widely used alternatives:
+
+| Capability                            | Clem | Parquet | Arrow IPC | HDF5 | SQLite |
+|---------------------------------------|:----:|:-------:|:---------:|:----:|:------:|
+| Columnar storage                      |  ✓   |    ✓    |     ✓     |  ~   |   ✗    |
+| Zero-copy memory-mapped reads         |  ✓   |    ✗    |     ✓     |  ~   |   ✗    |
+| Predicate pushdown (min/max/count)    |  ✓   |    ✓    |     ✗     |  ✗   |   ✓    |
+| Storage niche optimisation            |  ✓   |    ✗    |     ✗     |  ✗   |   ✗    |
+| Multi-schema single-file (multimodal) |  ✓   |    ✗    |     ✗     |  ✓   |   ✓    |
+| Block compression                     |  ✗   |    ✓    |     ~     |  ✓   |   ~    |
+| Crash-safe atomic commits             |  ✓   |    ~    |     ~     |  ✗   |   ✓    |
+| Lock-free concurrent readers          |  ✓   |    ✓    |     ✓     |  ~   |   ~    |
+| Deletion and in-situ mutation         |  ✗   |    ✗    |     ✗     |  ✓   |   ✓    |
+
+<sub>✓ native · ~ partial or via tooling · ✗ not supported</sub>
+
+`clem` understands **platform-agnostic** primitive types such as `u32` or `f64`. Platform-dependent types such as
+`usize` are deliberately omitted to ensure file portability. External user-defined types are mapped directly to a
+generated schema using the provided `#[derive(Data)]` macro.
+
 ### How to use clem
 
 Add `clem` to your `Cargo.toml`:
