@@ -6,19 +6,12 @@ specific file type built atop `clem` with a canonical schema – but must remove
 underlying reader.
 
 ```text
-File
-├─ Header
-│  ├─ magic: [u8; 4] // b"clem"
-│  ├─ version: u8
-│  ├─ tail: NonZeroU64
-│  ├─ manifest: Sector
-│  └─ alignment padding
-├─ Segment 0
-⋮
-├─ Segment N
-├─ Empty (optional)
-├─ Manifest
-└─ Metadata (optional)
+Header
+├─ magic: [u8; 4]      // b"clem"
+├─ version: u8
+├─ tail: NonZeroU64    // offset immediately after the final segment
+├─ manifest: Sector    // offset + length of the encoded manifest
+└─ alignment padding   // zero-filled to the next 64-bit boundary
 ```
 
 A major version number is embedded in the file header to indicate breaking changes in the format specification. Forwards
