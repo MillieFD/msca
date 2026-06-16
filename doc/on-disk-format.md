@@ -60,3 +60,46 @@ Multimodality and schema evolution are realised by appending additional schema s
 extensibility are realised by appending additional data segments. Format extensibility may be achieved via the
 introduction of new segment variants in future releases.
 
+### File Header
+
+The header is the only file region with a fixed size and offset; essential for providing an entry point for
+uninitialised readers. The header begins with a magic byte sequence and version number used to identify the clem format,
+followed by the mutable pointers required to bootstrap navigation.
+
+```text
+Header
+├─ magic: [u8; 4]      // b"clem"
+├─ version: u8
+├─ tail: NonZeroU64    // offset immediately after the final segment
+├─ manifest: Sector    // offset + length of the encoded manifest
+└─ alignment padding   // zero-filled to the next 64-bit boundary
+```
+
+##### Magic Bytes
+
+Used to identify the file type. Implementers may prepend their own file header – e.g. to indicate a specific file type
+built atop `clem` with a canonical schema – but must remove the prepended data before passing to the underlying reader.
+Readers must reject any file that does not begin with the expected magic byte sequence.
+
+##### Version Number
+
+A major version number is embedded in the file header to indicate breaking changes in the format specification. Forwards
+and backwards compatibility across version numbers is not guaranteed. Readers must reject any file with an unrecognised
+version number.
+
+##### Tail Pointer
+
+Mutable pointer recording the byte offset immediately following the final committed segment. New segments are always
+appended from `tail`, not from EOF. An empty region may exist between `tail` and the start of the manifest when
+appending segments that are shorter than the combined manifest and metadata. This empty region is reclaimed during the
+next write-cycle.
+
+##### Manifest Sector
+
+A [sector](#sectors-and-segments) to locate the CBOR manifest written after the immutable segment region.
+
+##### Alignment Padding
+
+The memory map is page-aligned. Padding the header to a 64-bit boundary is therefore essential to keep all subsequent
+segments aligned both on-disk and in-memory.
+
