@@ -157,14 +157,15 @@
         - [ ] Duplicate items are allowed; uniqueness is not guaranteed.
         - [ ] Stored using the manifest `schemas` field; no new manifest machinery or segment types.
 - [ ] Support compact encoding for buffers with a single repeated value e.g. all `true` or all `None`.
-    - [ ] Compact buffers on-disk are indicated by a `count` of one in the buffer header.
+    - [ ] Indicate compact buffers via a bit-packed mask in the data segment header; use existing serialize for `BitVec`
     - Breaks the current assumption that all buffers in a data segment contain the same number of items.
     - [ ] Refactor `manifest::Buffer` struct into enum:
         - [ ] Current buffer becomes `Buffer::Full` variant with fields.
         - [ ] Add `Buffer::Lite` variant with a single `item: [u8; B]` field containing the single serialized value.
     - [ ] Query readers can deserialize directly from `Buffer::Lite` without file IO.
+    - [ ] Accumulator begins with all `Buffer::Lite`; switches to `Buffer::Full` when a different value is pushed.
 - [ ] Fix `serde` crate feature; requires `bitvec` dependency to activate the `serde` feature.
-- [ ] Add feature-gated free-form metadata binary blob written after the manifest.
+- [ ] Add an optional feature-gated free-form metadata binary blob written after the manifest.
     - [ ] CBOR decoding ignores on-disk `metadata: Sector` field if present when the feature is disabled.
     - [ ] CBOR encoding adds on-disk `metadata: Sector` field if absent when the feature is enabled.
 - [ ] Add `bin` segment variant for immutable binary data in any format (e.g. TOML):
