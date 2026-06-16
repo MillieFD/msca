@@ -45,7 +45,7 @@ pub type BoxAcc<I> = Box<dyn Accumulate<Item = I, Buffer = Vec<u8>>>;
 // NOTE: Deterministic runtime order via BTreeMap; #[derive] ensures identical compile time order.
 pub type Columns<'a> = dyn Iterator<Item = &'a mut Column> + 'a;
 
-/// An **in-memory data accumulator** used to build data segments for the specified [`Schema`].
+/// An **in-memory staging buffer** used to build data segments for the specified [`Schema`].
 ///
 /// ### Segment Composition
 ///
@@ -74,16 +74,38 @@ pub type Columns<'a> = dyn Iterator<Item = &'a mut Column> + 'a;
 /// ```
 ///
 /// The [`Schema`][1] maps each **platform-agnostic** primitive [`Type`][3] to a contiguous buffer;
-/// providing essential context for buffer deserialization. Each `Accumulator` holds a [`Sector`][4]
+/// providing essential context for buffer deserialization. Each `Accumulator` holds a [`Sector`]
 /// for the corresponding schema which is written to disk within each data segment header. All
 /// columns contain an equal number of rows indicated by `count` in the segment header.
 ///
 /// Refer to the [schema module documentation](crate::schema) for more details.
 ///
-/// [1]: schema::Schema
+/// ### Concurrent Producers
+///
+/// Initialise a new accumulator via [`Dataset::schema`][4] which:
+///
+/// - Constructs a [`Schema`][2] for the specified [`Item`](I) type.
+/// - Eagerly writes a schema segment to disk if unregistered.
+/// - Reuses the existing schema segment if already registered.
+/// - Returns a new empty accumulator.
+///
+/// Use [`Clone`] to initialise a new empty accumulator for the same [`Schema`][2] and [`Item`](I)
+/// type. Users should prefer to clone an existing valid accumulator to bypass schema lookup and
+/// [`Type`][3] verification compared to [`Dataset::schema`][4]. Each clone is independent and
+/// starts empty.
+///
+/// 1. Register the [`Schema`][1] once via [`Dataset::schema`][4] to initialise an accumulator.
+/// 2. [`Clone`] one accumulator for each worker thread.
+/// 3. Each thread accumulates data independently.
+/// 4. Commit each accumulator sequentially via [`Dataset::write`][5].
+///
+/// Refer to the [write-cycle documentation](crate::io) for more details.
+///
+/// [1]: crate::schema::Schema
 /// [2]: crate::Data
-/// [3]: schema::Type
-/// [4]: Sector
+/// [3]: crate::schema::Type
+/// [4]: crate::Dataset::schema
+/// [5]: crate::Dataset::write
 pub struct Accumulator<I> {
     /// Type-erased [`Accumulate`] trait object.
     pub data: BoxAcc<I>,
