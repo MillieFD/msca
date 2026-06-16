@@ -112,6 +112,7 @@
 
 - [ ] Implement common process abstractions without adding new segment types:
     - [ ] Add feature-gated `Set` abstraction to guarantee item uniqueness across all data segments:
+        - [ ] New `set` feature in `Cargo.toml` (OFF by default).
         - [ ] Shape described by `schema` segment, items stored in `data` segments.
         - [ ] Composite types are supported; uniqueness is determined by the type's `PartialEq` implementation.
         - [ ] Abstraction coordinated via the `Set` struct wrapping an `Accumulator`; initialised via `Dataset::set`
@@ -130,6 +131,7 @@
             - [ ] CBOR encoding adds on-disk `sets` field if absent when the feature is enabled.
         - [ ] Order is not guaranteed; sorting would require mutation of existing segments (explicitly disallowed).
     - [ ] Add feature-gated `Map` abstraction to amortise the cost of large repetitive values:
+        - [ ] Replaces current prototype `dictionary` feature with `map` feature in `Cargo.toml` (OFF by default).
         - [ ] Shape described by `schema` segment, entries (keys + items) stored in `data` segments.
         - [ ] Key uniqueness guaranteed across all data segments.
         - [ ] Abstraction coordinated via the `Map` struct:
@@ -152,12 +154,16 @@
             - [ ] CBOR encoding adds on-disk `maps` field if absent when the feature is enabled.
         - [ ] Order is not guaranteed; sorting would require mutation of existing segments (explicitly disallowed).
     - [ ] Add feature-gated `Index` abstraction for items sorted by insertion order:
+        - [x] New `index` feature in `Cargo.toml` (OFF by default).
         - [ ] Insertion index is calculated across all data segments corresponding to the specified schema.
         - [ ] Shape described by `schema` segment, items stored in `data` segments.
-        - [ ] Abstraction coordinated via the `Index` struct:
-            - [ ] Contains an `Accumulator` to store new entries.
-            - [ ] Contains a `next: u64` field to track the next available index for insertion.
-            - [ ] Initialised via `Dataset::index`.
+        - [ ] Abstraction adds functionality to the existing `Accumulator` struct:
+            - [ ] Add `next: u64` field to track the next available index for insertion.
+            - [ ] Add `next` initialisation summing all on-disk buffer item counts.
+            - [ ] Add `next` incrementation in `Accumulate::push` to keep track of insertion index.
+            - [ ] Add `Accumulator::<I>::insert(&self, item: I) -> u64` function:
+                - Delegates to `Accumulate::push` internally.
+                - Returns the inserted index.
         - [ ] Duplicate items are allowed; uniqueness is not guaranteed.
         - [ ] Stored using the manifest `schemas` field; no new manifest machinery or segment types.
 - [ ] Support compact encoding for buffers with a single repeated value e.g. all `true` or all `None`.
