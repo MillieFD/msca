@@ -1005,6 +1005,19 @@ mod tests {
         assert_eq!(a, b);
     }
 
+    /// [`Sector::new`] rejects a zero `length`; every sector must describe at least one byte.
+    #[test]
+    fn sector_zero_length_errors() {
+        assert!(Sector::new(100, 0).is_err());
+    }
+
+    /// [`Sector::next`] returns [`None`] when the trailing offset overflows `u64`.
+    #[test]
+    fn sector_next_overflow() {
+        let sector = Sector::new(u64::MAX, 1u64).expect("Sector::new failed");
+        assert!(sector.next().is_none());
+    }
+
     /// File [`HEADER`] is rounded up ↑ to the next 64-bit alignment boundary.
     #[test]
     fn header_aligned() {
