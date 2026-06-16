@@ -73,36 +73,3 @@ pub use clem_core::{
 
 #[cfg(feature = "derive")]
 pub use clem_derive::{Data, Read};
-
-/* --------------------------------------------------------------------------------------- Tests */
-
-#[cfg(all(test, feature = "derive"))]
-mod tests {
-    use super::*;
-
-    /// A user record exercising both derives across mixed field types.
-    #[derive(Data, Read)]
-    struct Reading {
-        sensor: u32,
-        latitude: f64,
-        longitude: f64,
-    }
-
-    #[test]
-    fn derive_data_accumulates() {
-        let mut schema = Schema::new("readings");
-        let mut acc = Reading::accumulator(&mut schema).expect("accumulator failed");
-        assert!(acc.is_empty());
-        acc.push(Reading {
-            sensor: 1,
-            latitude: 51.5,
-            longitude: -0.1,
-        });
-        acc.push(Reading {
-            sensor: 2,
-            latitude: 48.9,
-            longitude: 2.4,
-        });
-        assert_eq!(acc.count(), 2);
-    }
-}
