@@ -118,6 +118,42 @@ impl Dataset {
             schema: schema.finish(self).await?,
         })
     }
+
+    /// [`Write`] the accumulated data to the [clem](crate) file and return the number of rows.
+    ///
+    /// Empty accumulators are ignored.
+    ///
+    /// ### Errors
+    ///
+    /// Returns [`io::Error::Io`] if the underlying [write-cycle](io) fails, or [`io::Error::Number`]
+    /// if a `u64` overflow occurs while computing a segment `size` or `offset`.
+    pub async fn write<I>(&mut self, accumulator: Accumulator<I>) -> Result<u64, io::Error> {
+        let count = match accumulator.is_empty() {
+            true => return Ok(0),
+            false => accumulator.count(),
+        };
+        let sector = accumulator.sector(&mut self.file.header)?;
+        let mut columns = self
+            .file
+            .manifest
+            .schemas
+            .get_mut(&accumulator.name)
+            // SAFETY: Dataset::schema registers the schema before producing an Accumulator
+            .expect("Schema missing from manifest")
+            .columns
+            .values_mut();
+        // NOTE: Buffer offset is relative to the immutable region; excludes the file header.
+        let offset = sector
+            .offset
+            .checked_add(Accumulator::<I>::HEADER as u64)
+            .ok_or(number::Error::Zero)?
+            .checked_sub(HEADER as u64)
+            .ok_or(number::Error::Zero)?;
+        accumulator.data.column_buffers(offset, &mut columns)?;
+        self.mmap = self.file.write(accumulator, &sector).await?.into();
+        Ok(count)
+    }
+
     /// Initialise a new [`Query`] over the named [`Schema`][1].
     ///
     /// The query begins with **every** column and **every** buffer from the specified schema.
