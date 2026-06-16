@@ -7,7 +7,7 @@
 `clem` optimises read and write performance independently by separating the data lifecycle into two phases:
 
 1. **In-memory** accumulator for high-throughput ingestion.
-2. **On-disk** columnar buffers for analytical queries across a arbitrary number of dimensions.
+2. **On-disk** columnar buffers for analytical queries across an arbitrary number of dimensions.
 
 The result is a single, self-describing, portable file that ingests data quickly and answers analytical queries with
 minimal IO overhead. The format is intended as an extensible backend that can be adapted to suit a variety of scientific
@@ -19,10 +19,22 @@ Please cite `clem` in your academic work using the provided [citation](CITATION.
 
 ### Motivation and Design Goals
 
-// TODO → add a list of design goals here
+`clem` is designed to address the shortcomings of existing storage engines for edge deployment in scientific and
+research applications where data integrity and high throughput are critical. Development is guided by a focused set of
+design goals:
 
-To achieve these design goals, clem decouples **logical structure** (types and schemas) from **physical storage**
-(segments). The [on-disk-format.md](./doc/on-disk-format.md) document shows how each goal is met.
+- **Compact** file size with interleaved segments.
+- **Performant** ingestion and queries with minimal IO.
+- **Adaptable** to a wide variety of applications.
+- **Durable** against crashes and data loss.
+- **Minimal** memory footprint and runtime overhead.
+
+The self-describing deterministic on-disk layout ensures portability across platforms and architectures. Multiple
+schemas can coexist in a single multimodal file, enabling simple collaboration and sharing of heterogeneous data.
+No background server is required.
+
+To achieve these goals, clem decouples **logical structure** (types and schemas) from **physical storage** (segments).
+The [on-disk-format.md](./doc/on-disk-format.md) document shows how each goal is met.
 
 ### When to use clem
 
@@ -59,7 +71,50 @@ Add `clem` to your `Cargo.toml`:
 clem = "0.1"
 ```
 
+A minimal end-to-end example — derive the traits, accumulate rows, commit a segment, then query it:
+
+```rust
+use clem::{Accumulate, Data, Dataset, Read};
+
+#[derive(Data, Read)]
+struct Reading {
+    sensor: u32,
+    temperature: f64,
+}
+
+let mut dataset = Dataset::new("readings.clem").await?;
+
+// Register the schema once and accumulate rows in memory.
+let mut readings = dataset.schema::<Reading>("readings").await?;
+readings.push(Reading { sensor: 1, temperature: 21.5 });
+readings.push(Reading { sensor: 2, temperature: 18.0 });
+
+// Commit one immutable data segment.
+dataset.write(readings).await?;
+
+// Query with segment pruning and lazy zero-copy reads.
+for row in dataset.query("readings") ?.range("temperature", 20.0..) ?.read::<Reading>() ? {
+let row = row ?;
+// ... process each row
+}
+```
+
+See the [user guide](./doc/user-guide.md) for a full walkthrough covering schema registration, multithreaded
+accumulation, and the complete query and filter vocabulary.
+
 ### Crate Features
+
+`clem` ships a minimal default surface; additional capabilities are opt-in via Cargo features.
+
+| Feature    | Default | Description                                                            |
+|------------|:-------:|------------------------------------------------------------------------|
+| `derive`   |   on    | `#[derive(Data)]` and `#[derive(Read)]` macros for external types.     |
+| `serde`    |   off   | `serde` support for exported types                                     |
+| `metadata` |   off   | Read and write surface for the optional free-form file-level metadata. |
+| `log`      |   off   | Structured logging across the read and write paths; requires a logger. |
+
+> [!WARNING] 🚧 Under Development
+> Several crate features are still under active development. Feautre APIs may change before the 1.0 release.
 
 ### License
 
