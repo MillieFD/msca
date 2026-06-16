@@ -491,7 +491,7 @@ impl Accumulate for BitVec {
             sector: Sector { offset, length: self.size()? },
             count: self.count().try_into()?,
             min: Accumulate::min(self).map(u128::from).unwrap_or(u128::MIN).serialize()?,
-            max: Accumulate::min(self).map(u128::from).unwrap_or(u128::MAX).serialize()?,
+            max: Accumulate::max(self).map(u128::from).unwrap_or(u128::MAX).serialize()?,
         };
         let next = buf.sector.next().ok_or(Error::Zero)?.align()?;
         columns.next().map(|column| column.buffers.push(buf));
