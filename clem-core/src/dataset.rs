@@ -34,7 +34,7 @@ use crate::{io, schema, Accumulate, Accumulator, Data, Schema};
 #[derive(Debug)]
 pub struct Dataset {
     /// Underlying [`File`] handle backing this dataset.
-    file: File,
+    pub(crate) file: File,
     /// Read-only [memory map](Mmap) backed by the [clem](crate) file.
     ///
     /// ### ⚠️ Warning
@@ -42,7 +42,7 @@ pub struct Dataset {
     /// Undefined behaviour may occur if the mapped region is modified. The [`Mmap`] is therefore
     /// tightly scoped; mapping only the immutable segment region to reduce the risk of undefined
     /// behaviour. Refer to the [`File::mmap`] documentation for more details.
-    mmap: Arc<Mmap>,
+    pub mmap: Arc<Mmap>,
 }
 
 impl Dataset {
