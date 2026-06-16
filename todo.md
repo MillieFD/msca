@@ -91,11 +91,15 @@
     - [x] What is clem; high-level overview with a link to [on-disk-format.md](./doc/on-disk-format.md) for details.
     - [x] Cite clem in academic work; link to `CITATION.cff` file and instructions for citing the crate.
     - [ ] Why use clem; motivation and design goals.
-    - [ ] When to use clem; ideal use-cases and comparison to alternatives e.g. Apache Parquet or SQL databases.
-    - [ ] How to use clem; installation instructions and basic usage examples for writing and reading data.
+    - [ ] When to use clem; ideal use-cases and comparison to alternatives e.g. Apache Parquet or SQLite.
+    - [ ] How to use clem; installation instructions and link to [user-guide.md](./doc/user-guide.md) for details.
     - [ ] Describe the optional crate features; when should each feature be enabled / disabled and why.
-    - [ ] Contributing guidelines; how to report issues and contribute code.
 - [x] Add a `CITATION.cff` file (CFF 1.2.0; author Amelia Fraser-Dale, ORCID 0009-0005-1160-1367, BSD-3-Clause).
+- [ ] Add [user-guide.md](./doc/user-guide.md) with basic usage examples:
+    - [ ] Create a new dataset
+    - [ ] Register a schema for external composite types; explains `#[derive(Data)]` and `Dataset::schema`.
+    - [ ] Write a data segment; explains `Accumulator` and `Dataset::write` with multithreaded accumulation via `Clone`.
+    - [ ] Query data; explains `Dataset::query` and the `Query` API with filters and iterators.
 - [ ] Add [on-disk-format.md](./doc/on-disk-format.md) describing the on-disk layout in detail; include ASCI diagrams.
 - [ ] Search for discrepancies between [doc](./doc) and actual implementations. Update documentation as needed.
 - [x] Full test coverage:
