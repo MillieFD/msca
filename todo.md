@@ -49,6 +49,15 @@
         - [x] `Query::read::<I>` reads the composite stream for `I`; mirrors `Data::accumulator`.
     - [x] Fix inverted buffer pruning in `Query::range`; overlapping buffers are retained, disjoint buffers removed.
     - [ ] Implement optional and unsized readers: `OptBitVec` + `OptInSitu` + `Seq` + `OptSeq` + `Flatten`
+        - [x] Implement `Deserialize` trait for niche types: `Option<char>` + `Option<NonZero>`
+        - [x] Add `OptInSitu` reader using `Deserialize` for niche-optimised optional types.
+        - [x] Add `OptBitVec` reader using bit-packed validity map + concatenated data region.
+        - [x] `Seq` reads the offset region to define boundaries, then deserializes each unsized item e.g. `Vec<T>`.
+        - [x] `OptSeq` reads the offset region to define boundaries and validity; `NonZero` offsets use zero for `None`.
+        - [x] Manifest buffer sectors include the whole composite buffer body; exclude buffer header (length prefix).
+        - [x] Fix `OptSeq::push` to keep cumulative offsets monotonic across a trailing `None` row.
+        - [ ] Nested type support via `Flatten` reader; serialization collapses nested types into one on-disk layer.
+        - [ ] Automatically bit-pack `Vec<bool>` during serialization; schema records the column type as `BitVec`.
     - [ ] Expand `#[derive(Data)]` to support enums by encoding the discriminant.
     - [ ] Add remaining query filters: `eq` + `one_of` + `none_of` + `is_some` + `is_none` + `mask` + `limit` + `offset`
     - [x] `Query::read` and `Query::collect` are no longer async; update documentation.
