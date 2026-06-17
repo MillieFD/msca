@@ -171,6 +171,25 @@ pub struct OptBitVec<'a> {
     data: Iter<'a, u8>,
 }
 
+/// A **stateful cursor** over paired offset and value data streams for a single [`Column`]; used to
+/// [`Deserialize`](Deserialize) [unsized][1] items.
+///
+/// [1]: https://doc.rust-lang.org/reference/dynamically-sized-types.html
+#[doc(hidden)] // Reachable via Read::Src for unsized readers
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Debug, Clone)]
+pub struct Seq<'a> {
+    /// Cumulative non-zero end offsets for each item.
+    ///
+    /// The [`u64::MIN`] niche is used to encode [`None`] for optional unsized items.
+    offsets: Iter<'a, u64>,
+    /// Exclusive end offset of the previous non-null item and inclusive start offset for the
+    /// current item.
+    prev: u64,
+    /// Flattened data **source** from which items are [deserialized](Deserialize).
+    data: Iter<'a, u8>,
+}
+
 /* ----------------------------------------------------------------------- Read Trait Definition */
 
 /// An in-memory **data type** that can be lazily [deserialized](Deserialize) and [filtered](Filter)
