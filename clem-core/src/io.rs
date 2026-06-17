@@ -1085,6 +1085,56 @@ mod tests {
         assert!(matches!(u16::take(&bytes), Err(Error::Truncated { .. })));
     }
 
+    /// [`Option<char>`] decodes the `u32::MAX` niche sentinel as [`None`] and any other scalar as
+    /// [`Some`]; the inverse of its [`Serialize`] encoding.
+    #[test]
+    fn opt_char_deserialize() {
+        let none = None::<char>.serialize().expect("Serialize failed");
+        assert_eq!(
+            <Option<char>>::deserialize(&none).expect("Deserialize failed"),
+            None
+        );
+        let some = Some('q').serialize().expect("Serialize failed");
+        assert_eq!(
+            <Option<char>>::deserialize(&some).expect("Deserialize failed"),
+            Some('q')
+        );
+    }
+
+    /// [`Option<NonZeroU64>`] decodes the `0` niche sentinel as [`None`] and any non-zero value as
+    /// [`Some`]; the inverse of its [`Serialize`] encoding.
+    #[test]
+    fn opt_nonzero_deserialize() {
+        let none = None::<NonZeroU64>.serialize().expect("Serialize failed");
+        assert_eq!(
+            <Option<NonZeroU64>>::deserialize(&none).expect("Deserialize failed"),
+            None
+        );
+        let value = NonZeroU64::new(42);
+        let some = value.serialize().expect("Serialize failed");
+        assert_eq!(
+            <Option<NonZeroU64>>::deserialize(&some).expect("Deserialize failed"),
+            value
+        );
+    }
+
+    /// [`Option<NonZeroI32>`] decodes the `0` niche sentinel as [`None`] and a negative value as
+    /// [`Some`]; the inverse of its [`Serialize`] encoding.
+    #[test]
+    fn opt_nonzero_signed_deserialize() {
+        let none = None::<num::NonZeroI32>.serialize().expect("Serialize failed");
+        assert_eq!(
+            <Option<num::NonZeroI32>>::deserialize(&none).expect("Deserialize failed"),
+            None
+        );
+        let value = num::NonZeroI32::new(-5);
+        let some = value.serialize().expect("Serialize failed");
+        assert_eq!(
+            <Option<num::NonZeroI32>>::deserialize(&some).expect("Deserialize failed"),
+            value
+        );
+    }
+
     #[test]
     fn sector_ord() {
         let hi = Sector::new(200, 16).expect("Sector::new failed for hi");
