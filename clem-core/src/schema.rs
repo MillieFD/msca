@@ -81,7 +81,7 @@ use self::number::Number;
 use crate::accumulate::{Accumulate, BoxAcc, Buffer, Flatten, OptBitVec, OptInSitu, OptSeq, Seq};
 use crate::io::{self, Write};
 use crate::segment::Variant;
-use crate::{manifest, Align, Dataset, Sector, Serialize};
+use crate::{manifest, segment, Align, Dataset, Sector, Serialize};
 
 /* ------------------------------------------------------------------------------ Public Exports */
 
@@ -191,17 +191,17 @@ impl Serialize for Schema {
     type Buffer = Vec<u8>;
 
     fn size(&self) -> Result<NonZeroU64, number::Error> {
-        let size = { crate::segment::Header::SIZE + minicbor::len(self) }.align()?;
+        let size = { segment::Header::SIZE + minicbor::len(self) }.align()?;
         size.try_into().map_err(number::Error::Convert)
     }
 
     fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], number::Error> {
-        let pad = { crate::segment::Header::SIZE + minicbor::len(self) }.pad()?;
+        let pad = { segment::Header::SIZE + minicbor::len(self) }.pad()?;
         let buf = buf.serialize_push(&{ Variant::Schema as u8 })?;
         // NOTE: Self::size returns Error if usize overflows u64 (not expected in production)
         let mut buf = self.size()?.get().to_le_bytes().serialize_into(buf)?;
         // SAFETY: minicbor::encode is infallible when writing to Vec<u8>
-        minicbor::encode(self, &mut buf).expect("Infallible encode failed");
+        minicbor::encode(self, &mut buf).expect("Infallible manifest CBOR encode failed");
         buf[..pad].fill(u8::MIN);
         Ok(&mut buf[pad..])
     }
