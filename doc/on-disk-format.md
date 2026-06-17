@@ -111,7 +111,7 @@ sequential readers to identify the segment type and skip if necessary without de
 ```text
 segment header
 ├─ variant: u8       // segment variant identifier
-└─ next: NonZeroU64  // byte offset for the next segment header
+└─ next: NonZeroU64  // offset of the next segment header
 ```
 
 The `next` field encodes the offset to the start of the next segment header which increases monotonically. Headers
@@ -177,3 +177,51 @@ A metadata region is included directly after the segment header containing:
 
 All data buffers are guaranteed to begin at a 64-bit boundary. The number and order of buffers is determined by the
 associated schema segment.
+
+### Buffer Header
+
+Every buffer begins with a minimal header containing information shared by all variants.
+
+```text
+buffer header
+└─ next: NonZeroU64  // offset of the next buffer header
+```
+
+The `next` field encodes the offset to the start of the next buffer header which increases monotonically. Headers allow
+the entire buffer region to **self-describe**: a sequential reader can walk the data segment body end-to-end using
+information contained solely in the buffer headers and associated schema segment. Buffer deserialisation is informed by
+`type` information from the schema segment; the reader advances to the next deserialisation strategy at each buffer
+header `next` offset and ceases deserialisation at the segment header `next` offset. This is the basis for
+[manifest recovery](#durability-and-recovery).
+
+Niche-optimisation on the non-zero `next` field is leveraged to indicate [compact buffers](#compact-buffers). The header
+is excluded from the sector recorded in the [manifest](#manifest); the optimised random-access read path routes
+fearlessly to the relevant buffer without boundary checks or type verification.
+
+> [!TODO] Refactor Length to Next
+> The buffer header currently encodes the buffer body `length` instead of the `next` offset. A refactor is required to
+> bring the codebase in line with this specification document.
+
+### Columnar Data Buffers
+
+Each schema column maps to one contiguous **buffer** within the data segment body. The buffer header is followed by a
+buffer body containing end-to-end serialised data. The final item may be followed by a variable-length zero-filled
+padding region to maintain [64-bit SIMD alignment](./simd-alignment.md).
+
+```text
+[Header] [Body] [Padding]
+```
+
+Item serialization is determined by the column `type` described in the associated schema segment.
+
+| Size     | Optional  | Example              | Serialization Strategy                     |
+|----------|-----------|----------------------|:-------------------------------------------|
+| one bit  | no        | `bool`               | bit-packed in LSB0 order                   |
+| fixed    | no        | `i32`                | direct LE representation                   |
+| variable | no        | `Vec<f64>`           | offset region + concatenated data region   |
+| fixed    | non-niche | `Option<u64>`        | validity bits + concatenated data region   |
+| fixed    | niche     | `Option<NonZeroU64>` | concatenated data only; niche encodes none |
+| variable | yes       | `Option<String>`     | offset region + concatenated data region   |
+
+Each buffer body (the primary SIMD target) is aligned to a 64-bit boundary. The final serialized item may be followed by
+a variable-length zero-filled padding region to maintain this alignment.
