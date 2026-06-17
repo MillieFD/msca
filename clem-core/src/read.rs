@@ -156,6 +156,21 @@ impl<'a> Column<'a> {
     }
 }
 
+/// A **stateful cursor** over paired validity and value data streams for a single [`Column`]; used
+/// to [`Deserialize`] optional non-niche items.
+#[doc(hidden)] // Reachable via Read::Src for optional non-niche readers
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Debug, Clone)]
+pub struct OptBitVec<'a> {
+    /// Validity bits in [`Lsb0`] order. One bit per item.
+    ///
+    /// - `true` → [`Some`]
+    /// - `false` → [`None`]
+    bits: &'a BitSlice,
+    /// Data **source** from which items are [deserialized](Deserialize).
+    data: Iter<'a, u8>,
+}
+
 /* ----------------------------------------------------------------------- Read Trait Definition */
 
 /// An in-memory **data type** that can be lazily [deserialized](Deserialize) and [filtered](Filter)
