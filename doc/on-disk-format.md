@@ -225,3 +225,42 @@ Item serialization is determined by the column `type` described in the associate
 
 Each buffer body (the primary SIMD target) is aligned to a 64-bit boundary. The final serialized item may be followed by
 a variable-length zero-filled padding region to maintain this alignment.
+
+##### Unsized Buffers
+
+It is not possible to predetermine the disk space required for each instance of an [unsized] type; there is no guarantee
+that two `Vec<I>` instances will contain the same number of elements. Clem therefore unfolds unsized types into:
+
+1. Initial `offsets` region describing boundaries.
+2. Contiguous `data` region encoding values.
+
+This design enables **O(1) random access** and avoids per-element pointer chasing. Sequential scans across the contained
+elements remain linear; leveraging columnar optimisations for SIMD and prefetch.
+
+ ```text
+ offsets: [3, 6, 6]
+ values:  [a, b, c, d, e, f, g, h]
+ ```
+
+The serialized on-disk example above is deserialized into the memory representation below.
+
+> **Planned Feature:**
+> Implementers will be able to specify the underlying offset type based on the number of expected elements.
+
+ ```text
+ Row 0 → values[..3] → "abc"
+ Row 1 → values[3..6] → "def"
+ Row 2 → values[6..6] → "" (empty)
+ Row 3 → values[6..] → "gh"
+ ```
+
+Nested unsized types use **multiple offset layers** alongside a **single data buffer**. This composable design preserves
+the performance advantages associated with contiguous value storage; namely predictable vectorised traversal. Scanning
+performance across the concatenated data region is unaffected by deep nesting. The inner offsets buffer is written in
+order of traversal to improve cache locality during nested iteration and reduce TLB misses.
+
+ ```text
+ inner offsets
+ outer offsets
+ values
+ ```
