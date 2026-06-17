@@ -103,3 +103,29 @@ A [sector](#sectors-and-segments) to locate the CBOR manifest written after the 
 The memory map is page-aligned. Padding the header to a 64-bit boundary is therefore essential to keep all subsequent
 segments aligned both on-disk and in-memory.
 
+### Segment Header
+
+Every segment begins with a minimal header containing information shared by all variants. The header is used by
+sequential readers to identify the segment type and skip if necessary without deserialisation.
+
+```text
+Segment Header
+├─ variant: u8       // segment variant identifier
+└─ next: NonZeroU64  // byte offset for the next segment header
+```
+
+The `next` field encodes the offset to the start of the next segment header which increases monotonically. Headers
+allow the entire segment region to **self-describe**: a sequential reader can walk the segment region end-to-end using
+information contained solely in the segment headers and dispatch relevant segment body deserialisation based on the
+`variant` identifier. This is the basis for [manifest recovery](#durability-and-recovery).
+
+The header is excluded from the sector recorded in the [manifest](#manifest); the optimised random-access read path
+routes fearlessly to the relevant segment body region without boundary checks or variant verification.
+
+> [!TODO] Refactor Length to Next
+> The segment header currently encodes the segment body `length` instead of the `next` offset. A refactor is required to
+> bring the codebase in line with this specification document.
+
+> [!TODO] Header Padding
+> The segment header is currently unpadded which causes misalignment of the segment body (does not start at a 64-bit
+> boundary). Is it beneficial to add a varible-length zero-filled padding region after the header `next` field?
