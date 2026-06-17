@@ -52,7 +52,7 @@ Two segment variants are currently defined.
 
 | Variant |  Byte  | Payload                                                        |
 |--------:|:------:|:---------------------------------------------------------------|
-|  Schema | `0x01` | The [structure](#schema-segment) of an encoded type.           |
+|  Schema | `0x01` | The [structure](#schema-segments) of an encoded type.          |
 |    Data | `0x02` | The [columnar buffers](#data-segment) for one schema instance. |
 |  Binary | `0x03` | Free-form immutable binary data                                |
 
