@@ -35,7 +35,7 @@ Two abstractions are used to describe contiguous byte regions in the file: Secto
 Sectors can point anything from a single columnar buffer to an entire segment.
 
 ```text
-Sector
+sector
 ├─ offset: u64
 └─ length: NonZeroU64
 ```
@@ -67,7 +67,7 @@ uninitialised readers. The header begins with a magic byte sequence and version 
 followed by the mutable pointers required to bootstrap navigation.
 
 ```text
-Header
+file header
 ├─ magic: [u8; 4]      // b"clem"
 ├─ version: u8
 ├─ tail: NonZeroU64    // offset immediately after the final segment
@@ -109,7 +109,7 @@ Every segment begins with a minimal header containing information shared by all 
 sequential readers to identify the segment type and skip if necessary without deserialisation.
 
 ```text
-Segment Header
+segment header
 ├─ variant: u8       // segment variant identifier
 └─ next: NonZeroU64  // byte offset for the next segment header
 ```
@@ -129,3 +129,51 @@ routes fearlessly to the relevant segment body region without boundary checks or
 > [!TODO] Header Padding
 > The segment header is currently unpadded which causes misalignment of the segment body (does not start at a 64-bit
 > boundary). Is it beneficial to add a varible-length zero-filled padding region after the header `next` field?
+
+### Schema Segments
+
+A schema segment is used to describe the **structure** of an encoded item type. Edge nodes from the hierarchical type
+graph are flattened into a platform-invariant and deterministically-ordered sequence of column descriptors, each mapping
+a field `name` to its corresponding `type`. The segment body encodes this structure using a CBOR map.
+
+```text
+schema segment
+├─ segment header
+│  ├─ variant: u8 = 0x01
+│  └─ next: NonZeroU64
+├─ segment body: CBOR
+└─ alignment padding
+```
+
+Each schema segment encodes **one** schema and each clem file requires at least **one** schema segment. Multimodality
+and schema evolution are achieved by appending additional segments.
+
+### Data Segments
+
+A data segment stores the **columnar buffers** for a single schema instance. Each data segment is associated with
+**one** schema segment via the `schema` offset field for [data integrity](#durability-and-recovery); the optimised read
+path resolves columns for a known schema via the [manifest](#manifest).
+
+```text
+data segment
+├─ segment header
+│  ├─ variant: u8 = 0x02
+│  └─ next: NonZeroU64
+├─ segment metadata
+│  ├─ schema: NonZeroU64  // offset of the associated schema segment
+│  ├─ count: NonZeroU64   // number of encoded items
+│  └─ alignment padding
+└─ segment body
+   ├─ 1st buffer
+   ⋮
+   └─ nth buffer
+```
+
+A metadata region is included directly after the segment header containing:
+
+1. A pointer to the associated schema segment which must be written to the file before this data segment.
+2. An item `count` indicating the total number of encoded rows; used for index-based random-access reads.
+3. A zero-filled padding region to maintain [64-bit SIMD alignment](./simd-alignment.md).
+
+All data buffers are guaranteed to begin at a 64-bit boundary. The number and order of buffers is determined by the
+associated schema segment.
