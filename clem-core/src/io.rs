@@ -80,6 +80,7 @@ use std::num::{self, NonZeroU64, TryFromIntError};
 use std::ops::Add;
 use std::path::{Path, PathBuf};
 
+use bitvec::macros::internal::funty::Fundamental;
 use memmap2::{Mmap, MmapOptions};
 use minicbor::{CborLen, Decode, Encode};
 use smol::fs::{self, OpenOptions};
@@ -615,40 +616,6 @@ pub trait Deserialize {
     /// Byte source from which values of [`Self`] are deserialized.
     type Src<'a>;
 
-    /// Pull the exact number of bytes required to [deserialize](Self::deserialize) one instance
-    /// of [`Self`] from `src`.
-    ///
-    /// Returns a read-only [slice][1] over the extracted bytes; splitting the source without an
-    /// intermediate copy and advancing `src` by the number of bytes read.
-    ///
-    /// ### Guidance
-    ///
-    /// The default implementation leverages [`size_of`]`::<Self>()` for fixed-size types. Unsized
-    /// types must override this default implementation with type-specific size determination logic
-    /// such as reading an on-disk [`length`](NonZeroU64) prefix.
-    ///
-    /// ### Errors
-    ///
-    /// Returns [`Error::Truncated`] if `src` contains fewer than the requested number of bytes.
-    ///
-    /// [1]: https://doc.rust-lang.org/std/primitive.slice.html
-    fn take(mut src: &[u8]) -> Result<&[u8], Error>
-    where
-        Self: Sized,
-    {
-        let expected = size_of::<Self>();
-        let actual = src.len();
-        src.get(..expected)
-            .map(|data| {
-                src = &src[expected..];
-                Ok(data)
-            })
-            .unwrap_or_else(|| {
-                src = &[];
-                Error::Truncated { expected, actual }.into()
-            })
-    }
-
     /// Deserialize [`Self`] from the provided [source](Self::Src).
     // TODO → Remove Sized trait bound on Self to support unsized types; could try return Box<Self>
     #[rustfmt::skip] // Single line where clause improves readability
@@ -661,7 +628,7 @@ impl Deserialize for u8 {
     type Src<'a> = &'a [u8];
 
     fn deserialize(src: &[u8]) -> Result<Self, Error> {
-        let buf = Self::take(src)?.try_into()?;
+        let buf = src.try_into()?;
         let num = Self::from_le_bytes(buf);
         Ok(num)
     }
@@ -671,7 +638,7 @@ impl Deserialize for u16 {
     type Src<'a> = &'a [u8];
 
     fn deserialize(src: &[u8]) -> Result<Self, Error> {
-        let buf = Self::take(src)?.try_into()?;
+        let buf = src.try_into()?;
         let num = Self::from_le_bytes(buf);
         Ok(num)
     }
@@ -681,7 +648,7 @@ impl Deserialize for u32 {
     type Src<'a> = &'a [u8];
 
     fn deserialize(src: &[u8]) -> Result<Self, Error> {
-        let buf = Self::take(src)?.try_into()?;
+        let buf = src.try_into()?;
         let num = Self::from_le_bytes(buf);
         Ok(num)
     }
@@ -691,7 +658,7 @@ impl Deserialize for u64 {
     type Src<'a> = &'a [u8];
 
     fn deserialize(src: &[u8]) -> Result<Self, Error> {
-        let buf = Self::take(src)?.try_into()?;
+        let buf = src.try_into()?;
         let num = Self::from_le_bytes(buf);
         Ok(num)
     }
@@ -701,7 +668,7 @@ impl Deserialize for u128 {
     type Src<'a> = &'a [u8];
 
     fn deserialize(src: &[u8]) -> Result<Self, Error> {
-        let buf = Self::take(src)?.try_into()?;
+        let buf = src.try_into()?;
         let num = Self::from_le_bytes(buf);
         Ok(num)
     }
@@ -754,7 +721,7 @@ impl Deserialize for i8 {
     type Src<'a> = &'a [u8];
 
     fn deserialize(src: &[u8]) -> Result<Self, Error> {
-        let buf = Self::take(src)?.try_into()?;
+        let buf = src.try_into()?;
         let num = Self::from_le_bytes(buf);
         Ok(num)
     }
@@ -764,7 +731,7 @@ impl Deserialize for i16 {
     type Src<'a> = &'a [u8];
 
     fn deserialize(src: &[u8]) -> Result<Self, Error> {
-        let buf = Self::take(src)?.try_into()?;
+        let buf = src.try_into()?;
         let num = Self::from_le_bytes(buf);
         Ok(num)
     }
@@ -774,7 +741,7 @@ impl Deserialize for i32 {
     type Src<'a> = &'a [u8];
 
     fn deserialize(src: &[u8]) -> Result<Self, Error> {
-        let buf = Self::take(src)?.try_into()?;
+        let buf = src.try_into()?;
         let num = Self::from_le_bytes(buf);
         Ok(num)
     }
@@ -784,7 +751,7 @@ impl Deserialize for i64 {
     type Src<'a> = &'a [u8];
 
     fn deserialize(src: &[u8]) -> Result<Self, Error> {
-        let buf = Self::take(src)?.try_into()?;
+        let buf = src.try_into()?;
         let num = Self::from_le_bytes(buf);
         Ok(num)
     }
@@ -794,7 +761,7 @@ impl Deserialize for i128 {
     type Src<'a> = &'a [u8];
 
     fn deserialize(src: &[u8]) -> Result<Self, Error> {
-        let buf = Self::take(src)?.try_into()?;
+        let buf = src.try_into()?;
         let num = Self::from_le_bytes(buf);
         Ok(num)
     }
@@ -844,7 +811,7 @@ impl Deserialize for f32 {
     type Src<'a> = &'a [u8];
 
     fn deserialize(src: &[u8]) -> Result<Self, Error> {
-        let buf = Self::take(src)?.try_into()?;
+        let buf = src.try_into()?;
         let num = Self::from_le_bytes(buf);
         Ok(num)
     }
@@ -854,7 +821,7 @@ impl Deserialize for f64 {
     type Src<'a> = &'a [u8];
 
     fn deserialize(src: &[u8]) -> Result<Self, Error> {
-        let buf = Self::take(src)?.try_into()?;
+        let buf = src.try_into()?;
         let num = Self::from_le_bytes(buf);
         Ok(num)
     }
@@ -868,6 +835,17 @@ impl Deserialize for char {
         char::from_u32(utf8).ok_or_else(|| Error::Utf8(utf8))
     }
 }
+
+// impl Deserialize for bool {
+//     type Src<'a> = &'a [u8];
+//
+//     fn deserialize(src: &[u8]) -> Result<Self, Error>
+//     where
+//         Self: Sized,
+//     {
+//         u8::deserialize(src)?.try_into().map_err(Into::into)
+//     }
+// }
 
 impl Deserialize for Option<num::NonZeroU8> {
     type Src<'a> = &'a [u8];
@@ -1071,19 +1049,6 @@ impl<I> Write for Accumulator<I> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn take_prefixes_src() {
-        let bytes = [1u8, 0, 2, 0];
-        assert_eq!(u16::take(&bytes).expect("Take failed"), &[1, 0]);
-        assert_eq!(bytes, [1, 0, 2, 0]); // Source is borrowed, never consumed.
-    }
-
-    #[test]
-    fn take_truncated_errors() {
-        let bytes = [1u8]; // One byte cannot encode u16.
-        assert!(matches!(u16::take(&bytes), Err(Error::Truncated { .. })));
-    }
 
     #[test]
     fn sector_ord() {

@@ -67,12 +67,13 @@ use std::collections::HashSet;
 use std::iter::from_fn;
 use std::slice::Iter;
 
+use bitvec::macros::internal::funty::Fundamental;
 use bitvec::order::Lsb0;
 use bitvec::slice::BitSlice;
 use bitvec::view::BitView;
 use memmap2::Mmap;
 
-use crate::io::{self, Deserialize};
+use crate::io::{self, Deserialize, Deserializer, Error};
 use crate::manifest::Buffer;
 use crate::query::Filter;
 use crate::schema::{Schema, Unfolder};
@@ -116,44 +117,6 @@ pub struct Column<'a> {
     pub(crate) mmap: &'a Mmap,
     /// Deduplicated [`Filter`] set used to [`evaluate`](Filter::evaluate) deserialized items.
     pub(crate) filters: &'a HashSet<Filter>,
-}
-
-impl<'a> Column<'a> {
-    /// Returns a read-only [memory map](Mmap) [slice][1] over the raw data bytes of the specified
-    /// [`Buffer`]. Excludes the buffer [`header`](Buffer::HEADER).
-    ///
-    /// ### Errors
-    ///
-    /// Returns [`Error::Truncated`](io::Error::Truncated) if the buffer extends beyond the end of
-    /// the [`Mmap`] or is shorter than the fixed-length buffer header.
-    ///
-    /// [1]: https://doc.rust-lang.org/std/primitive.slice.html
-    fn bytes(&self, buffer: &Buffer) -> Result<&'a [u8], io::Error> {
-        let bytes = buffer.sector.slice(self.mmap)?;
-        let actual = bytes.len();
-        bytes.get(Buffer::HEADER..).ok_or(io::Error::truncated(Buffer::HEADER, actual))
-    }
-
-    /// Returns a read-only [memory map](Mmap) [`BitSlice`] over the raw data bytes of the specified
-    /// [`Buffer`].
-    ///
-    /// Excludes the buffer [`header`](Buffer::HEADER) and leverages [`Buffer::count`] to discard
-    /// any trailing bit padding.
-    ///
-    /// ### Errors
-    ///
-    /// - [`Error::Truncated`](io::Error::Truncated) if the buffer extends beyond the end of
-    /// the [`Mmap`] or contains fewer bits than the expected `count`.
-    /// - [`Error::Number`](io::Error::Number) if the row count overflows [`usize`].
-    fn bits(&self, buffer: &Buffer) -> Result<&'a BitSlice<u8, Lsb0>, io::Error> {
-        let bytes = buffer.sector.slice(self.mmap)?;
-        let bits = bytes
-            .get(Buffer::HEADER..)
-            .ok_or_else(|| io::Error::truncated(Buffer::HEADER, bytes.len()))?
-            .view_bits::<Lsb0>();
-        let count: usize = buffer.count.get().try_into()?;
-        bits.get(..count).ok_or_else(|| io::Error::truncated(count, bits.len()))
-    }
 }
 
 /// A **stateful cursor** over paired validity and value data streams for a single [`Column`]; used
@@ -214,25 +177,34 @@ pub trait Read: Sized {
     /// [`Read::Ctx`] when exhausted.
     type Src<'a>: Default;
 
+    /// Pull the required number of bytes from [`Self::Src`] and [deserializes](Deserialize) into
+    /// one instance of [`Self`]; advancing the source without an intermediate copy by the number
+    /// of bytes read.
+    ///
+    /// ### Guidance
+    ///
+    /// The default implementation leverages [`size_of`]`::<Self>()` for fixed-size types. Unsized
+    /// types must override this default implementation with type-specific size determination logic
+    /// such as reading an on-disk [`length`](NonZeroU64) prefix.
+    ///
+    /// ### Errors
+    ///
+    /// Returns [`Error::Truncated`] if `src` contains fewer than the requested number of bytes.
+    ///
+    /// [1]: https://doc.rust-lang.org/std/primitive.slice.html
+    fn take(src: &mut Self::Src<'_>) -> Result<Self, Error>;
+
     /// Evaluate [`self`](Read) against every [`Filter`]:
     ///
     /// - `true` ← All filters pass
     /// - `false` ← One or more filters fail
     ///
-    /// Items are excluded from the result set if any filter fails.
+    /// Items are [excluded](Outcome::Excluded) from the result set if any filter fails.
     ///
     /// ### Errors
     ///
-    /// Returns [`Error`](io::Error) if a stored filter bound cannot [`Deserialize`] as [`Self`].
-    fn filter(&self, filters: &HashSet<Filter>) -> Result<bool, io::Error>
-    where
-        Self: for<'b> Deserialize<Src<'b> = &'b [u8]> + PartialOrd,
-    {
-        filters.iter().try_fold(true, |acc, filter| match acc {
-            true => filter.evaluate(self),
-            false => Ok(false),
-        })
-    }
+    /// Returns [`Error`] if a stored filter bound cannot [`Deserialize`] as [`Self`].
+    fn filter(&self, filters: &HashSet<Filter>) -> Result<bool, Error>;
 
     /// [`Deserialize`] and [`Filter`] one instance of [`Self`] from `src`.
     fn next<'a>(src: &mut Self::Src<'a>, ctx: &mut Self::Ctx<'a>) -> Outcome<Self>;
@@ -245,7 +217,7 @@ pub trait Read: Sized {
     /// This function provides the top-level iteration pipeline. Implementations should pull
     /// successive rows via [`Read::next`] and translate [`Outcome::Finished`] into [`None`] to
     /// terminate the [`Iterator`].
-    fn iter<'a>(mut ctx: Self::Ctx<'a>) -> impl Iterator<Item = Outcome<Self>> {
+    fn iter(mut ctx: Self::Ctx<'_>) -> impl Iterator<Item = Outcome<Self>> {
         let mut src = Default::default();
         from_fn(move || match Self::next(&mut src, &mut ctx) {
             Outcome::Finished => None,
@@ -275,41 +247,50 @@ where
 
     type Src<'a> = Iter<'a, u8>;
 
+    fn take(src: &mut Self::Src<'_>) -> Result<I, Error> {
+        let expected = size_of::<I>();
+        src.as_slice()
+            .split_at_checked(expected)
+            .ok_or_else(|| {
+                *src = Default::default();
+                Error::Truncated { expected, actual: src.len() }
+            })
+            .map(|data| {
+                *src = data.1.iter();
+                data.0.deserialize_into()
+            })
+            .flatten()
+    }
+
+    fn filter(&self, filters: &HashSet<Filter>) -> Result<bool, Error> {
+        filters.iter().try_fold(true, |acc, filter| match acc {
+            true => filter.evaluate(self),
+            false => Ok(false),
+        })
+    }
+
     /// [`Deserialize`] one instance of [`Self`](I) from the [`Read::Src`] cursor; refilling from
-    /// the next [`Buffer`] when `Src` is exhausted.
+    /// the next [`Buffer`] when the source is exhausted.
     ///
     /// Returns [`Outcome::Finished`] once every remaining [`Buffer`] is exhausted.
     ///
     /// Refer to the [trait-level documentation](Read::next) for more details.
-    fn next<'a>(src: &mut <Self as Read>::Src<'a>, ctx: &mut Self::Ctx<'a>) -> Outcome<Self> {
+    fn next<'a>(src: &mut Self::Src<'a>, ctx: &mut Self::Ctx<'a>) -> Outcome<Self> {
         while src.as_slice().is_empty() {
             let buffer = match ctx.buffers.next() {
                 Some(buffer) => buffer,
                 None => return Outcome::Finished,
             };
-            match ctx.bytes(buffer) {
+            match buffer.sector.slice(&ctx.mmap) {
                 Ok(data) => *src = data.iter(),
                 Err(e) => return Outcome::Error(e),
             }
         }
-        let bytes = match Self::take(src.as_slice()) {
-            Ok(bytes) => bytes,
-            Err(error) => {
-                // NOTE: Discard the truncated remainder; resume from the next buffer to avoid loop
-                *src = Default::default();
-                return Outcome::Error(error);
-            }
-        };
-        *src = src.as_slice().get(bytes.len()..).unwrap_or_default().iter();
-        let item = match Self::deserialize(bytes) {
-            Ok(item) => item,
-            Err(e) => return Outcome::Error(e),
-        };
-        match item.filter(ctx.filters) {
+        Self::take(src).map_or_else(Outcome::Error, |item| match item.filter(ctx.filters) {
             Ok(true) => Outcome::Success(item),
             Ok(false) => Outcome::Excluded,
             Err(e) => Outcome::Error(e),
-        }
+        })
     }
 }
 
@@ -318,27 +299,47 @@ impl Read for bool {
 
     type Src<'a> = &'a BitSlice<u8, Lsb0>;
 
+    fn take(src: &mut &BitSlice<u8>) -> Result<bool, Error> {
+        src.split_first()
+            .ok_or_else(|| {
+                *src = Default::default();
+                Error::Truncated {
+                    expected: size_of::<u8>(),
+                    actual: src.len(),
+                }
+            })
+            .map(|data| {
+                *src = data.1;
+                data.0.as_bool()
+            })
+    }
+
+    fn filter(&self, _: &HashSet<Filter>) -> Result<bool, Error> {
+        unimplemented!("Read::filter is not yet implemented for bool")
+    }
+
     /// Read one bit from the [`Read::Src`] cursor; refilling from the next [`Buffer`] when `Src`
     /// is exhausted.
     ///
     /// Returns [`Outcome::Finished`] once every remaining [`Buffer`] is exhausted.
     ///
     /// Refer to the [trait-level documentation](Read::next) for more details.
-    fn next<'a>(src: &mut Self::Src<'a>, ctx: &mut Self::Ctx<'a>) -> Outcome<Self> {
-        loop {
-            if let Some((bit, rest)) = src.split_first() {
-                *src = rest;
-                return Outcome::Success(*bit);
-            }
+    fn next<'a>(src: &mut &'a BitSlice<u8>, ctx: &mut Column<'a>) -> Outcome<Self> {
+        while src.is_empty() {
             let buffer = match ctx.buffers.next() {
                 Some(buffer) => buffer,
                 None => return Outcome::Finished,
             };
-            match ctx.bits(buffer) {
-                Ok(bits) => *src = bits,
-                Err(error) => return Outcome::Error(error),
+            match buffer.sector.slice(&ctx.mmap) {
+                Ok(data) => *src = data.view_bits::<Lsb0>(),
+                Err(e) => return Outcome::Error(e),
             }
         }
+        Self::take(src).map_or_else(Outcome::Error, |item| match item.filter(ctx.filters) {
+            Ok(true) => Outcome::Success(item),
+            Ok(false) => Outcome::Excluded,
+            Err(e) => Outcome::Error(e),
+        })
     }
 }
 
