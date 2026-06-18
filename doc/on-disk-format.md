@@ -271,6 +271,10 @@ categorical data such as sensor type, device ID, or location. It is possible for
 repeated value across an entire data segment. Instead of repeatedly encoding identical values, clem defaults to a
 **compact buffer** representation to improve storage density.
 
+> **Prefer binary segments for constant values**
+> Implementers are encouraged to use a `bin` segment for genuinely constant values that never change across the entire
+> file lifetime. This improves storage efficiency by eliminating an unnecessary column from the schema.
+
 Compact buffers contain exactly **one** value – regardless of the segment header `count` – and are therefore detected
 automatically by the file reader when the buffer header `next` offset is reached after deserialising a single value.
 The reader returns a looped iterator yielding this value `count` times.
