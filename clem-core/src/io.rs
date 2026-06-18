@@ -869,6 +869,108 @@ impl Deserialize for char {
     }
 }
 
+impl Deserialize for Option<num::NonZeroU8> {
+    type Src<'a> = &'a [u8];
+
+    fn deserialize(src: &[u8]) -> Result<Self, Error> {
+        // NOTE: serialize trait encodes none using the u8::MIN niche
+        u8::deserialize(src).map(num::NonZeroU8::new)
+    }
+}
+
+impl Deserialize for Option<num::NonZeroU16> {
+    type Src<'a> = &'a [u8];
+
+    fn deserialize(src: &[u8]) -> Result<Self, Error> {
+        // NOTE: serialize trait encodes none using the u16::MIN niche
+        u16::deserialize(src).map(num::NonZeroU16::new)
+    }
+}
+
+impl Deserialize for Option<num::NonZeroU32> {
+    type Src<'a> = &'a [u8];
+
+    fn deserialize(src: &[u8]) -> Result<Self, Error> {
+        // NOTE: serialize trait encodes none using the u32::MIN niche
+        u32::deserialize(src).map(num::NonZeroU32::new)
+    }
+}
+
+impl Deserialize for Option<NonZeroU64> {
+    type Src<'a> = &'a [u8];
+
+    fn deserialize(src: &[u8]) -> Result<Self, Error> {
+        // NOTE: serialize trait encodes none using the u64::MIN niche
+        u64::deserialize(src).map(NonZeroU64::new)
+    }
+}
+
+impl Deserialize for Option<num::NonZeroU128> {
+    type Src<'a> = &'a [u8];
+
+    fn deserialize(src: &[u8]) -> Result<Self, Error> {
+        // NOTE: serialize trait encodes none using the u128::MIN niche
+        u128::deserialize(src).map(num::NonZeroU128::new)
+    }
+}
+
+impl Deserialize for Option<num::NonZeroI8> {
+    type Src<'a> = &'a [u8];
+
+    fn deserialize(src: &[u8]) -> Result<Self, Error> {
+        // NOTE: serialize trait encodes none using the i8::MIN niche
+        i8::deserialize(src).map(num::NonZeroI8::new)
+    }
+}
+
+impl Deserialize for Option<num::NonZeroI16> {
+    type Src<'a> = &'a [u8];
+
+    fn deserialize(src: &[u8]) -> Result<Self, Error> {
+        // NOTE: serialize trait encodes none using the i16::MIN niche
+        i16::deserialize(src).map(num::NonZeroI16::new)
+    }
+}
+
+impl Deserialize for Option<num::NonZeroI32> {
+    type Src<'a> = &'a [u8];
+
+    fn deserialize(src: &[u8]) -> Result<Self, Error> {
+        // NOTE: serialize trait encodes none using the i32::MIN niche
+        i32::deserialize(src).map(num::NonZeroI32::new)
+    }
+}
+
+impl Deserialize for Option<num::NonZeroI64> {
+    type Src<'a> = &'a [u8];
+
+    fn deserialize(src: &[u8]) -> Result<Self, Error> {
+        // NOTE: serialize trait encodes none using the i64::MIN niche
+        i64::deserialize(src).map(num::NonZeroI64::new)
+    }
+}
+
+impl Deserialize for Option<num::NonZeroI128> {
+    type Src<'a> = &'a [u8];
+
+    fn deserialize(src: &[u8]) -> Result<Self, Error> {
+        // NOTE: serialize trait encodes none using the i128::MIN niche
+        i128::deserialize(src).map(num::NonZeroI128::new)
+    }
+}
+
+impl Deserialize for Option<char> {
+    type Src<'a> = &'a [u8];
+
+    fn deserialize(src: &[u8]) -> Result<Self, Error> {
+        // NOTE: serialize trait encodes none using the u32::MAX niche
+        match u32::deserialize(src)? {
+            u32::MAX => Ok(None),
+            utf8 => char::from_u32(utf8).map(Some).ok_or(Error::Utf8(utf8)),
+        }
+    }
+}
+
 /* --------------------------------------------------------------- Deserializer Trait Definition */
 
 /// A **source** that can be deserialized into a [supported data type](Deserialize).
