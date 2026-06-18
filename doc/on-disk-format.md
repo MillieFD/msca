@@ -194,9 +194,8 @@ information contained solely in the buffer headers and associated schema segment
 header `next` offset and ceases deserialisation at the segment header `next` offset. This is the basis for
 [manifest recovery](#durability-and-recovery).
 
-Niche-optimisation on the non-zero `next` field is leveraged to indicate [compact buffers](#compact-buffers). The header
-is excluded from the sector recorded in the [manifest](#manifest); the optimised random-access read path routes
-fearlessly to the relevant buffer without boundary checks or type verification.
+The header is excluded from the sector recorded in the [manifest](#manifest); the optimised random-access read path
+routes fearlessly to the relevant buffer without boundary checks or type verification.
 
 > [!TODO] Refactor Length to Next
 > The buffer header currently encodes the buffer body `length` instead of the `next` offset. A refactor is required to
@@ -264,3 +263,14 @@ order of traversal to improve cache locality during nested iteration and reduce 
  outer offsets
  values
  ```
+
+##### Compact Buffers
+
+Real-world applications often require the inclusion of columns with infrequently altered values; typically carrying
+categorical data such as sensor type, device ID, or location. It is possible for a column to contain only **one**
+repeated value across an entire data segment. Instead of repeatedly encoding identical values, clem defaults to a
+**compact buffer** representation to improve storage density.
+
+Compact buffers contain exactly **one** value – regardless of the segment header `count` – and are therefore detected
+automatically by the file reader when the buffer header `next` offset is reached after deserialising a single value.
+The reader returns a looped iterator yielding this value `count` times.
