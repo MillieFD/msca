@@ -176,10 +176,8 @@
         - [ ] Duplicate items are allowed; uniqueness is not guaranteed.
         - [ ] Stored using the manifest `schemas` field; no new manifest machinery or segment types.
 - [ ] Support compact encoding for buffers with a single repeated value e.g. all `true` or all `None`.
-    - [ ] Indicate compact buffers via a bit-packed mask in the data segment header:
-        - Use existing `BitVec` serialization implementation.
-        - The current data segment header includes seven bytes of zero-filled padding which can contain the mask.
-        - Schemas with ≤ 56 buffers would not increase the data segment header size.
+    - [ ] Compact buffers contain exactly one serialized value regardless of the segment header `count`.
+    - [ ] Detected when the buffer header `next` offset is reached after deserialising a single value.
     - Breaks the current assumption that all buffers in a data segment contain the same number of items.
     - [ ] Refactor `manifest::Buffer` struct into enum:
         - [ ] Current buffer becomes `Buffer::Full` variant with fields.
