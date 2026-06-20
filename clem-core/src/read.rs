@@ -96,8 +96,6 @@ pub enum Outcome<I> {
     ///
     /// [1]: Deserialize::deserialize
     Excluded,
-    /// Every candidate [`Item`](I) has been [`Read`].
-    Finished,
     /// An [`Error`](io::Error) occurred while [deserializing](Deserialize) or [filtering](Filter)
     /// the [`Item`](I).
     Error(io::Error),
