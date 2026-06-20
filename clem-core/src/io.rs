@@ -476,7 +476,7 @@ impl File {
 
 /* ------------------------------------------------------------------------------ Specific Error */
 
-/// Errors returned by [`File`] IO.
+/// Errors returned by [`File`](File) [`IO`](self).
 ///
 /// Enum variants cover various granular error cases that may arise when working with the underlying
 /// file. Users should consider handling errors explicitly wherever possible to provide meaningful
