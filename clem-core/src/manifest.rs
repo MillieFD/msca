@@ -17,7 +17,7 @@ use std::ops::RangeBounds;
 use minicbor::{CborLen, Decode, Encode};
 use smol::io::{AsyncRead, AsyncReadExt, AsyncSeek};
 
-use crate::io::{Header, Write};
+use crate::io::{Deserializer, Header, Write};
 use crate::schema::number::Error;
 use crate::schema::Type;
 use crate::{io, Deserialize, Sector, Serialize};
@@ -184,8 +184,6 @@ impl Serialize for Manifest {
 }
 
 impl Deserialize for Manifest {
-    type Src<'a> = &'a [u8];
-
     fn deserialize(src: &[u8]) -> Result<Self, io::Error> {
         minicbor::decode(src).map_err(io::Error::Decode)
     }
@@ -309,10 +307,10 @@ impl Buffer {
     pub(crate) unsafe fn disjoint<I, B>(&self, bounds: &B) -> Result<bool, io::Error>
     where
         B: RangeBounds<I>,
-        I: for<'a> Deserialize<Src<'a> = &'a [u8]> + PartialOrd,
+        I: Deserialize + PartialOrd,
     {
-        let min = I::deserialize(&self.min)?;
-        let max = I::deserialize(&self.max)?;
+        let min: I = self.min.as_slice().deserialize_into()?;
+        let max: I = self.max.as_slice().deserialize_into()?;
         let above = match bounds.end_bound() {
             Bound::Included(v) => &min > v,
             Bound::Excluded(v) => &min >= v,
