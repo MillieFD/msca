@@ -65,26 +65,22 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //! [5]: crate::query::Query
 
 use std::collections::HashSet;
-use std::iter::from_fn;
 use std::slice::Iter;
+use std::{iter, num};
 
-use bitvec::macros::internal::funty::Fundamental;
 use bitvec::order::Lsb0;
 use bitvec::slice::BitSlice;
-use bitvec::view::BitView;
 use memmap2::Mmap;
+use smol::stream::StreamExt;
 
-use crate::io::{self, Deserialize, Deserializer, Error};
+use crate::io::{Deserialize, Deserializer, Error};
 use crate::manifest::Buffer;
-use crate::query::Filter;
-use crate::schema::{Schema, Unfolder};
+use crate::query::{Evaluate, Filter};
 
 /* ------------------------------------------------------------------------------ Public Exports */
 
 /// Shorthand type-erased stack-allocated [pointer](Box) to a lazy [`Iterator`] yielding one
-/// deserialized [`Outcome`] per candidate [`Item`](I).
-///
-/// Constructed via [`Read::boxed`]. Returns [`None`] once every candidate [`Buffer`] is consumed.
+/// [`Outcome`] per candidate [`Item`](I), or [`None`] once every candidate [`Buffer`] is consumed.
 pub type Stream<'a, I> = Box<dyn Iterator<Item = Outcome<I>> + 'a>;
 
 /// The result of [deserializing](Deserialize) one [`Item`](I) from a [`Read`](Read) [`Stream`].
@@ -92,18 +88,34 @@ pub type Stream<'a, I> = Box<dyn Iterator<Item = Outcome<I>> + 'a>;
 #[derive(Debug)]
 pub enum Outcome<I> {
     /// A [deserialized](Deserialize::deserialize) [`Item`](I) which satisfies every [`Filter`].
-    Success(I),
-    /// The [`Item`](I) was rejected by one or more [filters](Filter) during [deserialization][1].
-    ///
-    /// [1]: Deserialize::deserialize
-    Excluded,
-    /// An [`Error`](io::Error) occurred while [deserializing](Deserialize) or [filtering](Filter)
-    /// the [`Item`](I).
-    Error(io::Error),
+    Include(I),
+    /// The [`Item`](I) was rejected by one or more [filters](Filter).
+    Exclude,
+    /// An [`Error`] occurred during [deserialization](Deserialize) or [filtering](Filter).
+    Error(Error),
 }
 
-/// A minimal column **data source** with [deserialization](Deserialize) context; used during
-/// [`Query`] execution.
+impl<I> Outcome<I> {
+    fn map<F, O>(&self, f: F) -> Outcome<O>
+    where
+        F: FnMut(I) -> O,
+    {
+        match self {
+            Outcome::Include(v) => Self::Include(f(v)),
+            Outcome::Exclude => Self::Exclude,
+            Outcome::Error(e) => e.into(),
+        }
+    }
+}
+
+impl<I> From<Error> for Outcome<I> {
+    fn from(e: Error) -> Self {
+        Outcome::Error(e)
+    }
+}
+
+/// A minimal columnar **data source** with [deserialization](Deserialize) context; used during
+/// [`Query`](crate::Query) execution.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug)]
 pub struct Column<'a> {
@@ -114,23 +126,45 @@ pub struct Column<'a> {
     ///
     /// Refer to the [safety documentation](io::File::mmap) for details.
     pub(crate) mmap: &'a Mmap,
-    /// Deduplicated [`Filter`] set used to [`evaluate`](Filter::evaluate) deserialized items.
+    /// Deduplicated [`Filter`](Filter) [`Set`](HashSet) used to [`Evaluate`] deserialized items.
     pub(crate) filters: &'a HashSet<Filter>,
+}
+
+impl<'a> Column<'a> {
+    fn stream<I>(&mut self) -> Stream<I>
+    where
+        I: Read + Evaluate,
+    {
+        self.buffers
+            .flat_map(|buf| buf.sector.slice(self.mmap))
+            .flat_map(match I::Src::try_from {
+                Ok(src) => src.boxed(self.filters),
+                Err(e) => iter::once(Outcome::Error(e)).into(),
+            })
+            .into()
+    }
 }
 
 /// A **stateful cursor** over paired validity and value data streams for a single [`Column`]; used
 /// to [`Deserialize`] optional non-niche items.
-#[doc(hidden)] // Reachable via Read::Src for optional non-niche readers
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone)]
-pub struct OptBitVec<'a> {
+struct OptBitVec<'a, I> {
     /// Validity bits in [`Lsb0`] order. One bit per item.
     ///
     /// - `true` → [`Some`]
     /// - `false` → [`None`]
-    bits: &'a BitSlice,
+    bits: Stream<'a, bool>,
     /// Data **source** from which items are [deserialized](Deserialize).
-    data: Iter<'a, u8>,
+    data: Stream<'a, I>,
+}
+
+impl<'a, I> TryFrom<&'a [u8]> for OptBitVec<'a, I> {
+    type Error = Error;
+
+    fn try_from(src: &'a [u8]) -> Result<Self, Self::Error> {
+        todo!("read the validity bits and data buffer into Self")
+    }
 }
 
 /// A **stateful cursor** over paired offset and value data streams for a single [`Column`]; used to
@@ -140,206 +174,315 @@ pub struct OptBitVec<'a> {
 #[doc(hidden)] // Reachable via Read::Src for unsized readers
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone)]
-pub struct Seq<'a> {
-    /// Cumulative non-zero end offsets for each item.
+struct Seq<'a, I> {
+    /// Cumulative non-zero end offsets for each [`Item`](I).
     ///
     /// The [`u64::MIN`] niche is used to encode [`None`] for optional unsized items.
-    offsets: Iter<'a, u64>,
-    /// Exclusive end offset of the previous non-null item and inclusive start offset for the
-    /// current item.
-    prev: u64,
+    offsets: Stream<'a, u64>,
+    /// Inclusive start offset for the next item.
+    start: u64,
     /// Flattened data **source** from which items are [deserialized](Deserialize).
-    data: Iter<'a, u8>,
+    data: Stream<'a, I>,
+}
+
+/* --------------------------------------------------------------------- Reader Trait Definition */
+
+trait Reader<I> {
+    /// Additional context required to construct a new empty instance of [`Self`].
+    type Ctx;
+
+    /// Returns a new empty instance of [`Self`] boxed as a [`Stream`] trait object.
+    fn boxed(&self, ctx: Self::Ctx) -> Stream<I>;
+}
+
+/* ----------------------------------------------------------------- Reader Trait Implementation */
+
+impl<'a, I> Reader<I> for &'a [u8]
+where
+    I: Deserialize + Evaluate,
+{
+    type Ctx = &'a HashSet<Filter>;
+
+    fn boxed(&self, ctx: Self::Ctx) -> Stream<I> {
+        let iter = iter::from_fn(move || {
+            self.deserialize_into().map_or_else(
+                |error| match error {
+                    Error::Truncated { actual: 0, .. } => None,
+                    other => Outcome::Error(other).into(),
+                },
+                |item: I| item.evaluate(ctx).into(),
+            )
+        });
+        Box::new(iter)
+    }
+}
+
+impl<'a> Reader<bool> for &'a BitSlice<u8, Lsb0> {
+    type Ctx = &'a HashSet<Filter>;
+
+    fn boxed(&self, ctx: Self::Ctx) -> Stream<bool> {
+        let iter = iter::from_fn(move || {
+            self.split_first().map_or_else(
+                |error| match error {
+                    Error::Truncated { actual: 0, .. } => None,
+                    other => Outcome::Error(other).into(),
+                },
+                |item: bool| item.evaluate(ctx).into(),
+            )
+        });
+        Box::new(iter)
+    }
+}
+
+impl<'a, I> Reader<Option<I>> for OptBitVec<'a, I>
+where
+    Option<I>: Read<Src<'a> = Self>,
+{
+    type Ctx = &'a HashSet<Filter>;
+
+    fn boxed(&self, ctx: Self::Ctx) -> Stream<Option<I>> {
+        let mut bits = self.bits;
+        let mut data = self.data;
+        let iter = iter::from_fn(move || match bits.next()? {
+            Outcome::Include(true) => data.next()?.map(Some).into(),
+            Outcome::Include(false) => Outcome::Include(None).into(),
+            other => other.into(),
+        });
+        Box::new(iter)
+    }
+}
+
+impl<'a, I> Reader<I> for Seq<'a, I>
+where
+    I: Read<Src<'a> = Self>,
+{
+    type Ctx = &'a HashSet<Filter>;
+
+    fn boxed(&self, ctx: Self::Ctx) -> Stream<I> {
+        todo!()
+    }
 }
 
 /* ----------------------------------------------------------------------- Read Trait Definition */
 
-/// An in-memory **data type** that can be lazily [deserialized](Deserialize) and [filtered](Filter)
-/// from a [clem](crate) file as a [`Stream`] of [`Outcome<Self>`](Outcome) items.
+/// A **data type** that can be lazily [streamed](Stream) from a [`Dataset`](crate::Dataset).
 ///
 /// ### Guidance
 ///
 /// Default implementations are provided for all supported primitive types. Implementors are advised
-/// to [`#[derive(Read)]`][1] for composite types, which zips one [`Stream`] per field and applies
-/// the appropriate [filters](Filter) during iteration.
+/// to [`derive`][1] this trait for composite types, which zips one [sub-stream](Stream) per field.
 // [1]: TODO → add link to clem-derive crate or feature
-pub trait Read: Sized {
-    /// Additional context required to construct a [`Stream`] of [`Self`].
-    ///
-    /// Primitive types read from a [`Column`]. Composite types read from a zipped context holding
-    /// one [`Stream`] per field; constructed from a [`Query`](crate::Query) via [`TryFrom`].
-    type Ctx<'a>;
-
-    /// Data **source cursor** from which values of [`Self`] are [deserialized](Deserialize).
-    ///
-    /// `Src` is initialised by [`Read::iter`], advanced by [`Read::next`], and refilled from
-    /// [`Read::Ctx`] when exhausted.
-    type Src<'a>: Default;
-
-    /// Pull the required number of bytes from [`Self::Src`] and [deserializes](Deserialize) into
-    /// one instance of [`Self`]; advancing the source without an intermediate copy by the number
-    /// of bytes read.
-    ///
-    /// ### Guidance
-    ///
-    /// The default implementation leverages [`size_of`]`::<Self>()` for fixed-size types. Unsized
-    /// types must override this default implementation with type-specific size determination logic
-    /// such as reading an on-disk [`length`](NonZeroU64) prefix.
-    ///
-    /// ### Errors
-    ///
-    /// Returns [`Error::Truncated`] if `src` contains fewer than the requested number of bytes.
-    ///
-    /// [1]: https://doc.rust-lang.org/std/primitive.slice.html
-    fn take(src: &mut Self::Src<'_>) -> Result<Self, Error>;
-
-    /// Evaluate [`self`](Read) against every [`Filter`]:
-    ///
-    /// - `true` ← All filters pass
-    /// - `false` ← One or more filters fail
-    ///
-    /// Items are [excluded](Outcome::Excluded) from the result set if any filter fails.
-    ///
-    /// ### Errors
-    ///
-    /// Returns [`Error`] if a stored filter bound cannot [`Deserialize`] as [`Self`].
-    fn filter(&self, filters: &HashSet<Filter>) -> Result<bool, Error>;
-
-    /// [`Deserialize`] and [`Filter`] one instance of [`Self`] from `src`.
-    fn next<'a>(src: &mut Self::Src<'a>, ctx: &mut Self::Ctx<'a>) -> Outcome<Self>;
-
-    /// Construct a lazy [`Iterator`] from the provided [`context`](Self::Ctx); yielding one
-    /// [deserialized](Deserialize) [`Outcome`] per candidate [`Item`](Self).
-    ///
-    /// ### Guidance
-    ///
-    /// This function provides the top-level iteration pipeline. Implementations should pull
-    /// successive rows via [`Read::next`] and translate [`Outcome::Finished`] into [`None`] to
-    /// terminate the [`Iterator`].
-    fn iter(mut ctx: Self::Ctx<'_>) -> impl Iterator<Item = Outcome<Self>> {
-        let mut src = Default::default();
-        from_fn(move || match Self::next(&mut src, &mut ctx) {
-            Outcome::Finished => None,
-            outcome => Some(outcome),
-        })
-    }
-
-    /// Construct a type-erased [`Stream`] of [`Self`] from the provided [`context`](Self::Ctx);
-    /// uses [`Read::iter`] internally.
-    fn boxed<'a>(ctx: Self::Ctx<'a>) -> Stream<'a, Self>
-    where
-        Self: 'a,
-    {
-        Box::new(Self::iter(ctx))
-    }
+pub trait Read {
+    /// The [stateful data source](Reader) from which to [`Deserialize`] values of [`Self`].
+    type Src<'a>: Reader<Self> + TryFrom<&'a [u8]>;
 }
 
 /* ------------------------------------------------------------------- Read Trait Implementation */
 
-/// Blanket [`Read`] implementation for fixed-size primitives.
-impl<I> Read for I
-where
-    I: for<'b> Deserialize<Src<'b> = &'b [u8]> + PartialOrd,
-    Schema: Unfolder<I>,
-{
-    type Ctx<'a> = Column<'a>;
+impl Read for u8 {
+    type Src<'a> = &'a [u8];
+}
 
-    type Src<'a> = Iter<'a, u8>;
+impl Read for u16 {
+    type Src<'a> = &'a [u8];
+}
 
-    fn take(src: &mut Self::Src<'_>) -> Result<I, Error> {
-        let expected = size_of::<I>();
-        src.as_slice()
-            .split_at_checked(expected)
-            .ok_or_else(|| {
-                *src = Default::default();
-                Error::Truncated { expected, actual: src.len() }
-            })
-            .map(|data| {
-                *src = data.1.iter();
-                data.0.deserialize_into()
-            })
-            .flatten()
-    }
+impl Read for u32 {
+    type Src<'a> = &'a [u8];
+}
 
-    fn filter(&self, filters: &HashSet<Filter>) -> Result<bool, Error> {
-        filters.iter().try_fold(true, |acc, filter| match acc {
-            true => filter.evaluate(self),
-            false => Ok(false),
-        })
-    }
+impl Read for u64 {
+    type Src<'a> = &'a [u8];
+}
 
-    /// [`Deserialize`] one instance of [`Self`](I) from the [`Read::Src`] cursor; refilling from
-    /// the next [`Buffer`] when the source is exhausted.
-    ///
-    /// Returns [`Outcome::Finished`] once every remaining [`Buffer`] is exhausted.
-    ///
-    /// Refer to the [trait-level documentation](Read::next) for more details.
-    fn next<'a>(src: &mut Self::Src<'a>, ctx: &mut Self::Ctx<'a>) -> Outcome<Self> {
-        while src.as_slice().is_empty() {
-            let buffer = match ctx.buffers.next() {
-                Some(buffer) => buffer,
-                None => return Outcome::Finished,
-            };
-            match buffer.sector.slice(&ctx.mmap) {
-                Ok(data) => *src = data.iter(),
-                Err(e) => return Outcome::Error(e),
-            }
-        }
-        Self::take(src).map_or_else(Outcome::Error, |item| match item.filter(ctx.filters) {
-            Ok(true) => Outcome::Success(item),
-            Ok(false) => Outcome::Excluded,
-            Err(e) => Outcome::Error(e),
-        })
-    }
+impl Read for u128 {
+    type Src<'a> = &'a [u8];
+}
+
+impl Read for i8 {
+    type Src<'a> = &'a [u8];
+}
+
+impl Read for i16 {
+    type Src<'a> = &'a [u8];
+}
+
+impl Read for i32 {
+    type Src<'a> = &'a [u8];
+}
+
+impl Read for i64 {
+    type Src<'a> = &'a [u8];
+}
+
+impl Read for i128 {
+    type Src<'a> = &'a [u8];
+}
+
+impl Read for f32 {
+    type Src<'a> = &'a [u8];
+}
+
+impl Read for f64 {
+    type Src<'a> = &'a [u8];
+}
+
+impl Read for char {
+    type Src<'a> = &'a [u8];
+}
+
+impl Read for num::NonZeroU8 {
+    type Src<'a> = &'a [u8];
+}
+
+impl Read for num::NonZeroU16 {
+    type Src<'a> = &'a [u8];
+}
+
+impl Read for num::NonZeroU32 {
+    type Src<'a> = &'a [u8];
+}
+
+impl Read for num::NonZeroU64 {
+    type Src<'a> = &'a [u8];
+}
+
+impl Read for num::NonZeroU128 {
+    type Src<'a> = &'a [u8];
+}
+
+impl Read for num::NonZeroI8 {
+    type Src<'a> = &'a [u8];
+}
+
+impl Read for num::NonZeroI16 {
+    type Src<'a> = &'a [u8];
+}
+
+impl Read for num::NonZeroI32 {
+    type Src<'a> = &'a [u8];
+}
+
+impl Read for num::NonZeroI64 {
+    type Src<'a> = &'a [u8];
+}
+
+impl Read for num::NonZeroI128 {
+    type Src<'a> = &'a [u8];
 }
 
 impl Read for bool {
-    type Ctx<'a> = Column<'a>;
-
     type Src<'a> = &'a BitSlice<u8, Lsb0>;
+}
 
-    fn take(src: &mut &BitSlice<u8>) -> Result<bool, Error> {
-        src.split_first()
-            .ok_or_else(|| {
-                *src = Default::default();
-                Error::Truncated {
-                    expected: size_of::<u8>(),
-                    actual: src.len(),
-                }
-            })
-            .map(|data| {
-                *src = data.1;
-                data.0.as_bool()
-            })
-    }
+impl Read for Option<u8> {
+    type Src<'a> = OptBitVec<'a, u8>;
+}
 
-    fn filter(&self, _: &HashSet<Filter>) -> Result<bool, Error> {
-        unimplemented!("Read::filter is not yet implemented for bool")
-    }
+impl Read for Option<u16> {
+    type Src<'a> = OptBitVec<'a, u16>;
+}
 
-    /// Read one bit from the [`Read::Src`] cursor; refilling from the next [`Buffer`] when `Src`
-    /// is exhausted.
-    ///
-    /// Returns [`Outcome::Finished`] once every remaining [`Buffer`] is exhausted.
-    ///
-    /// Refer to the [trait-level documentation](Read::next) for more details.
-    fn next<'a>(src: &mut &'a BitSlice<u8>, ctx: &mut Column<'a>) -> Outcome<Self> {
-        while src.is_empty() {
-            let buffer = match ctx.buffers.next() {
-                Some(buffer) => buffer,
-                None => return Outcome::Finished,
-            };
-            match buffer.sector.slice(&ctx.mmap) {
-                Ok(data) => *src = data.view_bits::<Lsb0>(),
-                Err(e) => return Outcome::Error(e),
-            }
-        }
-        Self::take(src).map_or_else(Outcome::Error, |item| match item.filter(ctx.filters) {
-            Ok(true) => Outcome::Success(item),
-            Ok(false) => Outcome::Excluded,
-            Err(e) => Outcome::Error(e),
-        })
-    }
+impl Read for Option<u32> {
+    type Src<'a> = OptBitVec<'a, u32>;
+}
+
+impl Read for Option<u64> {
+    type Src<'a> = OptBitVec<'a, u64>;
+}
+
+impl Read for Option<u128> {
+    type Src<'a> = OptBitVec<'a, u128>;
+}
+
+impl Read for Option<i8> {
+    type Src<'a> = OptBitVec<'a, i8>;
+}
+
+impl Read for Option<i16> {
+    type Src<'a> = OptBitVec<'a, i16>;
+}
+
+impl Read for Option<i32> {
+    type Src<'a> = OptBitVec<'a, i32>;
+}
+
+impl Read for Option<i64> {
+    type Src<'a> = OptBitVec<'a, i64>;
+}
+
+impl Read for Option<i128> {
+    type Src<'a> = OptBitVec<'a, i128>;
+}
+
+impl Read for Option<f32> {
+    type Src<'a> = OptBitVec<'a, f32>;
+}
+
+impl Read for Option<f64> {
+    type Src<'a> = OptBitVec<'a, f64>;
+}
+
+impl Read for Option<bool> {
+    type Src<'a> = OptBitVec<'a, bool>;
+}
+
+impl Read for Option<char> {
+    type Src<'a> = &'a [u8];
+}
+
+impl Read for Option<num::NonZeroU8> {
+    type Src<'a> = &'a [u8];
+}
+
+impl Read for Option<num::NonZeroU16> {
+    type Src<'a> = &'a [u8];
+}
+
+impl Read for Option<num::NonZeroU32> {
+    type Src<'a> = &'a [u8];
+}
+
+impl Read for Option<num::NonZeroU64> {
+    type Src<'a> = &'a [u8];
+}
+
+impl Read for Option<num::NonZeroU128> {
+    type Src<'a> = &'a [u8];
+}
+
+impl Read for Option<num::NonZeroI8> {
+    type Src<'a> = &'a [u8];
+}
+
+impl Read for Option<num::NonZeroI16> {
+    type Src<'a> = &'a [u8];
+}
+
+impl Read for Option<num::NonZeroI32> {
+    type Src<'a> = &'a [u8];
+}
+
+impl Read for Option<num::NonZeroI64> {
+    type Src<'a> = &'a [u8];
+}
+
+impl Read for Option<num::NonZeroI128> {
+    type Src<'a> = &'a [u8];
+}
+
+impl<I> Read for Vec<I>
+where
+    I: Read,
+{
+    type Src<'a> = Seq<'a, I>;
+}
+
+impl<I> Read for Option<Vec<I>>
+where
+    I: Read,
+{
+    type Src<'a> = Seq<'a, I>;
 }
 
 /* --------------------------------------------------------------------------------------- Tests */
