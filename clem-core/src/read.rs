@@ -8,26 +8,25 @@ Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the conditions of the LICENSE are met.
 */
 
-//! Data **streaming** interface for [query] execution.
+//! Data **streaming** interface for [query](crate::query) execution.
 //!
 //! ---
 //!
-//! [`clem`](crate) maximises IO performance by storing on-disk data as columnar [buffers](Buffer)
+//! [clem](crate) maximises IO performance by storing on-disk data as columnar [buffers](Buffer)
 //! optimised for range-based queries across an arbitrary number of dimensions; however, this
 //! underlying format is generally unsuitable for direct manipulation by end-users.
 //!
 //! This module provides an [iterator-based](Iterator) interface to coordinate the transition from
 //! raw binary data into supported rust types; corresponding to **phase 3** of the [read-cycle](io).
-//! The on-disk layout minimises contention for multiple simultaneous readers.
 //!
 //! ### Segment Composition
 //!
-//! Each [clem](crate) dataset is partitioned into self-describing segments which are immutable once
-//! written. Each segment begins with a minimal header consisting of a [`variant`][1] identifier and
-//! [`length`](NonZeroU64).
+//! Each [`Dataset`][1] is partitioned into self-describing segments which are immutable once
+//! written. Each segment begins with a minimal header consisting of a [`variant`][2] identifier and
+//! [`next`](num::NonZeroU64) offset.
 //!
-//! - [`Schema`] segments describe the structure of encoded data.
-//! - [`Data`][2] segments carry columnar [buffers](Buffer) for a specified schema.
+//! - [`Schema`][3] segments describe the structure of encoded data.
+//! - [`Data`][4] segments carry columnar [buffers](Buffer) for a specified schema.
 //!
 //! Multimodality and schema evolution are realised by appending additional schema segments. Data
 //! storage and file extensibility are realised by appending additional data segments. Format
@@ -35,7 +34,7 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //!
 //! ### Lazy Zero-Copy Reads
 //!
-//! Each [`Query`](query::Query) column is packaged into a lazy zero-copy [`Stream`] that:
+//! Each [`Query`][5] column is packaged into a lazy zero-copy [`Stream`] that:
 //!
 //! 1. Pulls bytes from the retained on-disk [buffers](Buffer).
 //! 2. [Deserializes](Deserialize) bytes into the requested Rust type.
@@ -59,9 +58,11 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //!
 //! This module addresses **phase three** of the [read-cycle](io).
 //!
-//! [1]: crate::segment::Variant
-//! [2]: crate::Data
-//! [3]: crate::manifest::Manifest
+//! [1]: crate::dataset::Dataset
+//! [2]: crate::segment::Variant
+//! [3]: crate::schema::Schema
+//! [4]: crate::Data
+//! [5]: crate::query::Query
 
 use std::collections::HashSet;
 use std::iter::from_fn;
