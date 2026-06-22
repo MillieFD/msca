@@ -149,17 +149,17 @@ impl<'a> Column<'a> {
 /// to [`Deserialize`] optional non-niche items.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone)]
-struct OptBitVec<'a, I> {
+struct OptBitVec<'a> {
     /// Validity bits in [`Lsb0`] order. One bit per item.
     ///
     /// - `true` → [`Some`]
     /// - `false` → [`None`]
-    bits: Stream<'a, bool>,
+    bits: &'a BitSlice<u8, Lsb0>,
     /// Data **source** from which items are [deserialized](Deserialize).
-    data: Stream<'a, I>,
+    data: &'a [u8],
 }
 
-impl<'a, I> TryFrom<&'a [u8]> for OptBitVec<'a, I> {
+impl<'a> TryFrom<&'a [u8]> for OptBitVec<'a> {
     type Error = Error;
 
     fn try_from(src: &'a [u8]) -> Result<Self, Self::Error> {
@@ -174,15 +174,22 @@ impl<'a, I> TryFrom<&'a [u8]> for OptBitVec<'a, I> {
 #[doc(hidden)] // Reachable via Read::Src for unsized readers
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone)]
-struct Seq<'a, I> {
+struct Seq<'a> {
     /// Cumulative non-zero end offsets for each [`Item`](I).
     ///
     /// The [`u64::MIN`] niche is used to encode [`None`] for optional unsized items.
-    offsets: Stream<'a, u64>,
+    offsets: &'a [u8],
     /// Inclusive start offset for the next item.
     start: u64,
     /// Flattened data **source** from which items are [deserialized](Deserialize).
-    data: Stream<'a, I>,
+    data: &'a [u8],
+}
+
+impl<'a> TryFrom<&'a [u8]> for Seq<'a> {
+    type Error = Error;
+
+    fn try_from(src: &'a [u8]) -> Result<Self, Self::Error> {
+    }
 }
 
 /* --------------------------------------------------------------------- Reader Trait Definition */
@@ -234,15 +241,15 @@ impl<'a> Reader<bool> for &'a BitSlice<u8, Lsb0> {
     }
 }
 
-impl<'a, I> Reader<Option<I>> for OptBitVec<'a, I>
+impl<'a, I> Reader<I> for OptBitVec<'a>
 where
-    Option<I>: Read<Src<'a> = Self>,
+    I: Read<Src<'a> = Self>,
 {
     type Ctx = &'a HashSet<Filter>;
 
-    fn boxed(&self, ctx: Self::Ctx) -> Stream<Option<I>> {
-        let mut bits = self.bits;
-        let mut data = self.data;
+    fn boxed(&self, ctx: Self::Ctx) -> Stream<I> {
+        let mut bits = self.bits.boxed(ctx);
+        let mut data = self.data.boxed(ctx);
         let iter = iter::from_fn(move || match bits.next()? {
             Outcome::Include(true) => data.next()?.map(Some).into(),
             Outcome::Include(false) => Outcome::Include(None).into(),
@@ -252,14 +259,17 @@ where
     }
 }
 
-impl<'a, I> Reader<I> for Seq<'a, I>
+impl<'a, I> Reader<I> for Seq<'a>
 where
     I: Read<Src<'a> = Self>,
 {
     type Ctx = &'a HashSet<Filter>;
 
     fn boxed(&self, ctx: Self::Ctx) -> Stream<I> {
-        todo!()
+        let mut offsets: Stream<u64> = self.offsets.boxed(ctx);
+        let mut data = self.data.boxed(ctx);
+        let mut start = u64::MIN;
+        Box::new(iter)
     }
 }
 
@@ -376,55 +386,55 @@ impl Read for bool {
 }
 
 impl Read for Option<u8> {
-    type Src<'a> = OptBitVec<'a, u8>;
+    type Src<'a> = OptBitVec<'a>;
 }
 
 impl Read for Option<u16> {
-    type Src<'a> = OptBitVec<'a, u16>;
+    type Src<'a> = OptBitVec<'a>;
 }
 
 impl Read for Option<u32> {
-    type Src<'a> = OptBitVec<'a, u32>;
+    type Src<'a> = OptBitVec<'a>;
 }
 
 impl Read for Option<u64> {
-    type Src<'a> = OptBitVec<'a, u64>;
+    type Src<'a> = OptBitVec<'a>;
 }
 
 impl Read for Option<u128> {
-    type Src<'a> = OptBitVec<'a, u128>;
+    type Src<'a> = OptBitVec<'a>;
 }
 
 impl Read for Option<i8> {
-    type Src<'a> = OptBitVec<'a, i8>;
+    type Src<'a> = OptBitVec<'a>;
 }
 
 impl Read for Option<i16> {
-    type Src<'a> = OptBitVec<'a, i16>;
+    type Src<'a> = OptBitVec<'a>;
 }
 
 impl Read for Option<i32> {
-    type Src<'a> = OptBitVec<'a, i32>;
+    type Src<'a> = OptBitVec<'a>;
 }
 
 impl Read for Option<i64> {
-    type Src<'a> = OptBitVec<'a, i64>;
+    type Src<'a> = OptBitVec<'a>;
 }
 
 impl Read for Option<i128> {
-    type Src<'a> = OptBitVec<'a, i128>;
+    type Src<'a> = OptBitVec<'a>;
 }
 
 impl Read for Option<f32> {
-    type Src<'a> = OptBitVec<'a, f32>;
+    type Src<'a> = OptBitVec<'a>;
 }
 
 impl Read for Option<f64> {
-    type Src<'a> = OptBitVec<'a, f64>;
+    type Src<'a> = OptBitVec<'a>;
 }
 
 impl Read for Option<bool> {
-    type Src<'a> = OptBitVec<'a, bool>;
+    type Src<'a> = OptBitVec<'a>;
 }
 
 impl Read for Option<char> {
@@ -475,14 +485,14 @@ impl<I> Read for Vec<I>
 where
     I: Read,
 {
-    type Src<'a> = Seq<'a, I>;
+    type Src<'a> = Seq<'a>;
 }
 
 impl<I> Read for Option<Vec<I>>
 where
     I: Read,
 {
-    type Src<'a> = Seq<'a, I>;
+    type Src<'a> = Seq<'a>;
 }
 
 /* --------------------------------------------------------------------------------------- Tests */
