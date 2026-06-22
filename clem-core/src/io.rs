@@ -970,10 +970,9 @@ where
 
 /* ----------------------------------------------------------- Deserializer Trait Implementation */
 
-impl<I, S> Deserializer<I> for S
+impl<I> Deserializer<I> for &[u8]
 where
     I: Deserialize,
-    S: AsRef<[u8]>,
 {
     fn deserialize_into(&self) -> Result<I, Error> {
         let bytes = self.as_ref();
