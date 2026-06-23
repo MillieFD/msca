@@ -86,7 +86,7 @@ impl Manifest {
         let mut buf = vec![0u8; size];
         sector.seek_to_start(file).await?;
         file.read_exact(&mut buf).await?;
-        Manifest::deserialize(&buf)
+        Manifest::deserialize(&mut &buf[..])
     }
 
     /// Reconstructs a [`Manifest`] by walking segments in `data` up to the specified `tail`
@@ -184,7 +184,8 @@ impl Serialize for Manifest {
 }
 
 impl Deserialize for Manifest {
-    fn deserialize(src: &[u8]) -> Result<Self, io::Error> {
+    fn deserialize(src: &mut &[u8]) -> Result<Self, io::Error> {
+        // NOTE: one-shot decode from a pre-sized CBOR buffer; the slice is not advanced.
         minicbor::decode(src).map_err(io::Error::Decode)
     }
 }
