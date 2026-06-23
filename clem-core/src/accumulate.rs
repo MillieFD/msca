@@ -395,18 +395,17 @@ where
 
 /* ----------------------------------------------------------------- Accumulate Trait Definition */
 
-/// An in-memory **data accumulator** that ingests values of the specified [`type`](Self::Item) and
-/// encodes into an optimised on-disk format.
-pub trait Accumulate: Serialize {
-    /// The input type accepted by [`Self::push`].
-    type Item;
-
+/// An in-memory **data accumulator** that ingests [items](I) of the specified [`Type`][1] and
+/// [serializes](Serialize) into an optimised on-disk format.
+///
+/// [1]: crate::schema::Type
+pub trait Accumulate<I>: Serialize {
     /// Returns a new empty instance of [`Self`] boxed as a [`BoxAcc`] trait object.
     // NOTE: Buffer must be a growable Vec; compiler cannot predict the number of accumulated items
-    fn boxed(&self) -> BoxAcc<Self::Item>;
+    fn boxed(&self) -> BoxAcc<I>;
 
-    /// Append an [`Item`](Self::Item) to the [accumulator](Self)
-    fn push(&mut self, value: Self::Item);
+    /// Append one [`Item`](I) to the [accumulator](Self)
+    fn push(&mut self, value: I);
 
     /// Reinitialise the [accumulator](Self) without writing to disk. All data is permanently lost.
     ///
@@ -419,17 +418,13 @@ pub trait Accumulate: Serialize {
     /// Returns the number of accumulated rows.
     fn count(&self) -> u64;
 
-    /// Returns the minimum accumulated value, or [`None`] if the [`Item`](Self::Item) is not
-    /// meaningfully [orderable](PartialOrd).
-    fn min(&self) -> Option<Self::Item> {
-        None
-    }
+    /// Returns the minimum accumulated value, or [`None`] if the [`Item`](I) is not meaningfully
+    /// [orderable](PartialOrd).
+    fn min(&self) -> Option<I> { None }
 
-    /// Returns the maximum accumulated value, or [`None`] if the [`Item`](Self::Item) is not
-    /// meaningfully [orderable](PartialOrd).
-    fn max(&self) -> Option<Self::Item> {
-        None
-    }
+    /// Returns the maximum accumulated value, or [`None`] if the [`Item`](I) is not meaningfully
+    /// [orderable](PartialOrd).
+    fn max(&self) -> Option<I> { None }
 
     /// Generates one or more [`Buffer`] instances describing the accumulated data and appends to
     /// the [`Manifest`][1].
