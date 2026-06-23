@@ -384,15 +384,6 @@ where
 #[doc(hidden)]
 pub struct Flatten<T>(#[n(0)] pub T);
 
-impl<A, B> From<A> for Flatten<A>
-where
-    A: Accumulate<Item = Option<B>>,
-{
-    fn from(value: A) -> Self {
-        Self(value)
-    }
-}
-
 /* ----------------------------------------------------------------- Accumulate Trait Definition */
 
 /// An in-memory **data accumulator** that ingests [items](I) of the specified [`Type`][1] and
