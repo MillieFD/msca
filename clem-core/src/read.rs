@@ -71,48 +71,17 @@ use std::{iter, num};
 use bitvec::order::Lsb0;
 use bitvec::slice::BitSlice;
 use memmap2::Mmap;
-use smol::stream::StreamExt;
 
 use crate::io::{Deserialize, Deserializer, Error};
 use crate::manifest::Buffer;
 use crate::query::{Evaluate, Filter};
+use crate::segment::Align;
 
 /* ------------------------------------------------------------------------------ Public Exports */
 
 /// Shorthand type-erased stack-allocated [pointer](Box) to a lazy [`Iterator`] yielding one
 /// [`Outcome`] per candidate [`Item`](I), or [`None`] once every candidate [`Buffer`] is consumed.
 pub type Stream<'a, I> = Box<dyn Iterator<Item = Outcome<I>> + 'a>;
-
-/// The result of [deserializing](Deserialize) one [`Item`](I) from a [`Read`](Read) [`Stream`].
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Debug)]
-pub enum Outcome<I> {
-    /// A [deserialized](Deserialize::deserialize) [`Item`](I) which satisfies every [`Filter`].
-    Include(I),
-    /// The [`Item`](I) was rejected by one or more [filters](Filter).
-    Exclude,
-    /// An [`Error`] occurred during [deserialization](Deserialize) or [filtering](Filter).
-    Error(Error),
-}
-
-impl<I> Outcome<I> {
-    fn map<F, O>(&self, f: F) -> Outcome<O>
-    where
-        F: FnMut(I) -> O,
-    {
-        match self {
-            Outcome::Include(v) => Self::Include(f(v)),
-            Outcome::Exclude => Self::Exclude,
-            Outcome::Error(e) => e.into(),
-        }
-    }
-}
-
-impl<I> From<Error> for Outcome<I> {
-    fn from(e: Error) -> Self {
-        Outcome::Error(e)
-    }
-}
 
 /// A minimal columnar **data source** with [deserialization](Deserialize) context; used during
 /// [`Query`](crate::Query) execution.
@@ -187,6 +156,42 @@ struct Seq<'a> {
 
 impl<'a> TryFrom<&'a [u8]> for Seq<'a> {
     type Error = Error;
+/* ------------------------------------------------------------------------- Read Stream Outcome */
+
+/// The result of [deserializing](Deserialize) one [`Item`](I) from a [`Read`](Read) [`Stream`].
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Debug)]
+pub enum Outcome<I> {
+    /// A [deserialized](Deserialize::deserialize) [`Item`](I) which satisfies every [`Filter`].
+    Include(I),
+    /// The [`Item`](I) was rejected by one or more [filters](Filter).
+    Exclude,
+    /// An [`Error`] occurred during [deserialization](Deserialize) or [filtering](Filter).
+    Error(Error),
+}
+
+impl<I> Outcome<I> {
+    /// Map an [`Include`](Outcome::Include) [`Item`](I) through `f`, preserving
+    /// [`Exclude`](Outcome::Exclude) and [`Error`](Outcome::Error). Consumes [`self`](Outcome) so the
+    /// inner item can be moved into a wrapping type (for example [`Some`]) without cloning.
+    fn map<F, O>(self, f: F) -> Outcome<O>
+    where
+        F: FnOnce(I) -> O,
+    {
+        match self {
+            Self::Include(v) => Outcome::Include(f(v)),
+            Self::Exclude => Outcome::Exclude,
+            Self::Error(e) => Outcome::Error(e),
+        }
+    }
+}
+
+impl<I> From<Error> for Outcome<I> {
+    fn from(e: Error) -> Self {
+        Outcome::Error(e)
+    }
+}
+
 
     fn try_from(src: &'a [u8]) -> Result<Self, Self::Error> {
     }
