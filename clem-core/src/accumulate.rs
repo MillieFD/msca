@@ -891,6 +891,22 @@ impl Serialize for char {
     }
 }
 
+impl Serialize for bool {
+    type Buffer = [u8; size_of::<Self>()];
+
+    fn size(&self) -> Result<NonZeroU64, Error> {
+        { size_of::<Self>() as u64 }.try_into().map_err(Error::from)
+    }
+
+    fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
+        u8::from(*self).serialize_into(buf)
+    }
+
+    fn serialize(&self) -> Result<Self::Buffer, Error> {
+        Ok([u8::from(*self)])
+    }
+}
+
 impl Serialize for u8 {
     type Buffer = [u8; size_of::<Self>()];
 
