@@ -39,7 +39,7 @@ use crate::Sector;
 /// Shorthand type-erased stack-allocated [pointer](Box) to an [`Accumulate`] trait object backed by
 /// a heap-allocated growable [`Buffer`](Serialize::Buffer).
 // NOTE: Buffer must be a growable Vec; compiler cannot predict the number of accumulated items
-pub type BoxAcc<I> = Box<dyn Accumulate<Item = I, Buffer = Vec<u8>>>;
+pub type BoxAcc<I> = Box<dyn Accumulate<I, Buffer = Vec<u8>>>;
 
 /// Shorthand type-erased [`Iterator`] over mutable [`Column`] descriptors.
 // NOTE: Deterministic runtime order via BTreeMap; #[derive] ensures identical compile time order.
@@ -437,14 +437,12 @@ pub trait Accumulate<I>: Serialize {
 
 /* ------------------------------------------------------------- Accumulate Trait Implementation */
 
-impl<I> Accumulate for Accumulator<I> {
-    type Item = I;
-
-    fn boxed(&self) -> BoxAcc<Self::Item> {
+impl<I> Accumulate<I> for Accumulator<I> {
+    fn boxed(&self) -> BoxAcc<I> {
         self.data.boxed()
     }
 
-    fn push(&mut self, value: Self::Item) {
+    fn push(&mut self, value: I) {
         self.data.push(value);
     }
 
@@ -460,11 +458,11 @@ impl<I> Accumulate for Accumulator<I> {
         self.data.count()
     }
 
-    fn min(&self) -> Option<Self::Item> {
+    fn min(&self) -> Option<I> {
         self.data.min()
     }
 
-    fn max(&self) -> Option<Self::Item> {
+    fn max(&self) -> Option<I> {
         self.data.max()
     }
 
@@ -473,14 +471,12 @@ impl<I> Accumulate for Accumulator<I> {
     }
 }
 
-impl Accumulate for BitVec {
-    type Item = bool;
-
-    fn boxed(&self) -> BoxAcc<Self::Item> {
+impl Accumulate<bool> for BitVec {
+    fn boxed(&self) -> BoxAcc<bool> {
         Box::new(Self::default())
     }
 
-    fn push(&mut self, value: Self::Item) {
+    fn push(&mut self, value: bool) {
         BitVec::push(self, value);
     }
 
@@ -496,12 +492,12 @@ impl Accumulate for BitVec {
         BitVec::len(self) as u64
     }
 
-    fn min(&self) -> Option<Self::Item> {
+    fn min(&self) -> Option<bool> {
         const_assert!(false < true);
         self.iter().min().as_deref().copied()
     }
 
-    fn max(&self) -> Option<Self::Item> {
+    fn max(&self) -> Option<bool> {
         const_assert!(false < true);
         self.iter().max().as_deref().copied()
     }
@@ -523,17 +519,15 @@ impl Accumulate for BitVec {
     }
 }
 
-impl<I> Accumulate for Vec<I>
+impl<I> Accumulate<I> for Vec<I>
 where
     I: Serialize + Copy + PartialOrd + 'static,
 {
-    type Item = I;
-
-    fn boxed(&self) -> BoxAcc<Self::Item> {
+    fn boxed(&self) -> BoxAcc<I> {
         Box::new(Self::default())
     }
 
-    fn push(&mut self, value: Self::Item) {
+    fn push(&mut self, value: I) {
         Vec::push(self, value);
     }
 
@@ -549,7 +543,7 @@ where
         Vec::len(self) as u64
     }
 
-    fn min(&self) -> Option<Self::Item> {
+    fn min(&self) -> Option<I> {
         let rm_nan = |item: &I| item.partial_cmp(item).is_some();
         self.iter().copied().filter(rm_nan).reduce(|a, b| match a < b {
             true => a,
@@ -557,7 +551,7 @@ where
         })
     }
 
-    fn max(&self) -> Option<Self::Item> {
+    fn max(&self) -> Option<I> {
         let rm_nan = |item: &I| item.partial_cmp(item).is_some();
         self.iter().copied().filter(rm_nan).reduce(|a, b| match a > b {
             true => a,
@@ -590,18 +584,16 @@ where
     }
 }
 
-impl<I> Accumulate for OptInSitu<I>
+impl<I> Accumulate<Option<I>> for OptInSitu<I>
 where
     Option<I>: Serialize,
     I: Copy + PartialOrd + 'static,
 {
-    type Item = Option<I>;
-
-    fn boxed(&self) -> BoxAcc<Self::Item> {
+    fn boxed(&self) -> BoxAcc<Option<I>> {
         Box::new(Self::default())
     }
 
-    fn push(&mut self, value: Self::Item) {
+    fn push(&mut self, value: Option<I>) {
         self.data.push(value);
     }
 
@@ -617,11 +609,11 @@ where
         self.data.count()
     }
 
-    fn min(&self) -> Option<Self::Item> {
+    fn min(&self) -> Option<Option<I>> {
         self.data.min()
     }
 
-    fn max(&self) -> Option<Self::Item> {
+    fn max(&self) -> Option<Option<I>> {
         self.data.max()
     }
 
@@ -630,17 +622,15 @@ where
     }
 }
 
-impl<I> Accumulate for OptBitVec<I>
+impl<I> Accumulate<Option<I>> for OptBitVec<I>
 where
     I: Unfold + 'static,
 {
-    type Item = Option<I>;
-
-    fn boxed(&self) -> BoxAcc<Self::Item> {
+    fn boxed(&self) -> BoxAcc<Option<I>> {
         Box::new(Self::default())
     }
 
-    fn push(&mut self, value: Self::Item) {
+    fn push(&mut self, value: Option<I>) {
         if let Some(value) = value {
             self.mask.push(true);
             self.data.push(value);
@@ -680,17 +670,15 @@ where
     }
 }
 
-impl<I> Accumulate for Seq<I>
+impl<I> Accumulate<Vec<I>> for Seq<I>
 where
     I: Unfold + Default + 'static,
 {
-    type Item = Vec<I>;
-
-    fn boxed(&self) -> BoxAcc<Self::Item> {
+    fn boxed(&self) -> BoxAcc<Vec<I>> {
         Box::new(Self::default())
     }
 
-    fn push(&mut self, value: Self::Item) {
+    fn push(&mut self, value: Vec<I>) {
         // 1. Calculate the zero-based cumulative end offset
         let prev = self.offsets.last().copied().unwrap_or(u64::MIN);
         let next = prev.saturating_add(value.len() as u64);
@@ -733,13 +721,11 @@ impl<I> Accumulate for OptSeq<I>
 where
     I: Unfold + Default + 'static,
 {
-    type Item = Option<Vec<I>>;
-
-    fn boxed(&self) -> BoxAcc<Self::Item> {
+    fn boxed(&self) -> BoxAcc<Option<Vec<I>>> {
         Box::new(Self::default())
     }
 
-    fn push(&mut self, value: Self::Item) {
+    fn push(&mut self, value: Option<Vec<I>>) {
         if let Some(v) = value {
             let next = self
                 .offsets
@@ -787,17 +773,15 @@ where
     }
 }
 
-impl<A, B> Accumulate for Flatten<A>
+impl<A, B> Accumulate<Option<Option<B>>> for Flatten<A>
 where
-    A: Accumulate<Item = Option<B>> + Default + Serialize<Buffer = Vec<u8>> + 'static,
+    A: Accumulate<Option<B>> + Default + Serialize<Buffer = Vec<u8>> + 'static,
 {
-    type Item = Option<Option<B>>;
-
-    fn boxed(&self) -> BoxAcc<Self::Item> {
+    fn boxed(&self) -> BoxAcc<Option<Option<B>>> {
         Box::new(Self::default())
     }
 
-    fn push(&mut self, value: Self::Item) {
+    fn push(&mut self, value: Option<Option<B>>) {
         self.0.push(value.flatten());
     }
 
