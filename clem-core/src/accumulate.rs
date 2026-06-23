@@ -213,25 +213,28 @@ impl<T> Default for OptInSitu<T> {
 ///
 /// ### Data Layout
 ///
-/// [`OptBitVec`] encodes [validity](Option) and [value](T) separately for non-niche types:
+/// [`OptBitVec`] encodes [validity](Option) and [value](I) separately for non-niche types:
 ///
 /// 1. A packed [`BitVec`] encodes [`Some`] as `true`.
-/// 2. A contiguous data buffer encodes values.
+/// 2. A contiguous data buffer encodes only [`Some`] values.
 ///
-/// [`T::default`] generates placeholder values for [`None`] entries in the data buffer. This
-/// design maintains the alignment necessary for **O(1) random access** by index.
+/// [`None`] entries append no data; the validity mask alone records their position. This design
+/// improves storage density at the expense of index-based random access. Users are encouraged to
+/// [`Stream`][1] data via the [`Query`](crate::Query) interface.
 ///
 /// ### Guidance
 ///
 /// The sibling [`OptInSitu`] type encodes [`Some`] and [`None`] values directly in a single data
 /// buffer for supported niche types; no validity mask required. Implementors are advised to use
 /// niche-optimised types when possible to improve storage efficiency and random read performance.
+///
+/// [1]: crate::read::Stream
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Debug, Default, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[doc(hidden)]
-pub struct OptBitVec<T>
+pub struct OptBitVec<I>
 where
-    T: Unfold + Default,
+    I: Unfold,
 {
     /// Validity mask where `true → `[`Some`] and `false → `[`None`].
     #[cfg_attr(
@@ -239,15 +242,101 @@ where
         serde(default, skip_serializing_if = "BitVec::is_empty")
     )]
     pub mask: BitVec,
-    /// Contiguous payload padded with [`Default::default`] for [`None`] entries.
+    /// Contiguous payload of [`Some`] items only; [`None`] items append no data.
     #[cfg_attr(
         feature = "serde",
         serde(default, skip_serializing_if = "Accumulate::is_empty")
     )]
-    pub data: T::RawAcc,
+    pub data: I::RawAcc,
 }
 
-/// Data accumulator for [unsized][1] values.
+// NOTE: #[derive(Default)] would impose I: Default trait bound which complicates the proc macro
+impl<I> Default for OptBitVec<I>
+where
+    I: Unfold,
+{
+    fn default() -> Self {
+        Self {
+            mask: BitVec::default(),
+            data: I::RawAcc::default(),
+        }
+    }
+}
+
+/// Data **accumulator** for [unsized][1] values.
+///
+/// ### Data Layout
+///
+/// It is not possible to predetermine the disk space required by each instance of an unsized type;
+/// there is no guarantee that two [`Vec<I>`] contain the same number of elements. [Clem](crate)
+/// therefore unfolds unsized types into:
+///
+/// 1. Columnar `offsets` region describing boundaries.
+/// 2. Contiguous `data` region encoding values.
+///
+/// This design ensures **O(1) random access** and avoids per-element pointer chasing. Sequential
+/// scans across the contained [items](I) remain linear; leveraging columnar optimisations for SIMD
+/// and prefetch.
+///
+/// Each offset records one **zero-based** cumulative end per row, with `0` corresponding to the
+/// start of the concatenated `data` region. Item `i` spans `offset[i - 1] → offset[i]` with an
+/// implicit leading `0` if not otherwise specified. The offset count therefore equals the item
+/// count recorded in the segment header.
+///
+/// ```text
+/// offsets: [3, 6, 6, 8]
+/// data:  [a, b, c, d, e, f, g, h]
+/// ```
+///
+/// The serialized on-disk example above (four items) is deserialized into the memory representation
+/// below. Implementers can specify which type to use for offset storage based on the number of
+/// expected elements.
+///
+/// ```text
+/// Row 0 → data[..3] → "abc"
+/// Row 1 → data[3..6] → "def"
+/// Row 2 → data[6..6] → "" (empty)
+/// Row 3 → data[6..8] → "gh"
+/// ```
+///
+/// Nested unsized types use **multiple offset layers** alongside a **single data region**. This
+/// composable design preserves the performance advantages associated with contiguous value storage;
+/// namely predictable vectorised traversal. Scanning performance across the contiguous inner `data`
+/// region is unaffected by deep nesting. The inner offsets buffer is aligned in memory order of
+/// traversal to improve cache locality during nested iteration and reduce TLB misses.
+///
+/// ```text
+/// inner offsets
+/// outer offsets
+/// data
+/// ```
+///
+/// [1]: https://doc.rust-lang.org/reference/dynamically-sized-types.html
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Debug, Default, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[doc(hidden)]
+pub struct Seq<I>
+where
+    I: Unfold,
+{
+    /// Cumulative end offsets.
+    ///
+    /// Offset `n` marks the exclusive end of item `n` and the inclusive start of item `n + 1`.
+    #[cfg_attr(
+        feature = "serde",
+        serde(default, skip_serializing_if = "Vec::is_empty")
+    )]
+    // TODO Allow users to specify the offset type based on the number of expected elements.
+    pub offsets: Vec<u64>,
+    /// Flattened and concatenated [item](I) accumulator.
+    #[cfg_attr(
+        feature = "serde",
+        serde(default, skip_serializing_if = "Accumulate::is_empty")
+    )]
+    pub data: I::RawAcc,
+}
+
+/// Data **accumulator** for [optional](Option) [unsized][1] values.
 ///
 /// ### Data Layout
 ///
@@ -255,80 +344,13 @@ where
 /// there is no guarantee that two [`Vec<T>`] contain the same number of elements. [Clem](crate)
 /// therefore unfolds unsized types into:
 ///
-/// 1. Columnar `offsets` bufffer describing boundaries.
-/// 2. Contiguous `data` buffer encoding values.
+/// 1. Columnar `offsets` region describing boundaries.
+/// 2. Contiguous `data` region encoding values.
 ///
-/// This design ensures **O(1) random access** and avoids per-element pointer chasing. Sequential
-/// scans across the contained [elements](T) remain linear; leveraging columnar optimisations for
-/// SIMD and prefetch.
+/// [`OptSeq`] encodes validity in the `offsets` buffer without an auxiliary bitmap. [`None`] items
+/// are marked using a [`u64::MAX`] sentinel offset and append no data.
 ///
-/// ```text
-/// offsets: [3, 6, 6]
-/// values:  [a, b, c, d, e, f, g, h]
-/// ```
-///
-/// The serialized on-disk example above is deserialized into the memory representation below.
-/// Implementers can specify which type to use for offset storage based on the number of expected
-/// elements.
-///
-/// ```text
-/// Row 0 → values[..3] → "abc"
-/// Row 1 → values[3..6] → "def"
-/// Row 2 → values[6..6] → "" (empty)
-/// Row 3 → values[6..] → "gh"
-/// ```
-///
-/// Nested unsized types use **multiple offset layers** alongside a **single data buffer**. This
-/// composable design preserves the performance advantages associated with contiguous value storage;
-/// namely predictable vectorised traversal. Scanning performance across the contiguous inner
-/// `values` buffer is unaffected by deep nesting. The inner offsets buffer is aligned in memory
-/// order of traversal to improve cache locality during nested iteration and reduce TLB misses.
-///
-/// ```text
-/// inner offsets
-/// outer offsets
-/// values
-/// ```
-///
-/// [1]: https://doc.rust-lang.org/reference/dynamically-sized-types.html
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Debug, Default, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
-#[doc(hidden)]
-pub struct Seq<T>
-where
-    T: Unfold,
-{
-    /// Cumulative end offsets. `offsets[i]` marks the inclusive end of element `i` and the
-    /// exclusive start of element `i + 1`.
-    #[cfg_attr(
-        feature = "serde",
-        serde(default, skip_serializing_if = "Vec::is_empty")
-    )]
-    // TODO Allow users to specify the offset type based on the number of expected elements.
-    pub offsets: Vec<NonZeroU64>,
-    /// Flattened element buffer.
-    #[cfg_attr(
-        feature = "serde",
-        serde(default, skip_serializing_if = "Accumulate::is_empty")
-    )]
-    pub data: T::RawAcc,
-}
-
-/// Data accumulator for [optional](Option) [unsized][1] values.
-///
-/// ### Data Layout
-///
-/// It is not possible to predetermine the disk space required by each instance of an unsized type;
-/// there is no guarantee that two [`Vec<T>`] contain the same number of elements. [`Clem`](crate)
-/// therefore unfolds unsized types into:
-///
-/// 1. Columnar `offsets` bufffer describing boundaries.
-/// 2. Contiguous `data` buffer encoding values.
-///
-/// [`OptSeq`] leverages niche-optimisation on the `offsets` buffer to simultaneously encode
-/// validity without requiring an auxiliary bitmap. `None` rows append no data.
-///
-/// See the [documentation](Seq) on non-optional unsized type accumulation for more details.
+/// Refer to the [documentation](Seq) on non-optional unsized type accumulation for more details.
 ///
 /// [1]: https://doc.rust-lang.org/reference/dynamically-sized-types.html
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -338,13 +360,16 @@ pub struct OptSeq<T>
 where
     T: Unfold,
 {
-    /// Cumulative end offsets per row; [`None`] marks a null row (no data appended).
+    /// Cumulative end offsets.
+    ///
+    /// Offset `n` marks the exclusive end of item `n` and the inclusive start of item `n + 1`.
+    /// [`u64::MAX`] marks a [`None`] item (no data appended).
     #[cfg_attr(
         feature = "serde",
         serde(default, skip_serializing_if = "Vec::is_empty")
     )]
-    pub offsets: Vec<Option<NonZeroU64>>,
-    /// Flattened element buffer; only [`Some`] rows contribute entries.
+    pub offsets: Vec<u64>,
+    /// Flattened and concatenated [item](I) accumulator; only [`Some`] items contribute entries.
     #[cfg_attr(
         feature = "serde",
         serde(default, skip_serializing_if = "Accumulate::is_empty")
@@ -487,8 +512,12 @@ impl Accumulate for BitVec {
     }
 
     fn buffers(&self, offset: u64, columns: &mut Columns) -> Result<u64, Error> {
+        let prefix: u64 = manifest::Buffer::HEADER.try_into()?;
         let buf = manifest::Buffer {
-            sector: Sector { offset, length: self.size()? },
+            sector: Sector {
+                offset: offset.checked_add(prefix).ok_or(Error::Zero)?,
+                length: { self.size()?.get() - prefix }.try_into()?,
+            },
             count: self.count().try_into()?,
             min: Accumulate::min(self).map(u128::from).unwrap_or(u128::MIN).serialize()?,
             max: Accumulate::max(self).map(u128::from).unwrap_or(u128::MAX).serialize()?,
@@ -542,10 +571,14 @@ where
     }
 
     fn buffers(&self, offset: u64, columns: &mut Columns) -> Result<u64, Error> {
+        let prefix: u64 = manifest::Buffer::HEADER.try_into()?;
         let min = [u8::MIN; B];
         let max = [u8::MAX; B];
         let buf = manifest::Buffer {
-            sector: Sector { offset, length: self.size()? },
+            sector: Sector {
+                offset: offset.checked_add(prefix).ok_or(Error::Zero)?,
+                length: { self.size()?.get() - prefix }.try_into()?,
+            },
             count: self.count().try_into()?,
             min: match Accumulate::min(self) {
                 Some(v) => min.serialize_push(&v)?,
@@ -604,7 +637,7 @@ where
 
 impl<I> Accumulate for OptBitVec<I>
 where
-    I: Unfold + Default + 'static,
+    I: Unfold + 'static,
 {
     type Item = Option<I>;
 
@@ -613,8 +646,13 @@ where
     }
 
     fn push(&mut self, value: Self::Item) {
-        self.mask.push(value.is_some());
-        self.data.push(value.unwrap_or_default());
+        if let Some(value) = value {
+            self.mask.push(true);
+            self.data.push(value);
+        } else {
+            // NOTE: contiguous payload of Some items only; None items append no data.
+            self.mask.push(false);
+        }
     }
 
     fn discard(&mut self) {
@@ -631,13 +669,19 @@ where
     }
 
     fn buffers(&self, offset: u64, columns: &mut Columns) -> Result<u64, Error> {
-        let prefix: u64 = size_of::<NonZeroU64>().try_into()?;
-        let start = offset
-            .checked_add(prefix)
-            .ok_or(Error::Zero)?
-            .checked_add(self.mask.size()?.align()?)
-            .ok_or(Error::Zero)?;
-        self.data.buffers(start, columns)
+        let prefix: u64 = manifest::Buffer::HEADER.try_into()?;
+        let buf = manifest::Buffer {
+            sector: Sector {
+                offset: offset.checked_add(prefix).ok_or(Error::Zero)?,
+                length: { self.size()?.get() - prefix }.try_into()?,
+            },
+            count: self.count().try_into()?,
+            min: [u8::MIN; B],
+            max: [u8::MAX; B],
+        };
+        let next = buf.sector.next().ok_or(Error::Zero)?.align()?;
+        columns.next().map(|column| column.buffers.push(buf));
+        Ok(next)
     }
 }
 
@@ -652,8 +696,8 @@ where
     }
 
     fn push(&mut self, value: Self::Item) {
-        // 1. Calculate offset
-        let prev = self.offsets.last().copied().unwrap_or(NonZeroU64::MIN);
+        // 1. Calculate the zero-based cumulative end offset
+        let prev = self.offsets.last().copied().unwrap_or(u64::MIN);
         let next = prev.saturating_add(value.len() as u64);
         // 2. Push to buffers
         value.into_iter().for_each(|x| self.data.push(x));
@@ -674,13 +718,19 @@ where
     }
 
     fn buffers(&self, offset: u64, columns: &mut Columns) -> Result<u64, Error> {
-        let prefix: u64 = size_of::<NonZeroU64>().try_into()?;
-        let start = offset
-            .checked_add(prefix)
-            .ok_or(Error::Zero)?
-            .checked_add(self.offsets.size()?.align()?)
-            .ok_or(Error::Zero)?;
-        self.data.buffers(start, columns)
+        let prefix: u64 = manifest::Buffer::HEADER.try_into()?;
+        let buf = manifest::Buffer {
+            sector: Sector {
+                offset: offset.checked_add(prefix).ok_or(Error::Zero)?,
+                length: { self.size()?.get() - prefix }.try_into()?,
+            },
+            count: self.count().try_into()?,
+            min: [u8::MIN; B],
+            max: [u8::MAX; B],
+        };
+        let next = buf.sector.next().ok_or(Error::Zero)?.align()?;
+        columns.next().map(|column| column.buffers.push(buf));
+        Ok(next)
     }
 }
 
@@ -695,14 +745,20 @@ where
     }
 
     fn push(&mut self, value: Self::Item) {
-        let prev = self.offsets.last().copied().flatten().unwrap_or(NonZeroU64::MIN);
-        match value {
-            Some(value) => {
-                let next = prev.saturating_add(value.len() as u64);
-                value.into_iter().for_each(|x| self.data.push(x));
-                self.offsets.push(Some(next));
-            }
-            None => self.offsets.push(None),
+        if let Some(v) = value {
+            let next = self
+                .offsets
+                .iter()
+                .rev()
+                .find(|&o| o != &u64::MAX)
+                .copied()
+                .unwrap_or(u64::MIN)
+                .saturating_add(v.len() as u64);
+            v.into_iter().for_each(|x| self.data.push(x));
+            self.offsets.push(next);
+        } else {
+            // NOTE: contiguous payload of Some items only; None items append no data.
+            self.offsets.push(u64::MAX);
         }
     }
 
@@ -720,13 +776,19 @@ where
     }
 
     fn buffers(&self, offset: u64, columns: &mut Columns) -> Result<u64, Error> {
-        let prefix: u64 = size_of::<NonZeroU64>().try_into()?;
-        let start = offset
-            .checked_add(prefix)
-            .ok_or(Error::Zero)?
-            .checked_add(self.offsets.size()?.align()?)
-            .ok_or(Error::Zero)?;
-        self.data.buffers(start, columns)
+        let prefix: u64 = manifest::Buffer::HEADER.try_into()?;
+        let buf = manifest::Buffer {
+            sector: Sector {
+                offset: offset.checked_add(prefix).ok_or(Error::Zero)?,
+                length: { self.size()?.get() - prefix }.try_into()?,
+            },
+            count: self.count().try_into()?,
+            min: [u8::MIN; B],
+            max: [u8::MAX; B],
+        };
+        let next = buf.sector.next().ok_or(Error::Zero)?.align()?;
+        columns.next().map(|column| column.buffers.push(buf));
+        Ok(next)
     }
 }
 
@@ -1574,7 +1636,7 @@ where
 
 impl<T> Serialize for OptBitVec<T>
 where
-    T: Unfold + Default,
+    T: Unfold,
     T::RawAcc: Serialize<Buffer = Vec<u8>>,
 {
     type Buffer = Vec<u8>;
@@ -1827,22 +1889,22 @@ mod tests {
         assert_eq!(buf[14..], [u8::MIN; 2]); // Trailing bytes are zero-filled
     }
 
-    /// [`OptBitVec`] aligns the data buffer to the boundary following the validity mask.
+    /// [`OptBitVec`] aligns the value buffer to the boundary following the validity mask and stores
+    /// only [`Some`] values in the concatenated payload.
     #[test]
     fn opt_bit_vec_layout() {
         let mut acc: OptBitVec<u32> = OptBitVec::default();
         [Some(1u32), None, Some(3)].into_iter().for_each(|v| acc.push(v));
         let bytes = acc.serialize().expect("Serialize failed");
-        assert_eq!(bytes.len(), 48); // [prefix 8][mask 9 → 16][data 20 → 24]
-        assert_eq!(acc.size().expect("Size failed").get(), 48); // Composite is self-padded
-        assert_eq!(bytes[..8], 40u64.to_le_bytes()); // Outer prefix spans padded interior
+        assert_eq!(bytes.len(), 40); // [prefix 8][mask 9 → 16][data 16]
+        assert_eq!(acc.size().expect("Size failed").get(), 40); // Composite is self-padded
+        assert_eq!(bytes[..8], 32u64.to_le_bytes()); // Outer prefix spans padded interior
         assert_eq!(bytes[8..16], 1u64.to_le_bytes()); // Mask length prefix records exact size
         assert_eq!(bytes[16], 0b101); // Mask bits in Lsb0 order
         assert_eq!(bytes[17..24], [u8::MIN; 7]); // Mask padding bytes are zero-filled
-        assert_eq!(bytes[24..32], 12u64.to_le_bytes()); // Data length prefix records exact size
-        assert_eq!(bytes[32..36], 1u32.to_le_bytes());
-        assert_eq!(bytes[40..44], 3u32.to_le_bytes());
-        assert_eq!(bytes[44..48], [u8::MIN; 4]); // Data padding bytes are zero-filled
+        assert_eq!(bytes[24..32], 8u64.to_le_bytes()); // Value length prefix excludes None rows
+        assert_eq!(bytes[32..36], 1u32.to_le_bytes()); // Only Some values are stored, contiguously
+        assert_eq!(bytes[36..40], 3u32.to_le_bytes());
     }
 
     /// [`Seq`] offsets terminate on the boundary; data follows without intermediate padding.
@@ -1855,8 +1917,8 @@ mod tests {
         assert_eq!(bytes.len(), 48); // [prefix 8][offsets 24][data 13 → 16]
         assert_eq!(bytes[..8], 40u64.to_le_bytes()); // Outer prefix spans padded interior
         assert_eq!(bytes[8..16], 16u64.to_le_bytes()); // Offsets length prefix records exact size
-        assert_eq!(bytes[16..24], 4u64.to_le_bytes());
-        assert_eq!(bytes[24..32], 6u64.to_le_bytes());
+        assert_eq!(bytes[16..24], 3u64.to_le_bytes()); // Zero-based cumulative end of row 0
+        assert_eq!(bytes[24..32], 5u64.to_le_bytes()); // Zero-based cumulative end of row 1
         assert_eq!(bytes[32..40], 5u64.to_le_bytes()); // Data length prefix records exact size
         assert_eq!(bytes[40..45], [97, 98, 99, 100, 101]);
         assert_eq!(bytes[45..48], [u8::MIN; 3]); // Data padding bytes are zero-filled
@@ -1869,8 +1931,8 @@ mod tests {
         let mut col = Column::from(u16::with_unfolder::<Schema>());
         let next = data.buffers(0, &mut std::iter::once(&mut col)).expect("Buffers failed");
         assert_eq!(next, 16); // Next buffer begins at 64-bit alignment boundary
-        assert_eq!(col.buffers[0].sector.offset, 0);
-        assert_eq!(col.buffers[0].sector.length.get(), 14); // Exact size excludes padding
+        assert_eq!(col.buffers[0].sector.offset, 8); // Body starts after the header prefix
+        assert_eq!(col.buffers[0].sector.length.get(), 6); // Body excludes the prefix and padding
     }
 
     /// [`OptBitVec`] records the data buffer at its aligned offset inside the composite region.
@@ -1880,8 +1942,8 @@ mod tests {
         [Some(1u32), None, Some(3)].into_iter().for_each(|v| acc.push(v));
         let mut col = Column::from(u32::with_unfolder::<Schema>());
         let next = acc.buffers(0, &mut std::iter::once(&mut col)).expect("Buffers failed");
-        assert_eq!(next, 48); // Aligned end of the composite region
-        assert_eq!(col.buffers[0].sector.offset, 24); // Prefix + padded mask precede the data
-        assert_eq!(col.buffers[0].sector.length.get(), 20); // Exact size excludes padding
+        assert_eq!(next, 40); // Aligned end of the composite region
+        assert_eq!(col.buffers[0].sector.offset, 8); // Whole body starts after the header prefix
+        assert_eq!(col.buffers[0].sector.length.get(), 32); // Body spans the mask and data regions
     }
 }
