@@ -289,9 +289,12 @@ pub struct Column {
 
 impl Column {
     /// Returns [`Error::Type`] if the requested [`Type`] does not match the on-disk [`Column`]
-    /// type; otherwise returns an unmodified reference to [`self`](Column) for method chaining.
+    /// type; otherwise returns an immutable reference to [`self`](Column) for method chaining.
     ///
-    /// Refer to [`Column::accepts`] if a direct **or** nested inner-type match is permissible.
+    /// ### Guidance
+    ///
+    /// Refer to [`Column::accepts`] if a direct **or** nested inner-type match is permissible. Use
+    /// [`Column::exact_mut`] if a mutable reference is required for downstream functions.
     pub fn exact<I>(&self) -> Result<&Self, Error>
     where
         Schema: Unfolder<I>,
@@ -304,11 +307,29 @@ impl Column {
     }
 
     /// Returns [`Error::Type`] if the requested [`Type`] does not match the on-disk [`Column`]
+    /// type; otherwise returns a mutable reference to [`self`](Column) for method chaining.
+    ///
+    /// ### Guidance
+    ///
+    /// Refer to [`Column::accepts`] if a direct **or** nested inner-type match is permissible. Use
+    /// [`Column::exact`] if an immutable reference is required for downstream functions.
+    pub fn exact_mut<I>(&mut self) -> Result<&mut Self, Error>
+    where
+        Schema: Unfolder<I>,
+    {
+        self.exact::<I>()?;
+        Ok(self)
+    }
+
+    /// Returns [`Error::Type`] if the requested [`Type`] does not match the on-disk [`Column`]
     /// type **or** nested inner subtype; otherwise returns an unmodified reference to
     /// [`self`](Column) for method chaining.
     ///
-    /// Refer to [`Type::exact`] if a direct non-nested match is required.
-    fn accepts<I>(&self) -> Result<&Self, Error>
+    /// ### Guidance
+    ///
+    /// Refer to [`Type::exact`] if a direct non-nested match is required. Use
+    /// [`Column::accepts_mut`] if a mutable reference is required for downstream functions.
+    pub fn accepts<I>(&self) -> Result<&Self, Error>
     where
         Schema: Unfolder<I>,
     {
@@ -317,6 +338,22 @@ impl Column {
             true => Ok(self),
             false => Error::Type { expected: inner, found: self.ty.clone() }.into(),
         }
+    }
+
+    /// Returns [`Error::Type`] if the requested [`Type`] does not match the on-disk [`Column`]
+    /// type **or** nested inner subtype; otherwise returns an unmodified reference to
+    /// [`self`](Column) for method chaining.
+    ///
+    /// ### Guidance
+    ///
+    /// Refer to [`Type::exact`] if a direct non-nested match is required. Use [`Column::accepts`]
+    /// if an immutable reference is required for downstream functions.
+    pub fn accepts_mut<I>(&mut self) -> Result<&mut Self, Error>
+    where
+        Schema: Unfolder<I>,
+    {
+        self.accepts()?;
+        Ok(self)
     }
 
     /// Map the provided [`Key`](String) to a new empty [`Column`].
