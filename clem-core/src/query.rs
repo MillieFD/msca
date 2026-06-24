@@ -35,7 +35,7 @@ use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::fmt::{self, Display};
 use std::iter;
 use std::num::{self, TryFromIntError};
-use std::ops::{Bound, Not, RangeBounds};
+use std::ops::{Bound, RangeBounds};
 use std::sync::Arc;
 
 use memmap2::Mmap;
@@ -265,12 +265,12 @@ impl Query {
     ///
     /// - [`Error::Column`] if the named [`Column`] is not found in the [`Query`].
     /// - [`Error::Type`] if the requested [`Type`] is incompatible with the actual [`Column`] type.
-    pub fn eq<I>(mut self, name: &str, value: I) -> Result<Self, Error>
+    pub fn equal<I>(mut self, name: &str, value: I) -> Result<Self, Error>
     where
         I: Serialize,
         Schema: Unfolder<I>,
     {
-        self.get_mut(name)?.accepts_mut()?.filters.insert(Filter::eq(&value)?);
+        self.get_mut(name)?.accepts_mut()?.filters.insert(Filter::equal(&value)?);
         Ok(self) // return to builder pattern
     }
 
@@ -567,7 +567,7 @@ impl Filter {
     }
 
     /// Construct a [`Filter::Eq`] from the provided [`item`](I).
-    fn eq<I: Serialize>(item: &I) -> Result<Self, number::Error> {
+    fn equal<I: Serialize>(item: &I) -> Result<Self, number::Error> {
         Ok(Self::Eq([u8::MIN; B].serialize_push(item)?))
     }
 
@@ -680,8 +680,8 @@ pub trait Evaluate: Sized {
         for<'a> &'a S: IntoIterator<Item = &'a Filter>,
     {
         match filters.into_iter().try_fold(true, |acc, f| match acc {
-            true => Ok(true), // short-circuit without evaluating the remaining filters
-            false => self.assess(f),
+            false => Ok(false), // short-circuit without evaluating the remaining filters
+            true => self.assess(f),
         }) {
             Ok(true) => Outcome::Include(self),
             Ok(false) => Outcome::Exclude,
@@ -698,7 +698,7 @@ where
 {
     fn assess(&self, filter: &Filter) -> Result<bool, io::Error> {
         match filter {
-            Filter::Range { ub, lb } => self.range(ub, lb),
+            Filter::Range { lb, ub } => self.range(lb, ub),
             Filter::Eq(other) => self.equal(other),
             Filter::OneOf(set) => self.one_of(set),
             Filter::NoneOf(set) => self.none_of(set),
@@ -723,7 +723,7 @@ where
 
     fn assess(&self, filter: &Filter) -> Result<bool, io::Error> {
         match filter {
-            Filter::Range { ub, lb } => self.range(ub, lb),
+            Filter::Range { lb, ub } => self.range(lb, ub),
             Filter::Eq(other) => self.equal(other),
             Filter::OneOf(set) => self.one_of(set),
             Filter::NoneOf(set) => self.none_of(set),
@@ -736,6 +736,7 @@ where
 impl Evaluate for bool {
     fn assess(&self, filter: &Filter) -> Result<bool, io::Error> {
         match filter {
+            Filter::Eq(other) => Ok(other[0] == *self as u8),
             Filter::IsSome => self.is_some(),
             Filter::IsNone => self.is_none(),
             some => io::Error::Filter { filter: some.clone(), actual: Type::Bool }.into(),
@@ -835,10 +836,24 @@ where
 mod tests {
     use std::num::NonZeroU64;
 
+    use bitvec::vec::BitVec;
     use memmap2::MmapMut;
 
     use super::*;
+    use crate::accumulate::{Accumulate, OptBitVec, OptInSitu, OptSeq, Seq};
     use crate::Sector;
+
+    /// Collect the [`Include`](Outcome::Include) values from a [`Stream`], dropping
+    /// [`Exclude`](Outcome::Exclude) and panicking on any [`Error`](Outcome::Error).
+    fn collected<I>(stream: Stream<I>) -> Vec<I> {
+        stream
+            .filter_map(|outcome| match outcome {
+                Outcome::Include(item) => Some(item),
+                Outcome::Exclude => None,
+                Outcome::Error(error) => panic!("Read error → {error}"),
+            })
+            .collect()
+    }
 
     /// Build a single-segment `u32` [`Column`] descriptor with the given statistics. The `min` and
     /// `max` statistics are [serialized](Serialize) into their fixed-size [`[u8; B]`](B) arrays.
@@ -863,10 +878,11 @@ mod tests {
     fn query(bytes: &[u8], ty: Type, count: u64) -> Query {
         let mut mmap = MmapMut::map_anon(bytes.len().max(1)).expect("Anonymous map failed");
         mmap[..bytes.len()].copy_from_slice(bytes);
+        let header = manifest::Buffer::HEADER as u64;
         let buffer = manifest::Buffer {
             sector: Sector {
-                offset: u64::MIN,
-                length: NonZeroU64::new(bytes.len() as u64).expect("Empty buffer"),
+                offset: header,
+                length: NonZeroU64::new(bytes.len() as u64 - header).expect("Empty body"),
             },
             count: NonZeroU64::new(count).expect("Zero rows"),
             min: [u8::MIN; B],
@@ -880,7 +896,7 @@ mod tests {
         Query {
             mmap: Arc::new(mmap.make_read_only().expect("Read-only conversion failed")),
             columns: BTreeMap::from([(String::from("v"), column)]),
-            stride: NonZeroU32::MIN,
+            stride: num::NonZeroU32::MIN,
         }
     }
 
@@ -905,7 +921,7 @@ mod tests {
             .column::<u32>("v")
             .expect("Column failed")
             .map(|outcome| match outcome {
-                Outcome::Success(item) => item,
+                Outcome::Include(item) => item,
                 other => panic!("Unexpected outcome → {other:?}"),
             })
             .collect();
@@ -917,5 +933,145 @@ mod tests {
         let bytes = vec![1u32].serialize().expect("Serialize failed");
         let query = query(&bytes, Type::U32, 1);
         assert!(matches!(query.column::<u16>("v"), Err(Error::Type { .. })));
+    }
+
+    /// A bit-packed [`bool`] column streams back exactly `count` bits (no trailing padding bits).
+    #[test]
+    fn bool_column_round_trip() {
+        let mut acc = BitVec::default();
+        [true, false, true].into_iter().for_each(|bit| acc.push(bit));
+        let bytes = acc.serialize().expect("Serialize failed");
+        let query = query(&bytes, Type::Bool, 3);
+        let rows = collected(query.column::<bool>("v").expect("Column failed"));
+        assert_eq!(rows, vec![true, false, true]);
+    }
+
+    /// An [`OptBitVec`] column round-trips optionals; only [`Some`] values occupy the data region.
+    #[test]
+    fn opt_bit_vec_column_round_trip() {
+        let mut acc = OptBitVec::<u32>::default();
+        [Some(1u32), None, Some(3)].into_iter().for_each(|v| acc.push(v));
+        let bytes = acc.serialize().expect("Serialize failed");
+        let query = query(&bytes, Type::option(Type::U32), 3);
+        let rows = collected(query.column::<Option<u32>>("v").expect("Column failed"));
+        assert_eq!(rows, vec![Some(1), None, Some(3)]);
+    }
+
+    /// A niche optional column streams via the byte reader; the niche encodes [`None`].
+    #[test]
+    fn niche_option_column_round_trip() {
+        let mut acc = OptInSitu::<NonZeroU64>::default();
+        [NonZeroU64::new(5), None, NonZeroU64::new(7)].into_iter().for_each(|v| acc.push(v));
+        let bytes = acc.serialize().expect("Serialize failed");
+        let query = query(&bytes, Type::option(Type::NZU64), 3);
+        let rows = collected(query.column::<Option<NonZeroU64>>("v").expect("Column failed"));
+        assert_eq!(rows, vec![NonZeroU64::new(5), None, NonZeroU64::new(7)]);
+    }
+
+    /// A [`Seq`] column round-trips unsized rows from base-1 cumulative end offsets.
+    #[test]
+    fn seq_column_round_trip() {
+        let mut acc = Seq::<u8>::default();
+        acc.push(vec![97, 98, 99]);
+        acc.push(vec![100, 101]);
+        let bytes = acc.serialize().expect("Serialize failed");
+        let query = query(&bytes, Type::sequence(Type::U8), 2);
+        let rows = collected(query.column::<Vec<u8>>("v").expect("Column failed"));
+        assert_eq!(rows, vec![vec![97, 98, 99], vec![100, 101]]);
+    }
+
+    /// An optional [`Seq`] column round-trips optionals; the zero-offset niche encodes [`None`].
+    #[test]
+    fn opt_seq_column_round_trip() {
+        let mut acc = OptSeq::<u8>::default();
+        acc.push(Some(vec![97, 98]));
+        acc.push(None::<Vec<u8>>);
+        acc.push(Some(vec![99]));
+        let bytes = acc.serialize().expect("Serialize failed");
+        let query = query(&bytes, Type::option(Type::sequence(Type::U8)), 3);
+        let rows = collected(query.column::<Option<Vec<u8>>>("v").expect("Column failed"));
+        assert_eq!(rows, vec![Some(vec![97, 98]), None, Some(vec![99])]);
+    }
+
+    /// A [`String`] column decodes each row's UTF-8 byte run, including multi-byte scalars.
+    #[test]
+    fn string_column_round_trip() {
+        let mut acc = Seq::<u8>::default();
+        acc.push("héllo".as_bytes().to_vec());
+        acc.push("xyz".as_bytes().to_vec());
+        let bytes = acc.serialize().expect("Serialize failed");
+        let query = query(&bytes, Type::String, 2);
+        let rows = collected(query.column::<String>("v").expect("Column failed"));
+        assert_eq!(rows, vec![String::from("héllo"), String::from("xyz")]);
+    }
+
+    /// A [`str`] column borrows each row zero-copy from the map; the caller can collect at will.
+    #[test]
+    fn str_column_zero_copy() {
+        let mut acc = Seq::<u8>::default();
+        acc.push(b"abc".to_vec());
+        acc.push(b"de".to_vec());
+        let bytes = acc.serialize().expect("Serialize failed");
+        let query = query(&bytes, Type::String, 2);
+        let rows = collected(query.column::<&str>("v").expect("Column failed"));
+        assert_eq!(rows, vec!["abc", "de"]);
+    }
+
+    /// An [`eq`](Query::equal) filter excludes non-matching rows during iteration.
+    #[test]
+    fn eq_filter_excludes_non_matching() {
+        let bytes = vec![10u32, 20, 30].serialize().expect("Serialize failed");
+        let query = query(&bytes, Type::U32, 3).equal("v", 20u32).expect("eq failed");
+        let rows = collected(query.column::<u32>("v").expect("Column failed"));
+        assert_eq!(rows, vec![20]);
+    }
+
+    /// [`eq`](Query::equal) streams non-deserializable [`bool`] columns via the mask reader.
+    #[test]
+    fn eq_filter_bool_column() {
+        let mut acc = BitVec::default();
+        [true, false, true].into_iter().for_each(|bit| acc.push(bit));
+        let bytes = acc.serialize().expect("Serialize failed");
+        let query = query(&bytes, Type::Bool, 3).equal("v", false).expect("eq failed");
+        let rows = collected(query.column::<bool>("v").expect("Column failed"));
+        assert_eq!(rows, vec![false]);
+    }
+
+    /// [`is_some`](Query::is_some) retains [`Some`] rows; [`is_none`](Query::is_none) retains
+    /// [`None`] rows, delegating validity to the optional mask.
+    #[test]
+    fn validity_filters_split_optionals() {
+        let bytes = {
+            let mut acc = OptBitVec::<u32>::default();
+            [Some(1u32), None, Some(3)].into_iter().for_each(|v| acc.push(v));
+            acc.serialize().expect("Serialize failed")
+        };
+        let some = query(&bytes, Type::option(Type::U32), 3).is_some("v").expect("is_some failed");
+        assert_eq!(
+            collected(some.column::<Option<u32>>("v").expect("Column failed")),
+            vec![Some(1), Some(3)]
+        );
+        let none = query(&bytes, Type::option(Type::U32), 3).is_none("v").expect("is_none failed");
+        assert_eq!(
+            collected(none.column::<Option<u32>>("v").expect("Column failed")),
+            vec![None]
+        );
+    }
+
+    /// The builder eagerly rejects a validity filter on a non-optional column; the requested
+    /// [`Option`] type does not match the on-disk scalar [`Type`].
+    #[test]
+    fn is_some_on_non_optional_errors() {
+        let bytes = vec![1u32].serialize().expect("Serialize failed");
+        let result = query(&bytes, Type::U32, 1).is_some("v");
+        assert!(matches!(result, Err(Error::Type { .. })));
+    }
+
+    /// The builder eagerly rejects a value filter whose type is incompatible with the column.
+    #[test]
+    fn eq_type_mismatch_errors() {
+        let bytes = vec![1u32].serialize().expect("Serialize failed");
+        let result = query(&bytes, Type::U32, 1).equal("v", true);
+        assert!(matches!(result, Err(Error::Type { .. })));
     }
 }
