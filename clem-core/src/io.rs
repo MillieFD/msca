@@ -956,21 +956,18 @@ impl Deserialize for Option<char> {
 /* --------------------------------------------------------------- Deserializer Trait Definition */
 
 /// A **source** that can be deserialized into a [supported data type](Deserialize).
-pub trait Deserializer<I>
-where
-    I: Deserialize,
-{
+pub trait Deserializer {
     /// Deserialize [`Self`] into an instance of the target type [`I`].
-    fn deserialize_into(&mut self) -> Result<I, Error>;
+    fn deserialize_into<I: Deserialize>(&mut self) -> Result<I, Error>;
 }
 
 /* ----------------------------------------------------------- Deserializer Trait Implementation */
 
-impl<I> Deserializer<I> for &[u8]
-where
-    I: Deserialize,
-{
-    fn deserialize_into(&mut self) -> Result<I, Error> {
+impl Deserializer for &[u8] {
+    fn deserialize_into<I>(&mut self) -> Result<I, Error>
+    where
+        I: Deserialize,
+    {
         I::deserialize(self)
     }
 }
