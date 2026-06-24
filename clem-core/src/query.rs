@@ -192,8 +192,8 @@ impl Query {
         self // return to builder pattern
     }
 
-    /// Retain rows from the named [`Column`] only if the deserialized [`Item`](I) value falls
-    /// within the specified [`Range`](RangeBounds). Excluded rows are removed from all columns.
+    /// Retain rows from the named [`Column`] only if the deserialized [`item`](I) falls within the
+    /// specified [`Range`](RangeBounds). Excluded rows are removed from all columns.
     ///
     /// `range` is a **mixed** filter:
     /// 1. Eagerly evaluated **before** IO using [`Buffer`] statistics.
@@ -246,8 +246,8 @@ impl Query {
         Ok(self)
     }
 
-    /// Retain rows where the [`Item`](I) in the specified [`Column`] exactly equals a given
-    /// `value`. Useful for boolean flags, integer codes, and enum discriminants.
+    /// Retain only rows where the [`item`](I) in the specified [`Column`] exactly equals a given
+    /// [`value`](I). Useful for boolean flags, integer codes, and enum discriminants.
     ///
     /// ### Guidance
     ///
@@ -274,7 +274,8 @@ impl Query {
         Ok(self) // return to builder pattern
     }
 
-    /// Retain rows where the [`Column`] value is a member of a [finite set](S).
+    /// Retain only rows where the [`item`](I) in the specified [`Column`] is a member of a
+    /// [finite set](S).
     ///
     /// ### Guidance
     ///
@@ -297,6 +298,64 @@ impl Query {
         self.get_mut(name)?.accepts_mut()?.filters.insert(Filter::one_of(values)?);
         Ok(self) // return to builder pattern
     }
+
+    /// Reject any rows where the [`item`](I) in the specified [`Column`] is a member of a
+    /// [finite set](S).
+    ///
+    /// ### Guidance
+    ///
+    /// This filter can be applied to any [equatable](Eq) type.
+    ///
+    /// ```rust,ignore
+    /// .none_of("status_code", [404u16, 500])
+    /// ```
+    ///
+    /// ### Errors
+    ///
+    /// - [`Error::Column`] if the named [`Column`] is not found in the [`Query`].
+    /// - [`Error::Type`] if the requested [`Type`] is incompatible with the actual [`Column`] type.
+    pub fn none_of<I, V>(mut self, name: &str, values: V) -> Result<Self, Error>
+    where
+        I: Serialize,
+        V: IntoIterator<Item = I>,
+        Schema: Unfolder<I>,
+    {
+        self.get_mut(name)?.accepts_mut()?.filters.insert(Filter::none_of(values)?);
+        Ok(self) // return to builder pattern
+    }
+
+    /// Retain only rows where the [`item`](I) in the specified [`Column`] is [`Some`].
+    ///
+    /// ```rust,ignore
+    /// .is_some("calibration")
+    /// ```
+    ///
+    /// ### Errors
+    ///
+    /// - [`Error::Column`] if the named [`Column`] is not found in the [`Query`].
+    /// - [`Error::Type`] if the column [`Type`] is not [`Option`].
+    //noinspection RsSelfConvention → function name matches the corresponding filter variant
+    pub fn is_some(mut self, name: &str) -> Result<Self, Error> {
+        self.get_mut(name)?.optional()?.filters.insert(Filter::IsSome);
+        Ok(self) // return to builder pattern
+    }
+
+    /// Retain only rows where the [`item`](I) in the specified [`Column`] is [`None`].
+    ///
+    /// ```rust,ignore
+    /// .is_none("error_code")
+    /// ```
+    ///
+    /// ### Errors
+    ///
+    /// - [`Error::Column`] if the named [`Column`] is not found in the [`Query`].
+    /// - [`Error::Type`] if the column [`Type`] is not [`Option`].
+    //noinspection RsSelfConvention → function name matches the corresponding filter variant
+    pub fn is_none(mut self, name: &str) -> Result<Self, Error> {
+        self.get_mut(name)?.optional()?.filters.insert(Filter::IsNone);
+        Ok(self) // return to builder pattern
+    }
+
     /// Sample every nth row from the result set. Useful for decimation and preview reads on dense
     /// time-series data.
     ///
