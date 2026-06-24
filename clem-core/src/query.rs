@@ -496,9 +496,9 @@ impl From<manifest::Column> for Column {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Encode, Decode, CborLen)]
 #[non_exhaustive] // To accommodate potential future filter types.
-#[doc(hidden)] // Reachable through Read::filter and Read::next for manual implementations.
+#[doc(hidden)] // Reachable through the Evaluate trait for manual implementation.
 pub enum Filter {
-    /// Retain values within the specified range.
+    /// Retain items within the specified range.
     #[n(0)]
     Range {
         /// Lower bound
@@ -508,6 +508,38 @@ pub enum Filter {
         #[n(1)]
         ub: Bound<[u8; B]>,
     },
+    /// Retain items exactly equal to the operand.
+    #[n(1)]
+    Eq {
+        /// Equality operand [serialized](Serialize) as LE bytes into a fixed-size array with
+        /// trailing zeros. [Deserialize] according to the [`Type`] specified by the [`Schema`].
+        #[cbor(n(0), with = "minicbor::bytes")]
+        value: [u8; B],
+    },
+    /// Retain items that are a member of the operand set.
+    #[n(2)]
+    OneOf {
+        /// [`BTreeSet`] containing unique operands; each [serialized](Serialize) as LE bytes into a
+        /// fixed-size array with trailing zeros. [Deserialize] according to the [`Type`] specified
+        /// by the [`Schema`].
+        #[cbor(n(0), skip_if = "BTreeSet::is_empty")]
+        set: BTreeSet<[u8; B]>,
+    },
+    /// Reject items that are a member of the operand set.
+    #[n(3)]
+    NoneOf {
+        /// [`BTreeSet`] containing unique operands; each [serialized](Serialize) as LE bytes into a
+        /// fixed-size array with trailing zeros. [Deserialize] according to the [`Type`] specified
+        /// by the [`Schema`].
+        #[cbor(n(0), skip_if = "BTreeSet::is_empty")]
+        set: BTreeSet<[u8; B]>,
+    },
+    /// Retain [`Option`] items that are [`Some`].
+    #[n(4)]
+    IsSome,
+    /// Retain [`Option`] items that are [`None`].
+    #[n(5)]
+    IsNone,
 }
 
 impl Filter {
