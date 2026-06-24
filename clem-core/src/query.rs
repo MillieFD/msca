@@ -227,10 +227,10 @@ impl Query {
         let column = self.get_mut(name)?.accepts_mut()?;
         // 1. Insert filter for lazy evaluation during deserialization
         let filter = Filter::bounds(&bounds);
-        col.filters.insert(filter);
+        column.filters.insert(filter);
         // 2. Eagerly evaluate buffer min / max statistics
-        let n = col.buffers.len();
-        let mut keep = col
+        let n = column.buffers.len();
+        let mut keep = column
             .buffers
             .iter()
             // SAFETY: Type::verify guarantees that bounds match the on-disk column type
