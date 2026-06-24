@@ -41,7 +41,7 @@ use std::sync::Arc;
 use memmap2::Mmap;
 use minicbor::{CborLen, Decode, Encode};
 
-use crate::accumulate::Buffer;
+use crate::accumulate::{Buffer, OptBitVec};
 use crate::io::{self, Deserialize, Deserializer};
 use crate::manifest::{self, B};
 use crate::read::{self, Outcome, Read, Reader, Stream};
@@ -603,35 +603,139 @@ impl Display for Filter {
     }
 }
 
-    /// Returns `true` if the [`item`](I) is contained within the specified [`Range`](RangeBounds).
-    pub(crate) fn contains<I, S>(lb: &Bound<S>, ub: &Bound<S>, item: &I) -> Result<bool, io::Error>
+/// A **type** that can be tested against a [`Filter`] during [deserialization][1].
+///
+/// [1]: Deserialize::deserialize
+pub trait Evaluate: Sized {
+    /// Returns `true` if `self` is contained within the specified [`Range`](RangeBounds).
+    fn range<S>(&self, lb: &Bound<S>, ub: &Bound<S>) -> Result<bool, io::Error>
     where
-        I: Deserialize + PartialOrd,
+        Self: Deserialize + PartialOrd,
         S: AsRef<[u8]>,
     {
         let above = match lb {
-            Bound::Included(bytes) => *item >= bytes.as_ref().deserialize_into()?,
-            Bound::Excluded(bytes) => *item > bytes.as_ref().deserialize_into()?,
+            Bound::Included(bytes) => *self >= bytes.as_ref().deserialize_into()?,
+            Bound::Excluded(bytes) => *self > bytes.as_ref().deserialize_into()?,
             Bound::Unbounded => true,
         };
         let below = match ub {
-            Bound::Included(bytes) => *item <= bytes.as_ref().deserialize_into()?,
-            Bound::Excluded(bytes) => *item < bytes.as_ref().deserialize_into()?,
+            Bound::Included(bytes) => *self <= bytes.as_ref().deserialize_into()?,
+            Bound::Excluded(bytes) => *self < bytes.as_ref().deserialize_into()?,
             Bound::Unbounded => true,
         };
         Ok(above && below)
     }
 
-    /// Returns `true` if `item` equals any encoded operand in `values`.
-    fn member<I, S>(set: &S, item: &I) -> Result<bool, io::Error>
+    /// Returns `true` if `self` is exactly equal to [`other`](O)
+    fn equal<O>(&self, other: &O) -> Result<bool, io::Error>
     where
-        I: Deserialize + PartialEq,
+        Self: Deserialize + PartialEq,
+        O: AsRef<[u8]>,
+    {
+        Ok(*self == other.as_ref().deserialize_into()?)
+    }
+
+    /// Returns `true` if `self` is a member of the specified [set](S).
+    fn one_of<S>(&self, set: &S) -> Result<bool, io::Error>
+    where
+        Self: Deserialize + PartialEq,
         for<'a> &'a S: IntoIterator<Item = &'a [u8; B]>,
     {
         set.into_iter().try_fold(false, |acc, bytes| match acc {
             true => Ok(true), // short-circuit without deserializing
-            false => Ok(*item == bytes.as_ref().deserialize_into()?),
+            false => Ok(*self == bytes.as_ref().deserialize_into()?),
         })
+    }
+
+    /// Returns `true` if `self` is not a member of the specified [set](S).
+    fn none_of<S>(&self, set: &S) -> Result<bool, io::Error>
+    where
+        Self: Deserialize + PartialEq,
+        for<'a> &'a S: IntoIterator<Item = &'a [u8; B]>,
+    {
+        set.into_iter().try_fold(true, |acc, bytes| match acc {
+            true => Ok(*self != bytes.as_ref().deserialize_into()?),
+            false => Ok(false), // short-circuit without deserializing
+        })
+    }
+
+    /// Returns `true` if `self` is [`Some`].
+    fn is_some(&self) -> Result<bool, io::Error> {
+        Ok(true) // NOTE: non-option types (default) return true; cannot be None by definition
+    }
+
+    /// Returns `true` if `self` is [`None`].
+    fn is_none(&self) -> Result<bool, io::Error> {
+        Ok(false) // NOTE: non-option types (default) return false; must be Some by definition
+    }
+
+    /// Dispatch function that returns `true` if `self` satisfies the provided [`Filter`].
+    fn assess(&self, filter: &Filter) -> Result<bool, io::Error>;
+
+    /// Returns [`Outcome::Include`] if `self` satisfies **every** [`Filter`].
+    fn evaluate<S>(self, filters: &S) -> Outcome<Self>
+    where
+        for<'a> &'a S: IntoIterator<Item = &'a Filter>,
+    {
+        match filters.into_iter().try_fold(true, |acc, f| match acc {
+            true => Ok(true), // short-circuit without evaluating the remaining filters
+            false => self.assess(f),
+        }) {
+            Ok(true) => Outcome::Include(self),
+            Ok(false) => Outcome::Exclude,
+            Err(e) => Outcome::Error(e),
+        }
+    }
+}
+
+impl<I> Evaluate for I
+where
+    I: Unfold<RawAcc = Vec<I>, OptAcc = OptBitVec<I>> + Deserialize + PartialOrd,
+{
+    fn assess(&self, filter: &Filter) -> Result<bool, io::Error> {
+        match filter {
+            Filter::Range { ub, lb } => self.range(ub, lb),
+            Filter::Eq(other) => self.equal(other),
+            Filter::OneOf(set) => self.one_of(set),
+            Filter::NoneOf(set) => self.none_of(set),
+            Filter::IsSome => self.is_some(),
+            Filter::IsNone => self.is_none(),
+        }
+    }
+}
+
+impl<I> Evaluate for Option<I>
+where
+    I: Deserialize + PartialOrd,
+    Option<I>: Deserialize,
+{
+    fn is_some(&self) -> Result<bool, io::Error> {
+        Ok(self.is_some())
+    }
+
+    fn is_none(&self) -> Result<bool, io::Error> {
+        Ok(self.is_none())
+    }
+
+    fn assess(&self, filter: &Filter) -> Result<bool, io::Error> {
+        match filter {
+            Filter::Range { ub, lb } => self.range(ub, lb),
+            Filter::Eq(other) => self.equal(other),
+            Filter::OneOf(set) => self.one_of(set),
+            Filter::NoneOf(set) => self.none_of(set),
+            Filter::IsSome => Evaluate::is_some(self),
+            Filter::IsNone => Evaluate::is_none(self),
+        }
+    }
+}
+
+impl Evaluate for bool {
+    fn assess(&self, filter: &Filter) -> Result<bool, io::Error> {
+        match filter {
+            Filter::IsSome => self.is_some(),
+            Filter::IsNone => self.is_none(),
+            some => io::Error::Filter { filter: some.clone(), actual: Type::Bool }.into(),
+        }
     }
 }
 
