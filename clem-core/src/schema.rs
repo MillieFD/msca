@@ -243,31 +243,34 @@ impl Column {
 /// A minimal type **descriptor** that provides a stable and extensible representation for
 /// platform-agnostic Rust primitives; used when walking the type graph for schema encoding.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode, CborLen)]
+#[derive(Debug, Clone, Ord, PartialOrd, Hash, Encode, Decode, CborLen)]
 #[non_exhaustive] // To accommodate the potential future stabilisation of additional types.
 pub enum Type {
+    /// An unspecified [`Type`] that is [`equal`](Eq) to all other variants.
+    #[n(0)]
+    Any,
     /* ----------------------------------------------------------- Fixed-Size Machine Primitives */
     /// Boolean primitive which can be `true` or `false`.
-    #[n(0)]
+    #[n(1)]
     Bool,
     /// [Unicode scalar value][1] representing a single character primitive.
     ///
     /// [1]: https://www.unicode.org/glossary/#unicode_scalar_value
-    #[n(1)]
+    #[n(2)]
     Char,
     /// Rust numeric primitives.
-    #[n(2)]
+    #[n(3)]
     Number(#[n(0)] Number),
     /* --------------------------------------------------------- Fixed Size Container Primitives */
     /// Optional (nullable) value wrapping one subtype.
-    #[n(3)]
+    #[n(4)]
     Option {
         /// [`Type`] of the subtype root node.
         #[n(0)]
         subtype: Box<Type>,
     },
     /// Fixed size tuple wrapping an arbitrary number of subtypes.
-    #[n(4)]
+    #[n(5)]
     Tuple {
         /// [`Type`] of each subtype root node. [`Vec::len`] returns the arity.
         #[n(0)]
@@ -275,10 +278,10 @@ pub enum Type {
     },
     /* ------------------------------------------------------------ Unsized Container Primitives */
     /// Variable length UTF-8 string encoded as a sequence of bytes.
-    #[n(5)]
+    #[n(6)]
     String,
     /// Variable length homogenous sequence wrapping one subtype.
-    #[n(6)]
+    #[n(7)]
     Sequence {
         /// [`Type`] of the subtype root node.
         #[n(0)]
@@ -324,10 +327,7 @@ impl Type {
     pub const NZI8: Self = Self::Number(Number { kind: number::Kind::NonZeroInt, size: 1 });
 
     /// A [`Number`](Number) descriptor for the [`NonZeroU128`](num::NonZeroU128) type.
-    pub const NZU128: Self = Self::Number(Number {
-        kind: number::Kind::NonZeroUInt,
-        size: 16,
-    });
+    pub const NZU128: Self = Self::Number(Number { kind: number::Kind::NonZeroUInt, size: 16 });
 
     /// A [`Number`](Number) descriptor for the [`NonZeroU16`](num::NonZeroU16) type.
     pub const NZU16: Self = Self::Number(Number { kind: number::Kind::NonZeroUInt, size: 2 });
@@ -373,9 +373,21 @@ impl Type {
     }
 }
 
+impl PartialEq<Self> for Type {
+    fn eq(&self, other: &Self) -> bool {
+        match self {
+            Type::Any => true, // Type::Any matches all other types
+            specific => specific.eq(other),
+        }
+    }
+}
+
+impl Eq for Type {}
+
 impl Display for Type {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::Any => write!(f, "any"),
             Self::Bool => f.write_str("bool"),
             Self::Char => f.write_str("char"),
             Self::Number(n) => n.fmt(f),
