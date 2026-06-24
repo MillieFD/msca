@@ -405,7 +405,7 @@ where
 /// Stateless type-level wrapper that flattens nested types on [`push`](Accumulate::push). All
 /// storage lives in the inner accumulator.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Debug, Default, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode, CborLen)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode, CborLen)]
 #[doc(hidden)]
 pub struct Flatten<I>(#[n(0)] pub I);
 
@@ -726,6 +726,7 @@ where
                 length: { self.size()?.get() - prefix }.try_into()?,
             },
             count: self.count().try_into()?,
+            // NOTE: unsized collections are not meaningfully orderable; min and max are unpopulated
             min: [u8::MIN; B],
             max: [u8::MAX; B],
         };
@@ -735,16 +736,43 @@ where
     }
 }
 
-impl<I> Accumulate for OptSeq<I>
+impl Accumulate<String> for Seq<u8> {
+    fn boxed(&self) -> BoxAcc<String> {
+        Box::new(Self::default())
+    }
+
+    fn push(&mut self, item: String) {
+        let bytes = item.into_bytes();
+        self.push(bytes);
+    }
+
+    fn discard(&mut self) {
+        Accumulate::<Vec<u8>>::discard(self);
+    }
+
+    fn is_empty(&self) -> bool {
+        Accumulate::<Vec<u8>>::is_empty(self)
+    }
+
+    fn count(&self) -> u64 {
+        Accumulate::<Vec<u8>>::count(self)
+    }
+
+    fn buffers(&self, offset: u64, columns: &mut Columns) -> Result<u64, Error> {
+        Accumulate::<Vec<u8>>::buffers(self, offset, columns)
+    }
+}
+
+impl<I> Accumulate<Option<Vec<I>>> for OptSeq<I>
 where
-    I: Unfold + Default + 'static,
+    I: Unfold + 'static,
 {
     fn boxed(&self) -> BoxAcc<Option<Vec<I>>> {
         Box::new(Self::default())
     }
 
     fn push(&mut self, item: Option<Vec<I>>) {
-        if let Some(v) = item {
+        if let Some(i) = item {
             let next = self
                 .offsets
                 .iter()
@@ -752,8 +780,8 @@ where
                 .find(|&o| o != &u64::MAX)
                 .copied()
                 .unwrap_or(u64::MIN)
-                .saturating_add(v.len() as u64);
-            v.into_iter().for_each(|x| self.data.push(x));
+                .saturating_add(i.len() as u64);
+            i.into_iter().for_each(|x| self.data.push(x));
             self.offsets.push(next);
         } else {
             // NOTE: contiguous payload of Some items only; None items append no data.
@@ -788,6 +816,33 @@ where
         let next = buf.sector.next().ok_or(Error::Zero)?.align()?;
         columns.next().map(|column| column.buffers.push(buf));
         Ok(next)
+    }
+}
+
+impl Accumulate<Option<String>> for OptSeq<u8> {
+    fn boxed(&self) -> BoxAcc<Option<String>> {
+        Box::new(Self::default())
+    }
+
+    fn push(&mut self, item: Option<String>) {
+        let bytes = item.map(String::into_bytes);
+        self.push(bytes);
+    }
+
+    fn discard(&mut self) {
+        Accumulate::<Option<Vec<u8>>>::discard(self);
+    }
+
+    fn is_empty(&self) -> bool {
+        Accumulate::<Option<Vec<u8>>>::is_empty(self)
+    }
+
+    fn count(&self) -> u64 {
+        Accumulate::<Option<Vec<u8>>>::count(self)
+    }
+
+    fn buffers(&self, offset: u64, columns: &mut Columns) -> Result<u64, Error> {
+        Accumulate::<Option<Vec<u8>>>::buffers(self, offset, columns)
     }
 }
 
@@ -1942,5 +1997,36 @@ mod tests {
         assert_eq!(next, 40); // Aligned end of the composite region
         assert_eq!(col.buffers[0].sector.offset, 8); // Whole body starts after the header prefix
         assert_eq!(col.buffers[0].sector.length.get(), 32); // Body spans the mask and data regions
+    }
+
+    /// [`Seq<u8>`] accumulates a [`String`] into the identical layout as its raw UTF-8 bytes.
+    #[test]
+    fn seq_string_matches_bytes() {
+        let mut text: Seq<u8> = Seq::default();
+        text.push(String::from("héllo"));
+        text.push(String::from("xyz"));
+        let mut bytes: Seq<u8> = Seq::default();
+        bytes.push("héllo".as_bytes().to_vec());
+        bytes.push(b"xyz".to_vec());
+        let text = text.serialize().expect("Serialize failed");
+        let bytes = bytes.serialize().expect("Serialize failed");
+        assert_eq!(text, bytes);
+    }
+
+    /// [`OptSeq<u8>`] accumulates an [`Option<String>`] identically to its raw optional UTF-8 bytes;
+    /// the [`u64::MAX`] sentinel marks [`None`] in both.
+    #[test]
+    fn opt_seq_string_matches_bytes() {
+        let mut text: OptSeq<u8> = OptSeq::default();
+        text.push(Some(String::from("ab")));
+        text.push(None::<String>);
+        text.push(Some(String::from("c")));
+        let mut bytes: OptSeq<u8> = OptSeq::default();
+        bytes.push(Some(b"ab".to_vec()));
+        bytes.push(None::<Vec<u8>>);
+        bytes.push(Some(b"c".to_vec()));
+        let text = text.serialize().expect("Serialize failed");
+        let bytes = bytes.serialize().expect("Serialize failed");
+        assert_eq!(text, bytes);
     }
 }
