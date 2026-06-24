@@ -87,6 +87,8 @@ use smol::io::{AsyncRead, AsyncReadExt, AsyncSeek, AsyncSeekExt, AsyncWrite, Asy
 
 use crate::accumulate::{Accumulator, Buffer};
 use crate::manifest::{Manifest, Pending};
+use crate::query::Filter;
+use crate::schema::Type;
 use crate::{number, schema, Serialize};
 
 /* ------------------------------------------------------------------------------ Public Exports */
@@ -501,6 +503,13 @@ impl File {
 pub enum Error {
     /// CBOR decoding failure for a manifest or schema payload.
     Decode(minicbor::decode::Error),
+    /// The requested [`Filter`] is not compatible with the actual on-disk [` Column `] type.
+    Filter {
+        /// The [`Filter`] applied by the caller.
+        filter: Filter,
+        /// The actual on-disk column [`Type`].
+        actual: Type,
+    },
     /// Underlying [`std::io::Error`] from the file backing the [`Dataset`](crate::Dataset).
     Io(std::io::Error),
     /// File magic bytes did not match the expected `clem` signature.
@@ -549,6 +558,7 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Decode(e) => write!(f, "CBOR decode error → {e}"),
+            Self::Filter { filter, actual } => write!(f, "{filter} cannot evaluate {actual}"),
             Self::Io(e) => write!(f, "File IO error → {e}"),
             Self::Magic => f.write_str("File is not a valid clem dataset"),
             Self::Number(e) => write!(f, "Number error → {e}"),
