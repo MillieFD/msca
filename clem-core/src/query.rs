@@ -321,7 +321,7 @@ impl Column {
     }
 
     /// Returns [`Error::Type`] if the requested [`Type`] does not match the on-disk [`Column`]
-    /// type **or** nested inner subtype; otherwise returns an unmodified reference to
+    /// type **or** nested inner subtype; otherwise returns an immutable reference to
     /// [`self`](Column) for method chaining.
     ///
     /// ### Guidance
