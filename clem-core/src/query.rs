@@ -588,6 +588,7 @@ impl Filter {
     {
         Ok(Self::NoneOf(Self::set(set)?))
     }
+}
 
 impl Display for Filter {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
