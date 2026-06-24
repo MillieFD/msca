@@ -607,11 +607,11 @@ where
 pub trait Unfold: Sized {
     /// The [accumulator](Accumulate) type used to ingest unwrapped values of [`Self`].
     // NOTE: Buffer must be a growable Vec; compiler cannot predict the number of accumulated items
-    type RawAcc: Accumulate<Item = Self> + Serialize<Buffer = Vec<u8>> + Default + 'static;
+    type RawAcc: Accumulate<Self> + Serialize<Buffer = Vec<u8>> + Default + 'static;
 
     /// The [accumulator](Accumulate) type used to ingest [optional](Option) values of [`Self`].
     // NOTE: Buffer must be a growable Vec; compiler cannot predict the number of accumulated items
-    type OptAcc: Accumulate<Item = Option<Self>> + Serialize<Buffer = Vec<u8>> + Default + 'static;
+    type OptAcc: Accumulate<Option<Self>> + Serialize<Buffer = Vec<u8>> + Default + 'static;
 
     /// Delegates to [`unfold`](Unfolder::unfold) on the provided [`Unfolder`].
     fn with_unfolder<U>() -> Type
