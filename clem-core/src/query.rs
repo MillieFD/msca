@@ -356,6 +356,17 @@ impl Column {
         Ok(self)
     }
 
+    /// Returns [`Error::Filter`] if the on-disk [`column`](Column)`.`[`type`](Type) is not
+    /// [`Option`]; otherwise returns an immutable reference to [`self`](Column) for method
+    /// chaining.
+    fn optional(&mut self) -> Result<&mut Self, Error> {
+        let option = || Type::Option { subtype: Type::Any.into() };
+        match &self.ty {
+            Type::Option { .. } => Ok(self),
+            other => Error::Type { expected: option(), found: other.clone() }.into(),
+        }
+    }
+
     /// Map the provided [`Key`](String) to a new empty [`Column`].
     pub(crate) fn map(entry: (&String, &manifest::Column)) -> (String, Self) {
         (entry.0.clone(), entry.1.clone().into())
