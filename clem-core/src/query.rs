@@ -216,7 +216,7 @@ impl Query {
     /// ### Errors
     ///
     /// - [`Error::Column`] if the named [`Column`] is not found in the [`Query`].
-    /// - [`Error::Type`] if the column's on-disk [`Type`] is incompatible with [`I`].
+    /// - [`Error::Type`] if the requested [`Type`] is incompatible with the actual [`Column`] type.
     /// - [`Error::Io`] if an error occurs during [deserialization](Deserialize).
     pub fn range<I, B>(mut self, name: &str, bounds: B) -> Result<Self, Error>
     where
@@ -246,6 +246,57 @@ impl Query {
         Ok(self)
     }
 
+    /// Retain rows where the [`Item`](I) in the specified [`Column`] exactly equals a given
+    /// `value`. Useful for boolean flags, integer codes, and enum discriminants.
+    ///
+    /// ### Guidance
+    ///
+    /// This filter can be applied to any [equatable](Eq) type. [`Option`] columns test the inner
+    /// [`Some`] and exclude [`None`] items.
+    ///
+    /// ```rust,ignore
+    /// .eq("active", true)
+    /// .eq("sensor_id", 42u32)
+    /// ```
+    ///
+    /// Refer to the [module-level documentation](self) for more details.
+    ///
+    /// ### Errors
+    ///
+    /// - [`Error::Column`] if the named [`Column`] is not found in the [`Query`].
+    /// - [`Error::Type`] if the requested [`Type`] is incompatible with the actual [`Column`] type.
+    pub fn eq<I>(mut self, name: &str, value: I) -> Result<Self, Error>
+    where
+        I: Serialize,
+        Schema: Unfolder<I>,
+    {
+        self.get_mut(name)?.accepts_mut()?.filters.insert(Filter::eq(&value)?);
+        Ok(self) // return to builder pattern
+    }
+
+    /// Retain rows where the [`Column`] value is a member of a [finite set](S).
+    ///
+    /// ### Guidance
+    ///
+    /// This filter can be applied to any [equatable](Eq) type.
+    ///
+    /// ```rust,ignore
+    /// .one_of("sensor_id", [1u32, 4, 7, 12])
+    /// ```
+    ///
+    /// ### Errors
+    ///
+    /// - [`Error::Column`] if the named [`Column`] is not found in the [`Query`].
+    /// - [`Error::Type`] if the requested [`Type`] is incompatible with the actual [`Column`] type.
+    pub fn one_of<I, S>(mut self, name: &str, values: S) -> Result<Self, Error>
+    where
+        I: Serialize,
+        S: IntoIterator<Item = I>,
+        Schema: Unfolder<I>,
+    {
+        self.get_mut(name)?.accepts_mut()?.filters.insert(Filter::one_of(values)?);
+        Ok(self) // return to builder pattern
+    }
     /// Sample every nth row from the result set. Useful for decimation and preview reads on dense
     /// time-series data.
     ///
