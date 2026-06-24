@@ -154,7 +154,7 @@ impl Query {
     pub fn column<'a, I>(&'a self, name: &str) -> Result<Stream<'a, I>, Error>
     where
         I: Read + 'a,
-        I::Src<'a>: Reader<'a, I, Ctx = &'a HashSet<Filter>> + TryFrom<&'a [u8]>,
+        I::Src<'a>: Reader<'a, I> + TryFrom<&'a [u8]>,
         Schema: Unfolder<I>,
     {
         // NOTE: Type::verify exactly once at initialisation (eager); progress fearlessly
