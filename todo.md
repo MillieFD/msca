@@ -53,13 +53,18 @@
         - [x] Add `OptInSitu` reader using `Deserialize` for niche-optimised optional types.
         - [x] Add `OptBitVec` reader using bit-packed validity map + concatenated data region.
         - [x] `Seq` reads the offset region to define boundaries, then deserializes each unsized item e.g. `Vec<T>`.
-        - [x] `OptSeq` reads the offset region to define boundaries and validity; `NonZero` offsets use zero for `None`.
+        - [x] One `Seq` reader serves sized and optional unsized columns; the `u64::MAX` sentinel encodes `None`.
         - [x] Manifest buffer sectors include the whole composite buffer body; exclude buffer header (length prefix).
         - [x] Fix `OptSeq::push` to keep cumulative offsets monotonic across a trailing `None` row.
+        - [x] `Deserialize::deserialize` advances a `&mut &[u8]` cursor so leaf readers stream sequentially.
+        - [x] `Seq`/`OptSeq` offsets are zero-based cumulative ends (`u64`); `None` uses the `u64::MAX` sentinel.
+        - [x] Unsized readers collect each row lazily via the built-in `Iterator::collect` (no handwritten collect).
+        - [x] `String` / `&str` columns: stored as a UTF-8 byte `Seq` (`Seq<u8>` / `OptSeq<u8>` accumulators):
+            - Read decodes each row via `str::from_utf8` into a borrowed `&str` or owned `String`.
         - [ ] Nested type support via `Flatten` reader; serialization collapses nested types into one on-disk layer.
         - [ ] Automatically bit-pack `Vec<bool>` during serialization; schema records the column type as `BitVec`.
     - [ ] Expand `#[derive(Data)]` to support enums by encoding the discriminant.
-    - [ ] Add remaining query filters: `eq` + `one_of` + `none_of` + `is_some` + `is_none` + `mask` + `limit` + `offset`
+    - [ ] Add remaining query filters: `mask` + `limit` + `offset`
     - [x] `Query::read` and `Query::collect` are no longer async; update documentation.
         - [x] Remove async references from [read-cycle.md](./doc/read-cycle.md).
         - [x] Remove async references from [query-filters.md](./doc/query-filters.md).
@@ -107,15 +112,21 @@
 - [ ] Add [user-guide.md](./doc/user-guide.md) with basic usage examples:
     - [ ] Create a new dataset
     - [ ] Register a schema for external composite types; explains `#[derive(Data)]` and `Dataset::schema`.
-    - [ ] Write a data segment; explains `Accumulator` and `Dataset::write` with multithreaded accumulation via `Clone`.
+    - [ ] Write a data segment; explains `Accumulator` and `Dataset::write` with subheadings for advanced use cases:
+        - [ ] Multithreaded accumulation via `Clone`.
+        - [ ] When + why + how to use the `map` feature with example code.
+        - [ ] When + why + how to use the `set` feature with example code.
+        - [ ] When + why + how to use the `index` feature with example code.
     - [ ] Query data; explains `Dataset::query` and the `Query` API with filters and iterators.
 - [x] Add [on-disk-format.md](./doc/on-disk-format.md) describing the on-disk layout in detail.
 - [ ] Search for discrepancies between [doc](./doc) and actual implementations. Update documentation as needed.
-- [x] Full test coverage:
-    - [x] Add comprehensive unit tests for core functionalities in each module; cover edge cases.
-    - [x] Add round-trip integration tests for `#[derive(Data)]` and `#[derive(Read)]` in "tests" directory.
-    - [x] Remove all round-trip tests from `clem-core` and `clem-derive` crates; move to "tests" directory.
+- [ ] Full test coverage:
+    - [ ] Add comprehensive unit tests for core functionalities in each module; cover edge cases.
+    - [ ] White-box accumulation and write tests for every supported type; check on-disk layout matches the spec.
+    - [x] External user perspective round-trip tests for `#[derive(Data)]` and `#[derive(Read)]` in "tests" directory.
+    - [x] No round-trip tests in `clem-core` and `clem-derive` crates; move to "tests" directory (external perspective).
 - [x] Remove all references to concurrency model `RwLock<Manifest>` in documentation; concurrency is deferred.
+- [ ] Alignment functions should use `core::num::next_multiple_of` for compiler optimisation.
 
 ### Extend Functionality (Priority III)
 
@@ -162,7 +173,7 @@
             - [ ] CBOR decoding ignores on-disk `maps` field if present when the feature is disabled.
             - [ ] CBOR encoding adds on-disk `maps` field if absent when the feature is enabled.
         - [ ] Order is not guaranteed; sorting would require mutation of existing segments (explicitly disallowed).
-    - [ ] Add feature-gated `Index` abstraction for items sorted by insertion order:
+    - [ ] Add feature-gated index abstraction for items sorted by insertion order:
         - [x] New `index` feature in `Cargo.toml` (OFF by default).
         - [ ] Insertion index is calculated across all data segments corresponding to the specified schema.
         - [ ] Shape described by `schema` segment, items stored in `data` segments.
