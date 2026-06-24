@@ -421,7 +421,7 @@ pub trait Accumulate<I>: Serialize {
     fn boxed(&self) -> BoxAcc<I>;
 
     /// Append one [`Item`](I) to the [accumulator](Self)
-    fn push(&mut self, value: I);
+    fn push(&mut self, item: I);
 
     /// Reinitialise the [accumulator](Self) without writing to disk. All data is permanently lost.
     ///
@@ -436,11 +436,15 @@ pub trait Accumulate<I>: Serialize {
 
     /// Returns the minimum accumulated value, or [`None`] if the [`Item`](I) is not meaningfully
     /// [orderable](PartialOrd).
-    fn min(&self) -> Option<I> { None }
+    fn min(&self) -> Option<I> {
+        None
+    }
 
     /// Returns the maximum accumulated value, or [`None`] if the [`Item`](I) is not meaningfully
     /// [orderable](PartialOrd).
-    fn max(&self) -> Option<I> { None }
+    fn max(&self) -> Option<I> {
+        None
+    }
 
     /// Generates one or more [`Buffer`] instances describing the accumulated data and appends to
     /// the [`Manifest`][1].
@@ -458,8 +462,8 @@ impl<I> Accumulate<I> for Accumulator<I> {
         self.data.boxed()
     }
 
-    fn push(&mut self, value: I) {
-        self.data.push(value);
+    fn push(&mut self, item: I) {
+        self.data.push(item);
     }
 
     fn discard(&mut self) {
@@ -492,8 +496,8 @@ impl Accumulate<bool> for BitVec {
         Box::new(Self::default())
     }
 
-    fn push(&mut self, value: bool) {
-        BitVec::push(self, value);
+    fn push(&mut self, item: bool) {
+        BitVec::push(self, item);
     }
 
     fn discard(&mut self) {
@@ -543,8 +547,8 @@ where
         Box::new(Self::default())
     }
 
-    fn push(&mut self, value: I) {
-        Vec::push(self, value);
+    fn push(&mut self, item: I) {
+        Vec::push(self, item);
     }
 
     fn discard(&mut self) {
@@ -609,8 +613,8 @@ where
         Box::new(Self::default())
     }
 
-    fn push(&mut self, value: Option<I>) {
-        self.data.push(value);
+    fn push(&mut self, item: Option<I>) {
+        self.data.push(item);
     }
 
     fn discard(&mut self) {
@@ -646,8 +650,8 @@ where
         Box::new(Self::default())
     }
 
-    fn push(&mut self, value: Option<I>) {
-        if let Some(value) = value {
+    fn push(&mut self, item: Option<I>) {
+        if let Some(value) = item {
             self.mask.push(true);
             self.data.push(value);
         } else {
@@ -694,12 +698,10 @@ where
         Box::new(Self::default())
     }
 
-    fn push(&mut self, value: Vec<I>) {
-        // 1. Calculate the zero-based cumulative end offset
-        let prev = self.offsets.last().copied().unwrap_or(u64::MIN);
-        let next = prev.saturating_add(value.len() as u64);
-        // 2. Push to buffers
-        value.into_iter().for_each(|x| self.data.push(x));
+    fn push(&mut self, item: Vec<I>) {
+        let size = item.len() as u64;
+        let next = self.offsets.last().copied().unwrap_or(u64::MIN).saturating_add(size);
+        item.into_iter().for_each(|i| self.data.push(i));
         self.offsets.push(next);
     }
 
@@ -741,8 +743,8 @@ where
         Box::new(Self::default())
     }
 
-    fn push(&mut self, value: Option<Vec<I>>) {
-        if let Some(v) = value {
+    fn push(&mut self, item: Option<Vec<I>>) {
+        if let Some(v) = item {
             let next = self
                 .offsets
                 .iter()
@@ -797,8 +799,8 @@ where
         Box::new(Self::default())
     }
 
-    fn push(&mut self, value: Option<Option<B>>) {
-        self.0.push(value.flatten());
+    fn push(&mut self, item: Option<Option<B>>) {
+        self.0.push(item.flatten());
     }
 
     fn discard(&mut self) {
