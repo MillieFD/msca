@@ -243,7 +243,7 @@ impl Column {
 /// A minimal type **descriptor** that provides a stable and extensible representation for
 /// platform-agnostic Rust primitives; used when walking the type graph for schema encoding.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Debug, Clone, Ord, PartialOrd, Hash, Encode, Decode, CborLen)]
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode, CborLen)]
 #[non_exhaustive] // To accommodate the potential future stabilisation of additional types.
 pub enum Type {
     /// An unspecified [`Type`] that is [`equal`](Eq) to all other variants.
@@ -372,17 +372,6 @@ impl Type {
         Self::Sequence { subtype: Box::new(subtype) }
     }
 }
-
-impl PartialEq<Self> for Type {
-    fn eq(&self, other: &Self) -> bool {
-        match self {
-            Type::Any => true, // Type::Any matches all other types
-            specific => specific.eq(other),
-        }
-    }
-}
-
-impl Eq for Type {}
 
 impl Display for Type {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -809,15 +798,15 @@ impl Unfold for String {
 
 /* ------------------------------------------------------------------- Unfolder Trait Definition */
 
-/// A **schema builder** that can unfold the supported type [`T`].
+/// A **schema builder** that can unfold the supported type [`I`].
 ///
 /// `Unfolder` is implemented independently for each supported type; enabling type-driven encoding.
 /// For example, the default [`Schema`] builder unfolds `u8` into a [`Type::Number`] descriptor.
-pub trait Unfolder<T>
+pub trait Unfolder<I>
 where
-    T: ?Sized,
+    I: ?Sized,
 {
-    /// Returns the [`Type`] descriptor produced by unfolding the supported [`T`].
+    /// Returns the [`Type`] descriptor produced by unfolding the supported [`I`].
     fn unfold() -> Type;
 }
 
