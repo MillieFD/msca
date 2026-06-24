@@ -790,6 +790,11 @@ where
     type OptAcc = OptSeq<T>;
 }
 
+impl Unfold for String {
+    type RawAcc = Seq<u8>;
+    type OptAcc = OptSeq<u8>;
+}
+
 /* ------------------------------------------------------------------- Unfolder Trait Definition */
 
 /// A **schema builder** that can unfold the supported type [`T`].
@@ -815,6 +820,18 @@ impl Unfolder<bool> for Schema {
 impl Unfolder<char> for Schema {
     fn unfold() -> Type {
         Type::Char
+    }
+}
+
+impl Unfolder<String> for Schema {
+    fn unfold() -> Type {
+        Type::String
+    }
+}
+
+impl Unfolder<&str> for Schema {
+    fn unfold() -> Type {
+        Type::String
     }
 }
 
