@@ -408,10 +408,10 @@ impl Column {
     where
         Schema: Unfolder<I>,
     {
-        let expected = Schema::unfold();
-        match self.ty == expected {
+        let expect = Schema::unfold();
+        match self.ty == expect {
             true => Ok(self),
-            false => Error::Type { expected, found: self.ty.clone() }.into(),
+            false => Error::Type { expect, actual: self.ty.clone() }.into(),
         }
     }
 
@@ -445,7 +445,7 @@ impl Column {
         let inner = Schema::unfold();
         match self.ty == inner || matches!(&self.ty, Type::Option { subtype: s } if **s == inner) {
             true => Ok(self),
-            false => Error::Type { expected: inner, found: self.ty.clone() }.into(),
+            false => Error::Type { expect: inner, actual: self.ty.clone() }.into(),
         }
     }
 
@@ -472,7 +472,7 @@ impl Column {
         let option = || Type::Option { subtype: Type::Any.into() };
         match &self.ty {
             Type::Option { .. } => Ok(self),
-            other => Error::Type { expected: option(), found: other.clone() }.into(),
+            other => Error::Type { expect: option(), actual: other.clone() }.into(),
         }
     }
 
@@ -639,6 +639,8 @@ impl Filter {
 #[derive(Debug)]
 #[non_exhaustive] // To accommodate potential future error cases.
 pub enum Error {
+    /// The requested [`Column`] name was not found in the query [`BTreeMap`].
+    Column(String),
     /// Underlying [`io::Error`] from the [clem](crate) [file](io::File).
     Io(io::Error),
     /// Underlying [`number::Error`] from a numerical operation or conversion.
@@ -646,12 +648,10 @@ pub enum Error {
     /// The requested [`Type`] did not match the actual on-disk [`Column`] type.
     Type {
         /// The [`Type`] expected by the caller.
-        expected: Type,
+        expect: Type,
         /// The actual on-disk column [`Type`].
-        found: Type,
+        actual: Type,
     },
-    /// The requested [`Column`] name was not found in the query [`BTreeMap`].
-    Column(String),
 }
 
 impl Error {
@@ -668,10 +668,10 @@ impl Error {
 impl Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::Column(name) => write!(f, "Column '{name}' not found"),
             Self::Io(e) => write!(f, "Query IO error → {e}"),
             Self::Number(e) => write!(f, "Number error → {e}"),
-            Self::Type { expected, found } => write!(f, "Type error → {expected} ≠ {found}"),
-            Self::Column(name) => write!(f, "Column '{name}' not found"),
+            Self::Type { expect, actual } => write!(f, "Type error → {expect} ≠ {actual}"),
         }
     }
 }
