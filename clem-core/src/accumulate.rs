@@ -692,7 +692,7 @@ where
 
 impl<I> Accumulate<Vec<I>> for Seq<I>
 where
-    I: Unfold + Default + 'static,
+    I: Unfold + 'static,
 {
     fn boxed(&self) -> BoxAcc<Vec<I>> {
         Box::new(Self::default())
