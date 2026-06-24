@@ -35,7 +35,7 @@ use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::fmt::{self, Display};
 use std::iter;
 use std::num::{self, TryFromIntError};
-use std::ops::{Bound, RangeBounds};
+use std::ops::{Bound, Not, RangeBounds};
 use std::sync::Arc;
 
 use memmap2::Mmap;
@@ -45,7 +45,7 @@ use crate::accumulate::Buffer;
 use crate::io::{self, Deserialize, Deserializer};
 use crate::manifest::{self, B};
 use crate::read::{self, Outcome, Read, Reader, Stream};
-use crate::schema::{number, Schema, Type, Unfolder};
+use crate::schema::{number, Schema, Type, Unfold, Unfolder};
 use crate::Serialize;
 
 /* ------------------------------------------------------------------------------ Public Exports */
@@ -508,32 +508,32 @@ pub enum Filter {
         #[n(1)]
         ub: Bound<[u8; B]>,
     },
-    /// Retain items exactly equal to the operand.
+    /// Retain items that are exactly [equal](Eq) to the inner operand.
+    ///
+    /// ### Wrapped Data
+    ///
+    /// The equality operand is [serialized](Serialize) as LE bytes into a fixed-size array with
+    /// trailing zeros. [Deserialize] according to the [`Type`] specified by the [`Schema`].
     #[n(1)]
-    Eq {
-        /// Equality operand [serialized](Serialize) as LE bytes into a fixed-size array with
-        /// trailing zeros. [Deserialize] according to the [`Type`] specified by the [`Schema`].
-        #[cbor(n(0), with = "minicbor::bytes")]
-        value: [u8; B],
-    },
+    Eq(#[cbor(n(0), with = "minicbor::bytes")] [u8; B]),
     /// Retain items that are a member of the operand set.
+    ///
+    /// ### Wrapped Data
+    ///
+    /// Each equality operand is [serialized](Serialize) as LE bytes into a fixed-size array with
+    /// trailing zeros and collected into a [`BTreeSet`] to ensure uniqueness. [Deserialize]
+    /// according to the [`Type`] specified by the [`Schema`].
     #[n(2)]
-    OneOf {
-        /// [`BTreeSet`] containing unique operands; each [serialized](Serialize) as LE bytes into a
-        /// fixed-size array with trailing zeros. [Deserialize] according to the [`Type`] specified
-        /// by the [`Schema`].
-        #[cbor(n(0), skip_if = "BTreeSet::is_empty")]
-        set: BTreeSet<[u8; B]>,
-    },
+    OneOf(#[cbor(n(0), skip_if = "BTreeSet::is_empty")] BTreeSet<[u8; B]>),
     /// Reject items that are a member of the operand set.
+    ///
+    /// ### Wrapped Data
+    ///
+    /// Each equality operand is [serialized](Serialize) as LE bytes into a fixed-size array with
+    /// trailing zeros and collected into a [`BTreeSet`] to ensure uniqueness. [Deserialize]
+    /// according to the [`Type`] specified by the [`Schema`].
     #[n(3)]
-    NoneOf {
-        /// [`BTreeSet`] containing unique operands; each [serialized](Serialize) as LE bytes into a
-        /// fixed-size array with trailing zeros. [Deserialize] according to the [`Type`] specified
-        /// by the [`Schema`].
-        #[cbor(n(0), skip_if = "BTreeSet::is_empty")]
-        set: BTreeSet<[u8; B]>,
-    },
+    NoneOf(#[cbor(n(0), skip_if = "BTreeSet::is_empty")] BTreeSet<[u8; B]>),
     /// Retain [`Option`] items that are [`Some`].
     #[n(4)]
     IsSome,
