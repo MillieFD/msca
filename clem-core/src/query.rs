@@ -465,7 +465,7 @@ impl Column {
         Ok(self)
     }
 
-    /// Returns [`Error::Filter`] if the on-disk [`column`](Column)`.`[`type`](Type) is not
+    /// Returns [`Error::Type`] if the on-disk [`column`](Column)`.`[`type`](Type) is not
     /// [`Option`]; otherwise returns an immutable reference to [`self`](Column) for method
     /// chaining.
     fn optional(&mut self) -> Result<&mut Self, Error> {
