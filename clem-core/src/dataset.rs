@@ -214,9 +214,7 @@ mod tests {
         v: BoxAcc<u32>,
     }
 
-    impl Accumulate for Acc {
-        type Item = Row;
-
+    impl Accumulate<Row> for Acc {
         fn boxed(&self) -> BoxAcc<Row> {
             Box::new(Acc { v: self.v.boxed() })
         }
