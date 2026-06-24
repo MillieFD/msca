@@ -307,6 +307,8 @@ impl From<manifest::Column> for Column {
 impl Type {
     /// Returns [`Error::Type`] if the requested [`Type`] does not match the on-disk [`Column`]
     /// type; otherwise returns an unmodified reference to [`self`](Column) for method chaining.
+    ///
+    /// Refer to [`Type::accepts`] if a direct **or** nested inner-type match is permissible.
     pub fn exact<I>(&self) -> Result<&Self, Error>
     where
         Schema: Unfolder<I>,
@@ -315,6 +317,22 @@ impl Type {
         match *self == expected {
             true => Ok(self),
             false => Error::Type { expected, found: self.clone() }.into(),
+        }
+    }
+
+    /// Returns [`Error::Type`] if the requested [`Type`] does not match the on-disk [`Column`]
+    /// type directly or as [`Option<I>`](Option); otherwise returns an unmodified reference to
+    /// [`self`](Column) for method chaining.
+    ///
+    /// Refer to [`Type::exact`] if a direct non-nested match is required.
+    fn accepts<I>(&self) -> Result<&Self, Error>
+    where
+        Schema: Unfolder<I>,
+    {
+        let inner = Schema::unfold();
+        match *self == inner || matches!(self, Type::Option { subtype } if **subtype == inner) {
+            true => Ok(self),
+            false => Error::Type { expected: inner, found: self.clone() }.into(),
         }
     }
 }
