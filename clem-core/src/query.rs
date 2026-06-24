@@ -543,6 +543,17 @@ pub enum Filter {
 }
 
 impl Filter {
+    /// [`Serialize`] each unique [item](I) from a [finite set](S).
+    fn set<I, S>(set: S) -> Result<BTreeSet<[u8; B]>, number::Error>
+    where
+        I: Serialize,
+        S: IntoIterator<Item = I>,
+    {
+        set.into_iter().map(|i| [u8::MIN; B].serialize_push(&i)).collect()
+    }
+
+    /* --------------------------------------------------------------------- Filter Constructors */
+
     /// Construct a [`Filter::Range`] from the provided [`range`](RangeBounds).
     pub(crate) fn bounds<B, I>(range: &B) -> Self
     where
@@ -555,21 +566,35 @@ impl Filter {
         }
     }
 
-    /// Returns `true` if the [`item`](I) satisfies [`self`](Filter).
-    pub(crate) fn evaluate<I>(&self, item: &I) -> Result<bool, io::Error>
-    where
-        I: for<'a> Deserialize<Src<'a> = &'a [u8]> + PartialOrd,
-    {
-        // NOTE: This dispatch function will grow as new filter variants are added
-        match self {
-            Self::Range { lb, ub } => Filter::contains(lb, ub, item),
-        }
+    /// Construct a [`Filter::Eq`] from the provided [`item`](I).
+    fn eq<I: Serialize>(item: &I) -> Result<Self, number::Error> {
+        Ok(Self::Eq([u8::MIN; B].serialize_push(item)?))
     }
+
+    /// Construct a [`Filter::OneOf`] from the provided [`item`](I) [`set`](S).
+    fn one_of<I, S>(set: S) -> Result<Self, number::Error>
+    where
+        I: Serialize,
+        S: IntoIterator<Item = I>,
+    {
+        Ok(Self::OneOf(Self::set(set)?))
+    }
+
+    /// Construct a [`Filter::NoneOf`] from the provided [`item`](I) [`set`](S).
+    fn none_of<I, S>(set: S) -> Result<Self, number::Error>
+    where
+        I: Serialize,
+        S: IntoIterator<Item = I>,
+    {
+        Ok(Self::NoneOf(Self::set(set)?))
+    }
+
+    /* ----------------------------------------------------------------------- Filter Evaluation */
 
     /// Returns `true` if the [`item`](I) is contained within the specified [`Range`](RangeBounds).
     pub(crate) fn contains<I, S>(lb: &Bound<S>, ub: &Bound<S>, item: &I) -> Result<bool, io::Error>
     where
-        I: for<'a> Deserialize<Src<'a> = &'a [u8]> + PartialOrd,
+        I: Deserialize + PartialOrd,
         S: AsRef<[u8]>,
     {
         let above = match lb {
@@ -583,6 +608,18 @@ impl Filter {
             Bound::Unbounded => true,
         };
         Ok(above && below)
+    }
+
+    /// Returns `true` if `item` equals any encoded operand in `values`.
+    fn member<I, S>(set: &S, item: &I) -> Result<bool, io::Error>
+    where
+        I: Deserialize + PartialEq,
+        for<'a> &'a S: IntoIterator<Item = &'a [u8; B]>,
+    {
+        set.into_iter().try_fold(false, |acc, bytes| match acc {
+            true => Ok(true), // short-circuit without deserializing
+            false => Ok(*item == bytes.as_ref().deserialize_into()?),
+        })
     }
 }
 
