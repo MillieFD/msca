@@ -628,14 +628,11 @@ pub trait Evaluate: Sized {
         Ok(above && below)
     }
 
-    /// Returns `true` if `self` is exactly equal to [`other`](O)
-    fn equal<O>(&self, other: &O) -> Result<bool, io::Error>
+    /// Returns `true` if `self` is exactly equal to [`other`](S)
+    fn equal<S>(&self, other: &S) -> Result<bool, io::Error>
     where
-        Self: Deserialize + PartialEq,
-        O: AsRef<[u8]>,
-    {
-        Ok(*self == other.as_ref().deserialize_into()?)
-    }
+        Self: PartialEq,
+        S: AsRef<[u8]>;
 
     /// Returns `true` if `self` is a member of the specified [set](S).
     fn one_of<S>(&self, set: &S) -> Result<bool, io::Error>
@@ -696,6 +693,13 @@ impl<I> Evaluate for I
 where
     I: Unfold<RawAcc = Vec<I>, OptAcc = OptBitVec<I>> + Deserialize + PartialOrd,
 {
+    fn equal<S>(&self, other: &S) -> Result<bool, io::Error>
+    where
+        S: AsRef<[u8]>,
+    {
+        Ok(*self == other.as_ref().deserialize_into()?)
+    }
+
     fn assess(&self, filter: &Filter) -> Result<bool, io::Error> {
         match filter {
             Filter::Range { lb, ub } => self.range(lb, ub),
@@ -713,6 +717,13 @@ where
     I: Deserialize + PartialOrd,
     Option<I>: Deserialize,
 {
+    fn equal<S>(&self, other: &S) -> Result<bool, io::Error>
+    where
+        S: AsRef<[u8]>,
+    {
+        Ok(*self == other.as_ref().deserialize_into()?)
+    }
+
     fn is_some(&self) -> Result<bool, io::Error> {
         Ok(self.is_some())
     }
@@ -734,6 +745,14 @@ where
 }
 
 impl Evaluate for bool {
+    fn equal<S>(&self, other: &S) -> Result<bool, io::Error>
+    where
+        Self: PartialEq,
+        S: AsRef<[u8]>,
+    {
+        Ok(*self as u8 == other.as_ref()[0])
+    }
+
     fn assess(&self, filter: &Filter) -> Result<bool, io::Error> {
         match filter {
             Filter::Eq(other) => Ok(other[0] == *self as u8),
