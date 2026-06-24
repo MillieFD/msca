@@ -190,7 +190,7 @@ impl<I> Debug for Accumulator<I> {
 /// Implementors are advised to use niche-optimised types when possible to improve storage
 /// efficiency and random read performance.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode, CborLen)]
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode, CborLen)]
 pub struct OptInSitu<T> {
     /// Contiguous payload encoding [`Some`] and [`None`] values directly.
     #[cbor(n(0), skip_if = "Vec::is_empty")]
@@ -313,7 +313,7 @@ where
 ///
 /// [1]: https://doc.rust-lang.org/reference/dynamically-sized-types.html
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Debug, Default, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[doc(hidden)]
 pub struct Seq<I>
 where
@@ -336,6 +336,19 @@ where
     pub data: I::RawAcc,
 }
 
+// NOTE: #[derive(Default)] would impose I: Default trait bound which complicates the API
+impl<I> Default for Seq<I>
+where
+    I: Unfold,
+{
+    fn default() -> Self {
+        Self {
+            offsets: Vec::new(),
+            data: I::RawAcc::default(),
+        }
+    }
+}
+
 /// Data **accumulator** for [optional](Option) [unsized][1] values.
 ///
 /// ### Data Layout
@@ -354,7 +367,7 @@ where
 ///
 /// [1]: https://doc.rust-lang.org/reference/dynamically-sized-types.html
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Debug, Default, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[doc(hidden)]
 pub struct OptSeq<T>
 where
@@ -377,12 +390,24 @@ where
     pub data: T::RawAcc,
 }
 
+impl<I> Default for OptSeq<I>
+where
+    I: Unfold,
+{
+    fn default() -> Self {
+        Self {
+            offsets: Vec::new(),
+            data: I::RawAcc::default(),
+        }
+    }
+}
+
 /// Stateless type-level wrapper that flattens nested types on [`push`](Accumulate::push). All
 /// storage lives in the inner accumulator.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Default, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode, CborLen)]
 #[doc(hidden)]
-pub struct Flatten<T>(#[n(0)] pub T);
+pub struct Flatten<I>(#[n(0)] pub I);
 
 /* ----------------------------------------------------------------- Accumulate Trait Definition */
 
