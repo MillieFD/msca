@@ -589,7 +589,18 @@ impl Filter {
         Ok(Self::NoneOf(Self::set(set)?))
     }
 
-    /* ----------------------------------------------------------------------- Filter Evaluation */
+impl Display for Filter {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Filter::Range { .. } => write!(f, "Filter::Range"),
+            Filter::Eq(..) => write!(f, "Filter::Eq"),
+            Filter::OneOf(..) => write!(f, "Filter::OneOf"),
+            Filter::NoneOf(..) => write!(f, "Filter::NoneOf"),
+            Filter::IsSome => write!(f, "Filter::IsSome"),
+            Filter::IsNone => write!(f, "Filter::IsNone"),
+        }
+    }
+}
 
     /// Returns `true` if the [`item`](I) is contained within the specified [`Range`](RangeBounds).
     pub(crate) fn contains<I, S>(lb: &Bound<S>, ub: &Bound<S>, item: &I) -> Result<bool, io::Error>
