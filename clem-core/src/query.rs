@@ -307,7 +307,7 @@ impl From<manifest::Column> for Column {
 impl Type {
     /// Returns [`Error::Type`] if the requested [`Type`] does not match the on-disk [`Column`]
     /// type; otherwise returns an unmodified reference to [`self`](Column) for method chaining.
-    pub fn verify<I>(&self) -> Result<&Self, Error>
+    pub fn exact<I>(&self) -> Result<&Self, Error>
     where
         Schema: Unfolder<I>,
     {
