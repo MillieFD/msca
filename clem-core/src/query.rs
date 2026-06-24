@@ -603,6 +603,8 @@ impl Display for Filter {
     }
 }
 
+/* ------------------------------------------------------------------- Evaluate Trait Definition */
+
 /// A **type** that can be tested against a [`Filter`] during [deserialization][1].
 ///
 /// [1]: Deserialize::deserialize
@@ -687,6 +689,8 @@ pub trait Evaluate: Sized {
         }
     }
 }
+
+/* --------------------------------------------------------------- Evaluate Trait Implementation */
 
 impl<I> Evaluate for I
 where
