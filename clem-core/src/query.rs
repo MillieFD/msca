@@ -33,8 +33,8 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::fmt::{self, Display};
-use std::iter::from_fn;
-use std::num::{NonZeroU32, TryFromIntError};
+use std::iter;
+use std::num::{self, TryFromIntError};
 use std::ops::{Bound, RangeBounds};
 use std::sync::Arc;
 
@@ -44,7 +44,7 @@ use minicbor::{CborLen, Decode, Encode};
 use crate::accumulate::Buffer;
 use crate::io::{self, Deserialize, Deserializer};
 use crate::manifest::{self, B};
-use crate::read::{self, Outcome, Read, Stream};
+use crate::read::{self, Outcome, Read, Reader, Stream};
 use crate::schema::{number, Schema, Type, Unfolder};
 use crate::Serialize;
 
@@ -75,7 +75,7 @@ pub struct Query {
     )]
     pub columns: BTreeMap<String, Column>,
     /// Decimation factor applied to downsample the result set; defaults to 1 (keep all data).
-    pub stride: NonZeroU32,
+    pub stride: num::NonZeroU32,
 }
 
 impl Query {
@@ -90,21 +90,20 @@ impl Query {
     pub fn read<'a, I>(&'a self) -> Result<impl Iterator<Item = Result<I, io::Error>> + 'a, Error>
     where
         I: Read + 'a,
-        I::Ctx<'a>: TryFrom<&'a Query, Error = Error>,
+        I::Src<'a>: TryFrom<&'a Query, Error = Error> + Iterator<Item = Outcome<I>> + 'a,
     {
-        let mut stream = I::boxed(self.try_into()?);
-        let rows = from_fn(move || {
+        let mut reader: I::Src<'a> = self.try_into()?;
+        let iter = iter::from_fn(move || {
             loop {
-                return match stream.next()? {
-                    Outcome::Success(item) => Some(Ok(item)),
-                    Outcome::Excluded => continue,
-                    Outcome::Finished => None,
-                    Outcome::Error(error) => Some(Err(error)),
+                return match reader.next()? {
+                    Outcome::Include(item) => Ok(item).into(),
+                    Outcome::Exclude => continue,
+                    Outcome::Error(error) => Err(error).into(),
                 };
             }
         })
         .step_by(self.stride.get().try_into()?);
-        Ok(rows)
+        Ok(iter)
     }
 
     /// Drain the [`Query`] result set into an owned [`Vec`] of [`deserialized`][1] [`items`](I).
@@ -118,7 +117,7 @@ impl Query {
     pub fn collect<I>(self) -> Result<Vec<I>, Error>
     where
         I: Read + 'static,
-        for<'a> I::Ctx<'a>: TryFrom<&'a Query, Error = Error>,
+        for<'a> I::Src<'a>: TryFrom<&'a Query, Error = Error> + Iterator<Item = Outcome<I>> + 'a,
     {
         self.read::<I>()?.collect::<Result<Vec<I>, io::Error>>().map_err(Error::from)
     }
@@ -154,18 +153,19 @@ impl Query {
     /// [1]: Deserialize::deserialize
     pub fn column<'a, I>(&'a self, name: &str) -> Result<Stream<'a, I>, Error>
     where
-        I: for<'b> Read<Ctx<'b> = read::Column<'b>> + 'a,
+        I: Read + 'a,
+        I::Src<'a>: Reader<'a, I, Ctx = &'a HashSet<Filter>> + TryFrom<&'a [u8]>,
         Schema: Unfolder<I>,
     {
-        let column = self.get(name)?;
         // NOTE: Type::verify exactly once at initialisation (eager); progress fearlessly
-        column.ty.verify::<I>()?;
-        let ctx = read::Column {
+        let column = self.get(name)?.exact()?;
+        let stream = read::Column {
             buffers: column.buffers.iter(),
             mmap: &self.mmap,
             filters: &column.filters,
-        };
-        Ok(I::boxed(ctx))
+        }
+        .stream();
+        Ok(stream)
     }
 
     /* --------------------------------------------------------------------------- Query Filters */
@@ -220,12 +220,11 @@ impl Query {
     /// - [`Error::Io`] if an error occurs during [deserialization](Deserialize).
     pub fn range<I, B>(mut self, name: &str, bounds: B) -> Result<Self, Error>
     where
-        I: Serialize + for<'a> Deserialize<Src<'a> = &'a [u8]> + PartialOrd,
+        I: Serialize + for<'a> Deserialize + PartialOrd,
         B: RangeBounds<I>,
         Schema: Unfolder<I>,
     {
-        let col = self.get_mut(name)?;
-        col.ty.verify::<I>()?;
+        let column = self.get_mut(name)?.accepts_mut()?;
         // 1. Insert filter for lazy evaluation during deserialization
         let filter = Filter::bounds(&bounds);
         col.filters.insert(filter);
@@ -256,7 +255,7 @@ impl Query {
     ///
     /// The default stride value `1` includes every row after filtering.
     pub fn stride(mut self, n: u32) -> Self {
-        self.stride = NonZeroU32::new(n).unwrap_or(NonZeroU32::MIN);
+        self.stride = num::NonZeroU32::new(n).unwrap_or(num::NonZeroU32::MIN);
         self // return to builder pattern
     }
 }
@@ -334,15 +333,15 @@ impl Column {
         Schema: Unfolder<I>,
     {
         let inner = Schema::unfold();
-        match self.ty == inner || matches!(&self.ty, Type::Option { sub } if **sub == inner) {
+        match self.ty == inner || matches!(&self.ty, Type::Option { subtype: s } if **s == inner) {
             true => Ok(self),
             false => Error::Type { expected: inner, found: self.ty.clone() }.into(),
         }
     }
 
     /// Returns [`Error::Type`] if the requested [`Type`] does not match the on-disk [`Column`]
-    /// type **or** nested inner subtype; otherwise returns an unmodified reference to
-    /// [`self`](Column) for method chaining.
+    /// type **or** nested inner subtype; otherwise returns a mutable reference to [`self`](Column)
+    /// for method chaining.
     ///
     /// ### Guidance
     ///
@@ -379,11 +378,6 @@ impl From<manifest::Column> for Column {
             ty: src.ty,
             buffers: src.buffers,
             filters: HashSet::new(),
-        }
-    }
-}
-
-impl Type {
         }
     }
 }
