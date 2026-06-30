@@ -130,40 +130,29 @@ impl<'a> Column<'a> {
     }
 }
 
-/// A **stateful cursor** over paired validity and value data streams for a single [`Column`]; used
+/// A **stateful cursor** over paired validity and value sub-buffers for a single [`Column`]; used
 /// to [`Deserialize`] optional non-niche items.
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[doc(hidden)] // Reachable via Read::Src for optional non-niche readers
 struct OptBitVec<'a> {
-    /// Validity bits in [`Lsb0`] order. One bit per item.
-    ///
-    /// - `true` → [`Some`]
-    /// - `false` → [`None`]
-#[derive(Clone, Copy, Debug)]
-    bits: &'a BitSlice<u8, Lsb0>,
-    /// Data **source** from which items are [deserialized](Deserialize).
+    /// [`Stream`] over the validity sub-buffer where `true` → [`Some`] and `false` → [`None`].
+    mask: Stream<'a, bool>,
+    /// Concatenated data sub-buffer from which [`Some`] items are [deserialized](Deserialize).
     data: &'a [u8],
 }
 
-/// A **stateful cursor** over paired offset and value data streams for a single [`Column`]; used to
+/// A **stateful cursor** over paired offset and value sub-buffers for a single [`Column`]; used to
 /// [`Deserialize`](Deserialize) [unsized][1] items.
 ///
 /// [1]: https://doc.rust-lang.org/reference/dynamically-sized-types.html
 #[doc(hidden)] // Reachable via Read::Src for unsized readers
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 struct Seq<'a> {
-    /// Cumulative non-zero end offsets for each [`Item`](I).
-    ///
-    /// The [`u64::MIN`] niche is used to encode [`None`] for optional unsized items.
-#[derive(Clone, Copy, Debug)]
-    offsets: &'a [u8],
-    /// Inclusive start offset for the next item.
-    start: u64,
-    /// Flattened data **source** from which items are [deserialized](Deserialize).
+    /// [`Stream`] over the `ends` sub-buffer yielding one `u64` cumulative end offset for each
+    /// [`Some`] or [`u64::MAX`] for [`None`].
+    ends: Stream<'a, u64>,
+    /// Concatenated data sub-buffer from which [`Some`] items are [deserialized](Deserialize).
     data: &'a [u8],
 }
 
-impl<'a> TryFrom<&'a [u8]> for Seq<'a> {
-    type Error = Error;
 /* ------------------------------------------------------------------------- Read Stream Outcome */
 
 /// The result of [deserializing](Deserialize) one [`Item`](I) from a [`Read`](Read) [`Stream`].
