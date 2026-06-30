@@ -144,14 +144,6 @@ struct OptBitVec<'a> {
     data: &'a [u8],
 }
 
-impl<'a> TryFrom<&'a [u8]> for OptBitVec<'a> {
-    type Error = Error;
-
-    fn try_from(src: &'a [u8]) -> Result<Self, Self::Error> {
-        todo!("read the validity bits and data buffer into Self")
-    }
-}
-
 /// A **stateful cursor** over paired offset and value data streams for a single [`Column`]; used to
 /// [`Deserialize`](Deserialize) [unsized][1] items.
 ///
