@@ -126,9 +126,16 @@ routes fearlessly to the relevant segment body region without boundary checks or
 > The segment header currently encodes the segment body `length` instead of the `next` offset. A refactor is required to
 > bring the codebase in line with this specification document.
 
-> [!TODO] Header Padding
-> The segment header is currently unpadded which causes misalignment of the segment body (does not start at a 64-bit
-> boundary). Is it beneficial to add a varible-length zero-filled padding region after the header `next` field?
+##### Alignment Padding
+
+The header is excluded from the sector recorded in the [manifest](#manifest) and is read **exclusively** during
+[manifest recovery](#durability-and-recovery); the optimised random-access read path routes fearlessly to the relevant
+segment body region without boundary checks or variant verification. [SIMD alignment](./simd-alignment.md) to the next
+64-bit boundary is therefore applied selectively based on the segment variant:
+
+- **Data segments** include a zero-filled padding region inserted after the [metadata](#data-segments) to ensure all
+  subsequent [columnar data buffers](#columnar-data-buffers) are begin at a 64-bit boundary.
+- **Schema segments** are unaligned to improve on-disk storage efficiency.
 
 ### Schema Segments
 
