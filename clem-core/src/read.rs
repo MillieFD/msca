@@ -133,12 +133,12 @@ impl<'a> Column<'a> {
 /// A **stateful cursor** over paired validity and value data streams for a single [`Column`]; used
 /// to [`Deserialize`] optional non-niche items.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Debug, Clone)]
 struct OptBitVec<'a> {
     /// Validity bits in [`Lsb0`] order. One bit per item.
     ///
     /// - `true` → [`Some`]
     /// - `false` → [`None`]
+#[derive(Clone, Copy, Debug)]
     bits: &'a BitSlice<u8, Lsb0>,
     /// Data **source** from which items are [deserialized](Deserialize).
     data: &'a [u8],
