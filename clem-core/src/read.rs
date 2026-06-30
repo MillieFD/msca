@@ -150,11 +150,11 @@ struct OptBitVec<'a> {
 /// [1]: https://doc.rust-lang.org/reference/dynamically-sized-types.html
 #[doc(hidden)] // Reachable via Read::Src for unsized readers
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Debug, Clone)]
 struct Seq<'a> {
     /// Cumulative non-zero end offsets for each [`Item`](I).
     ///
     /// The [`u64::MIN`] niche is used to encode [`None`] for optional unsized items.
+#[derive(Clone, Copy, Debug)]
     offsets: &'a [u8],
     /// Inclusive start offset for the next item.
     start: u64,
