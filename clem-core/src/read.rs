@@ -508,6 +508,18 @@ where
     type Src<'a> = Seq<'a>;
 }
 
+impl Read for String {
+    type Src<'a> = Seq<'a>;
+}
+
+impl Read for Option<String> {
+    type Src<'a> = Seq<'a>;
+}
+
+impl Read for &str {
+    type Src<'a> = Seq<'a>;
+}
+
 /* --------------------------------------------------------------------------------------- Tests */
 
 #[cfg(test)]
