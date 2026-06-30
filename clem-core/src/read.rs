@@ -72,7 +72,7 @@ use bitvec::order::Lsb0;
 use bitvec::slice::BitSlice;
 use memmap2::Mmap;
 
-use crate::io::{Deserialize, Deserializer, Error};
+use crate::io::{Deserialize, Error};
 use crate::manifest::Buffer;
 use crate::query::{Evaluate, Filter};
 use crate::segment::Align;
@@ -100,17 +100,33 @@ pub struct Column<'a> {
 }
 
 impl<'a> Column<'a> {
-    fn stream<I>(&mut self) -> Stream<I>
+    /// Construct a [`Stream`] that will lazily:
+    ///
+    /// 1. Pull bytes from the retained on-disk [buffers](Buffer).
+    /// 2. [`Deserialize`] bytes into the requested [`item`](I) type.
+    /// 3. [`Evaluate`] each query [`Filter`] on the deserialized item.
+    ///
+    /// Streams chain transparently across segments, abstracting away the underlying file structure
+    /// to provide a seamless interface for end-users.
+    ///
+    /// Refer to the [module-level documentation](self) for details.
+    pub(crate) fn stream<I>(self) -> Stream<'a, I>
     where
-        I: Read + Evaluate,
+        I: Read + 'a,
+        I::Src<'a>: Reader<'a, I> + TryFrom<&'a [u8], Error = Error>,
     {
-        self.buffers
-            .flat_map(|buf| buf.sector.slice(self.mmap))
-            .flat_map(match I::Src::try_from {
-                Ok(src) => src.boxed(self.filters),
-                Err(e) => iter::once(Outcome::Error(e)).into(),
-            })
-            .into()
+        let stream = self.buffers.flat_map(move |buf| {
+            buf.sector
+                .slice(self.mmap)
+                .map(|bytes| match I::Src::try_from(bytes) {
+                    Ok(src) => src.boxed(self.filters),
+                    Err(e) => Outcome::Error(e).once(),
+                })
+                .map_err(Outcome::Error)
+                .unwrap_or_else(Outcome::once)
+                .take(buf.count.get() as usize)
+        });
+        Box::from(stream)
     }
 }
 
