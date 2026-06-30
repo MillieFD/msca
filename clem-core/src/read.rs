@@ -181,6 +181,15 @@ impl<I> Outcome<I> {
             Self::Error(e) => Outcome::Error(e),
         }
     }
+
+    /// Construct a [`Stream`] that yields [`self`](Outcome) exactly [once](iter::once).
+    fn once<'a>(self) -> Stream<'a, I>
+    where
+        I: 'a,
+    {
+        let out = iter::once(self);
+        Box::from(out)
+    }
 }
 
 impl<I> From<Error> for Outcome<I> {
