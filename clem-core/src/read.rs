@@ -246,6 +246,32 @@ where
         Ok(src)
     }
 }
+
+impl<'a> Reader<bool> for &'a BitSlice<u8, Lsb0> {
+    fn boxed<F>(self, filters: &'a F) -> Stream<bool>
+    where
+        &'a F: IntoIterator<Item = &'a Filter>,
+    {
+        let iter = self.iter().by_vals().map(move |bit| {
+            let f = filters.into_iter();
+            bit.evaluate(f)
+        });
+        Box::new(iter)
+    }
+
+    fn try_from_slice(src: &'a [u8]) -> Result<Self, Error>
+    where
+        Self: Sized,
+    {
+        Self::try_from(src).or_else(|b| {
+            Error::Truncated {
+                expected: NonZeroUsize::MIN.get(),
+                actual: b.len(),
+            }
+            .into()
+        })
+    }
+}
         });
     }
 }
