@@ -205,12 +205,18 @@ impl<I> From<Error> for Outcome<I> {
 
 /* --------------------------------------------------------------------- Reader Trait Definition */
 
-trait Reader<I> {
-    /// Additional context required to construct a new empty instance of [`Self`].
-    type Ctx;
+/// A **stateful data source** used to construct a lazy [`Stream`].
+#[doc(hidden)] // pub required for Query::column trait bounds; not intended as a stable API
+pub trait Reader<'a, I> {
+    /// Returns a new instance of [`Self`] boxed as a [`Stream`] trait object.
+    #[rustfmt::skip] // Single line where clause improves readability
+    fn boxed<F>(self, f: F) -> Stream<'a, I> where F: IntoIterator<Item = &'a Filter>;
 
-    /// Returns a new empty instance of [`Self`] boxed as a [`Stream`] trait object.
-    fn boxed(&self, ctx: Self::Ctx) -> Stream<I>;
+    /// Constructs a new instance of [`Self`] from the provided byte [slice][1].
+    ///
+    /// [1]: https://doc.rust-lang.org/std/primitive.slice.html
+    #[rustfmt::skip] // Single line where clause improves readability
+    fn try_from_slice(src: &'a [u8]) -> Result<Self, Error> where Self: Sized;
 }
 
 /* ----------------------------------------------------------------- Reader Trait Implementation */
