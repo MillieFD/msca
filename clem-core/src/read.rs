@@ -336,7 +336,7 @@ where
 // [1]: TODO → add link to clem-derive crate or feature
 pub trait Read {
     /// The [stateful data source](Reader) from which to [`Deserialize`] values of [`Self`].
-    type Src<'a>: Reader<Self> + TryFrom<&'a [u8]>;
+    type Src<'a>;
 }
 
 /* ------------------------------------------------------------------- Read Trait Implementation */
