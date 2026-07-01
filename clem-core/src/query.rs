@@ -1063,6 +1063,29 @@ mod tests {
         );
     }
 
+    /// A value filter on an optional column tests each [`Some`] and is forwarded to the value
+    /// reader; [`None`] rows carry no value and are retained. Combining with `is_some` drops them.
+    #[test]
+    fn value_filter_retains_none_on_optional() {
+        let bytes = {
+            let mut acc = OptBitVec::<u32>::default();
+            [Some(1u32), None, Some(20)].into_iter().for_each(|v| acc.push(v));
+            acc.serialize().expect("Serialize failed")
+        };
+        let ty = || Type::option(Type::U32);
+        let kept = query(&bytes, ty(), 3).equal("v", 20u32).expect("eq failed");
+        assert_eq!(
+            collected(kept.column::<Option<u32>>("v").expect("Column failed")),
+            vec![None, Some(20)]
+        );
+        let dropped =
+            query(&bytes, ty(), 3).equal("v", 20u32).and_then(|q| q.is_some("v")).expect("filter");
+        assert_eq!(
+            collected(dropped.column::<Option<u32>>("v").expect("Column failed")),
+            vec![Some(20)]
+        );
+    }
+
     /// The builder eagerly rejects a validity filter on a non-optional column; the requested
     /// [`Option`] type does not match the on-disk scalar [`Type`].
     #[test]
