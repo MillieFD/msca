@@ -289,8 +289,10 @@ impl Serialize for Header {
     }
 }
 
-impl Deserialize for Header {
-    fn deserialize(src: &mut &[u8]) -> Result<Self, Error> {
+impl<'de> Deserialize<'de> for Header {
+    type Ok = Self;
+
+    fn deserialize(src: &mut &'de [u8]) -> Result<Self, Error> {
         const N: usize = size_of_val(&MAGIC) + size_of_val(&VERSION);
         *src = src
             .split_first_chunk::<N>()
@@ -676,8 +678,10 @@ pub trait Deserialize<'de> {
 
 /* ------------------------------------------------------------ Deserialize Trait Implementation */
 
-impl Deserialize for u8 {
-    fn deserialize(src: &mut &[u8]) -> Result<Self, Error> {
+impl<'de> Deserialize<'de> for u8 {
+    type Ok = Self;
+
+    fn deserialize(src: &mut &'de [u8]) -> Result<Self, Error> {
         src.split_first()
             .ok_or(Error::Truncated {
                 expected: size_of::<Self>(),
@@ -690,8 +694,10 @@ impl Deserialize for u8 {
     }
 }
 
-impl Deserialize for u16 {
-    fn deserialize(src: &mut &[u8]) -> Result<Self, Error> {
+impl<'de> Deserialize<'de> for u16 {
+    type Ok = Self;
+
+    fn deserialize(src: &mut &'de [u8]) -> Result<Self, Error> {
         src.split_first_chunk()
             .ok_or(Error::Truncated {
                 expected: size_of::<Self>(),
@@ -704,8 +710,10 @@ impl Deserialize for u16 {
     }
 }
 
-impl Deserialize for u32 {
-    fn deserialize(src: &mut &[u8]) -> Result<Self, Error> {
+impl<'de> Deserialize<'de> for u32 {
+    type Ok = Self;
+
+    fn deserialize(src: &mut &'de [u8]) -> Result<Self, Error> {
         src.split_first_chunk()
             .ok_or(Error::Truncated {
                 expected: size_of::<Self>(),
@@ -718,8 +726,10 @@ impl Deserialize for u32 {
     }
 }
 
-impl Deserialize for u64 {
-    fn deserialize(src: &mut &[u8]) -> Result<Self, Error> {
+impl<'de> Deserialize<'de> for u64 {
+    type Ok = Self;
+
+    fn deserialize(src: &mut &'de [u8]) -> Result<Self, Error> {
         src.split_first_chunk()
             .ok_or(Error::Truncated {
                 expected: size_of::<Self>(),
@@ -732,8 +742,10 @@ impl Deserialize for u64 {
     }
 }
 
-impl Deserialize for u128 {
-    fn deserialize(src: &mut &[u8]) -> Result<Self, Error> {
+impl<'de> Deserialize<'de> for u128 {
+    type Ok = Self;
+
+    fn deserialize(src: &mut &'de [u8]) -> Result<Self, Error> {
         src.split_first_chunk()
             .ok_or(Error::Truncated {
                 expected: size_of::<Self>(),
@@ -746,38 +758,50 @@ impl Deserialize for u128 {
     }
 }
 
-impl Deserialize for num::NonZeroU8 {
-    fn deserialize(src: &mut &[u8]) -> Result<Self, Error> {
+impl<'de> Deserialize<'de> for num::NonZeroU8 {
+    type Ok = Self;
+
+    fn deserialize(src: &mut &'de [u8]) -> Result<Self, Error> {
         u8::deserialize(src)?.try_into().map_err(Into::into)
     }
 }
 
-impl Deserialize for num::NonZeroU16 {
-    fn deserialize(src: &mut &[u8]) -> Result<Self, Error> {
+impl<'de> Deserialize<'de> for num::NonZeroU16 {
+    type Ok = Self;
+
+    fn deserialize(src: &mut &'de [u8]) -> Result<Self, Error> {
         u16::deserialize(src)?.try_into().map_err(Into::into)
     }
 }
 
-impl Deserialize for num::NonZeroU32 {
-    fn deserialize(src: &mut &[u8]) -> Result<Self, Error> {
+impl<'de> Deserialize<'de> for num::NonZeroU32 {
+    type Ok = Self;
+
+    fn deserialize(src: &mut &'de [u8]) -> Result<Self, Error> {
         u32::deserialize(src)?.try_into().map_err(Into::into)
     }
 }
 
-impl Deserialize for NonZeroU64 {
-    fn deserialize(src: &mut &[u8]) -> Result<Self, Error> {
+impl<'de> Deserialize<'de> for NonZeroU64 {
+    type Ok = Self;
+
+    fn deserialize(src: &mut &'de [u8]) -> Result<Self, Error> {
         u64::deserialize(src)?.try_into().map_err(Into::into)
     }
 }
 
-impl Deserialize for num::NonZeroU128 {
-    fn deserialize(src: &mut &[u8]) -> Result<Self, Error> {
+impl<'de> Deserialize<'de> for num::NonZeroU128 {
+    type Ok = Self;
+
+    fn deserialize(src: &mut &'de [u8]) -> Result<Self, Error> {
         u128::deserialize(src)?.try_into().map_err(Into::into)
     }
 }
 
-impl Deserialize for i8 {
-    fn deserialize(src: &mut &[u8]) -> Result<Self, Error> {
+impl<'de> Deserialize<'de> for i8 {
+    type Ok = Self;
+
+    fn deserialize(src: &mut &'de [u8]) -> Result<Self, Error> {
         src.split_first_chunk()
             .ok_or(Error::Truncated {
                 expected: size_of::<Self>(),
@@ -790,8 +814,10 @@ impl Deserialize for i8 {
     }
 }
 
-impl Deserialize for i16 {
-    fn deserialize(src: &mut &[u8]) -> Result<Self, Error> {
+impl<'de> Deserialize<'de> for i16 {
+    type Ok = Self;
+
+    fn deserialize(src: &mut &'de [u8]) -> Result<Self, Error> {
         src.split_first_chunk()
             .ok_or(Error::Truncated {
                 expected: size_of::<Self>(),
@@ -804,8 +830,10 @@ impl Deserialize for i16 {
     }
 }
 
-impl Deserialize for i32 {
-    fn deserialize(src: &mut &[u8]) -> Result<Self, Error> {
+impl<'de> Deserialize<'de> for i32 {
+    type Ok = Self;
+
+    fn deserialize(src: &mut &'de [u8]) -> Result<Self, Error> {
         src.split_first_chunk()
             .ok_or(Error::Truncated {
                 expected: size_of::<Self>(),
@@ -818,8 +846,10 @@ impl Deserialize for i32 {
     }
 }
 
-impl Deserialize for i64 {
-    fn deserialize(src: &mut &[u8]) -> Result<Self, Error> {
+impl<'de> Deserialize<'de> for i64 {
+    type Ok = Self;
+
+    fn deserialize(src: &mut &'de [u8]) -> Result<Self, Error> {
         src.split_first_chunk()
             .ok_or(Error::Truncated {
                 expected: size_of::<Self>(),
@@ -832,8 +862,10 @@ impl Deserialize for i64 {
     }
 }
 
-impl Deserialize for i128 {
-    fn deserialize(src: &mut &[u8]) -> Result<Self, Error> {
+impl<'de> Deserialize<'de> for i128 {
+    type Ok = Self;
+
+    fn deserialize(src: &mut &'de [u8]) -> Result<Self, Error> {
         src.split_first_chunk()
             .ok_or(Error::Truncated {
                 expected: size_of::<Self>(),
@@ -846,38 +878,50 @@ impl Deserialize for i128 {
     }
 }
 
-impl Deserialize for num::NonZeroI8 {
-    fn deserialize(src: &mut &[u8]) -> Result<Self, Error> {
+impl<'de> Deserialize<'de> for num::NonZeroI8 {
+    type Ok = Self;
+
+    fn deserialize(src: &mut &'de [u8]) -> Result<Self, Error> {
         i8::deserialize(src)?.try_into().map_err(Into::into)
     }
 }
 
-impl Deserialize for num::NonZeroI16 {
-    fn deserialize(src: &mut &[u8]) -> Result<Self, Error> {
+impl<'de> Deserialize<'de> for num::NonZeroI16 {
+    type Ok = Self;
+
+    fn deserialize(src: &mut &'de [u8]) -> Result<Self, Error> {
         i16::deserialize(src)?.try_into().map_err(Into::into)
     }
 }
 
-impl Deserialize for num::NonZeroI32 {
-    fn deserialize(src: &mut &[u8]) -> Result<Self, Error> {
+impl<'de> Deserialize<'de> for num::NonZeroI32 {
+    type Ok = Self;
+
+    fn deserialize(src: &mut &'de [u8]) -> Result<Self, Error> {
         i32::deserialize(src)?.try_into().map_err(Into::into)
     }
 }
 
-impl Deserialize for num::NonZeroI64 {
-    fn deserialize(src: &mut &[u8]) -> Result<Self, Error> {
+impl<'de> Deserialize<'de> for num::NonZeroI64 {
+    type Ok = Self;
+
+    fn deserialize(src: &mut &'de [u8]) -> Result<Self, Error> {
         i64::deserialize(src)?.try_into().map_err(Into::into)
     }
 }
 
-impl Deserialize for num::NonZeroI128 {
-    fn deserialize(src: &mut &[u8]) -> Result<Self, Error> {
+impl<'de> Deserialize<'de> for num::NonZeroI128 {
+    type Ok = Self;
+
+    fn deserialize(src: &mut &'de [u8]) -> Result<Self, Error> {
         i128::deserialize(src)?.try_into().map_err(Into::into)
     }
 }
 
-impl Deserialize for f32 {
-    fn deserialize(src: &mut &[u8]) -> Result<Self, Error> {
+impl<'de> Deserialize<'de> for f32 {
+    type Ok = Self;
+
+    fn deserialize(src: &mut &'de [u8]) -> Result<Self, Error> {
         src.split_first_chunk()
             .ok_or(Error::Truncated {
                 expected: size_of::<Self>(),
@@ -890,8 +934,10 @@ impl Deserialize for f32 {
     }
 }
 
-impl Deserialize for f64 {
-    fn deserialize(src: &mut &[u8]) -> Result<Self, Error> {
+impl<'de> Deserialize<'de> for f64 {
+    type Ok = Self;
+
+    fn deserialize(src: &mut &'de [u8]) -> Result<Self, Error> {
         src.split_first_chunk()
             .ok_or(Error::Truncated {
                 expected: size_of::<Self>(),
@@ -904,85 +950,109 @@ impl Deserialize for f64 {
     }
 }
 
-impl Deserialize for char {
-    fn deserialize(src: &mut &[u8]) -> Result<Self, Error> {
+impl<'de> Deserialize<'de> for char {
+    type Ok = Self;
+
+    fn deserialize(src: &mut &'de [u8]) -> Result<Self, Error> {
         let utf8 = u32::deserialize(src)?;
         char::from_u32(utf8).ok_or(Error::Utf8(utf8))
     }
 }
 
-impl Deserialize for Option<num::NonZeroU8> {
-    fn deserialize(src: &mut &[u8]) -> Result<Self, Error> {
+impl<'de> Deserialize<'de> for Option<num::NonZeroU8> {
+    type Ok = Self;
+
+    fn deserialize(src: &mut &'de [u8]) -> Result<Self, Error> {
         // NOTE: serialize trait encodes none using the u8::MIN niche
         u8::deserialize(src).map(num::NonZeroU8::new)
     }
 }
 
-impl Deserialize for Option<num::NonZeroU16> {
-    fn deserialize(src: &mut &[u8]) -> Result<Self, Error> {
+impl<'de> Deserialize<'de> for Option<num::NonZeroU16> {
+    type Ok = Self;
+
+    fn deserialize(src: &mut &'de [u8]) -> Result<Self, Error> {
         // NOTE: serialize trait encodes none using the u16::MIN niche
         u16::deserialize(src).map(num::NonZeroU16::new)
     }
 }
 
-impl Deserialize for Option<num::NonZeroU32> {
-    fn deserialize(src: &mut &[u8]) -> Result<Self, Error> {
+impl<'de> Deserialize<'de> for Option<num::NonZeroU32> {
+    type Ok = Self;
+
+    fn deserialize(src: &mut &'de [u8]) -> Result<Self, Error> {
         // NOTE: serialize trait encodes none using the u32::MIN niche
         u32::deserialize(src).map(num::NonZeroU32::new)
     }
 }
 
-impl Deserialize for Option<NonZeroU64> {
-    fn deserialize(src: &mut &[u8]) -> Result<Self, Error> {
+impl<'de> Deserialize<'de> for Option<NonZeroU64> {
+    type Ok = Self;
+
+    fn deserialize(src: &mut &'de [u8]) -> Result<Self, Error> {
         // NOTE: serialize trait encodes none using the u64::MIN niche
         u64::deserialize(src).map(NonZeroU64::new)
     }
 }
 
-impl Deserialize for Option<num::NonZeroU128> {
-    fn deserialize(src: &mut &[u8]) -> Result<Self, Error> {
+impl<'de> Deserialize<'de> for Option<num::NonZeroU128> {
+    type Ok = Self;
+
+    fn deserialize(src: &mut &'de [u8]) -> Result<Self, Error> {
         // NOTE: serialize trait encodes none using the u128::MIN niche
         u128::deserialize(src).map(num::NonZeroU128::new)
     }
 }
 
-impl Deserialize for Option<num::NonZeroI8> {
-    fn deserialize(src: &mut &[u8]) -> Result<Self, Error> {
+impl<'de> Deserialize<'de> for Option<num::NonZeroI8> {
+    type Ok = Self;
+
+    fn deserialize(src: &mut &'de [u8]) -> Result<Self, Error> {
         // NOTE: serialize trait encodes none using the i8::MIN niche
         i8::deserialize(src).map(num::NonZeroI8::new)
     }
 }
 
-impl Deserialize for Option<num::NonZeroI16> {
-    fn deserialize(src: &mut &[u8]) -> Result<Self, Error> {
+impl<'de> Deserialize<'de> for Option<num::NonZeroI16> {
+    type Ok = Self;
+
+    fn deserialize(src: &mut &'de [u8]) -> Result<Self, Error> {
         // NOTE: serialize trait encodes none using the i16::MIN niche
         i16::deserialize(src).map(num::NonZeroI16::new)
     }
 }
 
-impl Deserialize for Option<num::NonZeroI32> {
-    fn deserialize(src: &mut &[u8]) -> Result<Self, Error> {
+impl<'de> Deserialize<'de> for Option<num::NonZeroI32> {
+    type Ok = Self;
+
+    fn deserialize(src: &mut &'de [u8]) -> Result<Self, Error> {
         // NOTE: serialize trait encodes none using the i32::MIN niche
         i32::deserialize(src).map(num::NonZeroI32::new)
     }
 }
 
-impl Deserialize for Option<num::NonZeroI64> {
-    fn deserialize(src: &mut &[u8]) -> Result<Self, Error> {
+impl<'de> Deserialize<'de> for Option<num::NonZeroI64> {
+    type Ok = Self;
+
+    fn deserialize(src: &mut &'de [u8]) -> Result<Self, Error> {
         // NOTE: serialize trait encodes none using the i64::MIN niche
         i64::deserialize(src).map(num::NonZeroI64::new)
     }
 }
 
-impl Deserialize for Option<num::NonZeroI128> {
-    fn deserialize(src: &mut &[u8]) -> Result<Self, Error> {
+impl<'de> Deserialize<'de> for Option<num::NonZeroI128> {
+    type Ok = Self;
+
+    fn deserialize(src: &mut &'de [u8]) -> Result<Self, Error> {
         // NOTE: serialize trait encodes none using the i128::MIN niche
         i128::deserialize(src).map(num::NonZeroI128::new)
     }
 }
 
-impl Deserialize for Option<char> {
-    fn deserialize(src: &mut &[u8]) -> Result<Self, Error> {
+impl<'de> Deserialize<'de> for Option<char> {
+    type Ok = Self;
+
+    fn deserialize(src: &mut &'de [u8]) -> Result<Self, Error> {
         // NOTE: serialize trait encodes none using the u32::MAX niche
         match u32::deserialize(src)? {
             u32::MAX => Ok(None),
