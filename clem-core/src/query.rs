@@ -220,7 +220,7 @@ impl Query {
     /// - [`Error::Io`] if an error occurs during [deserialization](Deserialize).
     pub fn range<I, B>(mut self, name: &str, bounds: B) -> Result<Self, Error>
     where
-        I: Serialize + for<'a> Deserialize + PartialOrd,
+        I: for<'de> Deserialize<'de, Ok = I> + PartialOrd + Serialize,
         B: RangeBounds<I>,
         Schema: Unfolder<I>,
     {
@@ -612,7 +612,7 @@ pub trait Evaluate: Sized {
     /// Returns `true` if `self` is contained within the specified [`Range`](RangeBounds).
     fn range<S>(&self, lb: &Bound<S>, ub: &Bound<S>) -> Result<bool, io::Error>
     where
-        Self: Deserialize + PartialOrd,
+        Self: for<'de> Deserialize<'de, Ok = Self> + PartialOrd,
         S: AsRef<[u8]>,
     {
         let above = match lb {
@@ -637,7 +637,7 @@ pub trait Evaluate: Sized {
     /// Returns `true` if `self` is a member of the specified [set](S).
     fn one_of<S>(&self, set: &S) -> Result<bool, io::Error>
     where
-        Self: Deserialize + PartialEq,
+        Self: for<'de> Deserialize<'de, Ok = Self> + PartialEq,
         for<'a> &'a S: IntoIterator<Item = &'a [u8; B]>,
     {
         set.into_iter().try_fold(false, |acc, bytes| match acc {
@@ -649,7 +649,7 @@ pub trait Evaluate: Sized {
     /// Returns `true` if `self` is not a member of the specified [set](S).
     fn none_of<S>(&self, set: &S) -> Result<bool, io::Error>
     where
-        Self: Deserialize + PartialEq,
+        Self: for<'de> Deserialize<'de, Ok = Self> + PartialEq,
         for<'a> &'a S: IntoIterator<Item = &'a [u8; B]>,
     {
         set.into_iter().try_fold(true, |acc, bytes| match acc {
@@ -687,7 +687,7 @@ pub trait Evaluate: Sized {
 
 impl<I> Evaluate for I
 where
-    I: Deserialize + PartialOrd + Unfold<RawAcc = Vec<I>, OptAcc = OptBitVec<I>>,
+    I: for<'de> Deserialize<'de, Ok = I> + PartialOrd + Unfold<OptAcc = OptBitVec<I>>,
     Schema: Unfolder<I>,
 {
     fn equal<S>(&self, other: &S) -> Result<bool, io::Error>
@@ -710,8 +710,8 @@ where
 
 impl<I> Evaluate for Option<I>
 where
-    I: Deserialize + PartialOrd + Unfold,
-    Option<I>: Deserialize,
+    I: for<'de> Deserialize<'de, Ok = I> + PartialOrd + Unfold,
+    Option<I>: for<'de> Deserialize<'de, Ok = Option<I>>,
     Schema: Unfolder<I>,
 {
     fn equal<S>(&self, other: &S) -> Result<bool, io::Error>
