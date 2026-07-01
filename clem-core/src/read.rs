@@ -113,7 +113,7 @@ impl<'a> Column<'a> {
     pub(crate) fn stream<I>(self) -> Stream<'a, I>
     where
         I: Read + 'a,
-        I::Src<'a>: Reader<'a, I> + TryFrom<&'a [u8], Error = Error>,
+        I::Src<'a>: Reader<'a, I>,
     {
         let stream = self.buffers.flat_map(move |buf| {
             buf.sector
