@@ -11,7 +11,8 @@
 
 The result is a single, self-describing, portable file that ingests data quickly and answers analytical queries with
 minimal IO overhead. The format is intended as an extensible backend that can be adapted to suit a variety of scientific
-applications. Implementers can enhance the minimal high-performance core library with domain-specific optimisations.
+applications. Implementers can enhance the minimal performance-focused core library with their own domain-specific
+optimisations.
 
 ### Citation
 
