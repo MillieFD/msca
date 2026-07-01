@@ -88,8 +88,8 @@ use smol::io::{AsyncRead, AsyncReadExt, AsyncSeek, AsyncSeekExt, AsyncWrite, Asy
 use crate::accumulate::{Accumulator, Buffer};
 use crate::manifest::{Manifest, Pending};
 use crate::query::Filter;
-use crate::schema::Type;
-use crate::{number, schema, Serialize};
+use crate::schema::{Type, Unfold, Unfolder};
+use crate::{number, schema, Schema, Serialize};
 
 /* ------------------------------------------------------------------------------ Public Exports */
 
