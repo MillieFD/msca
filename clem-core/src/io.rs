@@ -1070,6 +1070,16 @@ impl<'de> Deserialize<'de> for [u8] {
         Ok(out)
     }
 }
+
+impl<'de> Deserialize<'de> for BitSlice<u8, Lsb0> {
+    type Ok = &'de BitSlice<u8, Lsb0>;
+
+    fn deserialize(src: &mut &'de [u8]) -> Result<Self::Ok, Error> {
+        let bits = mem::take(src).view_bits();
+        Ok(bits)
+    }
+}
+
 /* --------------------------------------------------------------- Deserializer Trait Definition */
 
 /// A **source** that can be deserialized into a [supported data type](Deserialize).
