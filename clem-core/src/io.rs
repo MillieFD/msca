@@ -74,11 +74,11 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 use std::array::TryFromSliceError;
 use std::cmp::Ordering;
 use std::convert::{Infallible, TryInto};
-use std::fmt;
 use std::io::SeekFrom;
 use std::num::{self, NonZeroU64, TryFromIntError};
 use std::ops::Add;
 use std::path::{Path, PathBuf};
+use std::{fmt, mem};
 
 use memmap2::{Mmap, MmapOptions};
 use minicbor::{CborLen, Decode, Encode};
@@ -1061,6 +1061,15 @@ impl<'de> Deserialize<'de> for Option<char> {
     }
 }
 
+impl<'de> Deserialize<'de> for [u8] {
+    type Ok = &'de [u8];
+
+    fn deserialize(src: &mut &'de [u8]) -> Result<Self::Ok, Error> {
+        // NOTE: consumes the entire source and replaces in situ with an empty byte slice
+        let out = mem::take(src);
+        Ok(out)
+    }
+}
 /* --------------------------------------------------------------- Deserializer Trait Definition */
 
 /// A **source** that can be deserialized into a [supported data type](Deserialize).
