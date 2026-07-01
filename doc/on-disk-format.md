@@ -265,6 +265,9 @@ inner ends
 data
 ```
 
+`String` buffers use an unsized collection of UTF-8 bytes. A reader may borrow each item as a zero-copy `&str` or
+collect into an owned `String`.
+
 ##### Compact Buffers
 
 Real-world applications often require the inclusion of columns with infrequently altered values; typically carrying
