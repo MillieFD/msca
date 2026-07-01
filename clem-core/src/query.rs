@@ -154,7 +154,7 @@ impl Query {
     pub fn column<'a, I>(&'a self, name: &str) -> Result<Stream<'a, I>, Error>
     where
         I: Read + 'a,
-        I::Src<'a>: Reader<'a, I> + TryFrom<&'a [u8]>,
+        I::Src<'a>: Reader<'a, I>,
         Schema: Unfolder<I>,
     {
         // NOTE: Type::verify exactly once at initialisation (eager); progress fearlessly
@@ -687,7 +687,8 @@ pub trait Evaluate: Sized {
 
 impl<I> Evaluate for I
 where
-    I: Unfold<RawAcc = Vec<I>, OptAcc = OptBitVec<I>> + Deserialize + PartialOrd,
+    I: Deserialize + PartialOrd + Unfold<RawAcc = Vec<I>, OptAcc = OptBitVec<I>>,
+    Schema: Unfolder<I>,
 {
     fn equal<S>(&self, other: &S) -> Result<bool, io::Error>
     where
@@ -702,16 +703,16 @@ where
             Filter::Eq(other) => self.equal(other),
             Filter::OneOf(set) => self.one_of(set),
             Filter::NoneOf(set) => self.none_of(set),
-            Filter::IsSome => self.is_some(),
-            Filter::IsNone => self.is_none(),
+            other => io::Error::filter(other).into(),
         }
     }
 }
 
 impl<I> Evaluate for Option<I>
 where
-    I: Deserialize + PartialOrd,
+    I: Deserialize + PartialOrd + Unfold,
     Option<I>: Deserialize,
+    Schema: Unfolder<I>,
 {
     fn equal<S>(&self, other: &S) -> Result<bool, io::Error>
     where
@@ -726,8 +727,7 @@ where
             Filter::Eq(other) => self.equal(other),
             Filter::OneOf(set) => self.one_of(set),
             Filter::NoneOf(set) => self.none_of(set),
-            Filter::IsSome => Evaluate::is_some(self),
-            Filter::IsNone => Evaluate::is_none(self),
+            other => io::Error::filter(other).into(),
         }
     }
 }
@@ -744,7 +744,7 @@ impl Evaluate for bool {
     fn assess(&self, filter: &Filter) -> Result<bool, io::Error> {
         match filter {
             Filter::Eq(other) => Ok(other[0] == *self as u8),
-            some => io::Error::Filter { filter: some.clone(), actual: Type::Bool }.into(),
+            other => io::Error::filter::<bool>(other).into(),
         }
     }
 }
