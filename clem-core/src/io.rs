@@ -1105,7 +1105,7 @@ where
 impl Deserializer for &[u8] {
     fn deserialize_into<I>(&mut self) -> Result<I, Error>
     where
-        I: Deserialize,
+        I: for<'de> Deserialize<'de, Ok = I>,
     {
         I::deserialize(self)
     }
