@@ -232,11 +232,6 @@ impl<I> From<Error> for Outcome<I> {
     }
 }
 
-
-    fn try_from(src: &'a [u8]) -> Result<Self, Self::Error> {
-    }
-}
-
 /* --------------------------------------------------------------------- Reader Trait Definition */
 
 /// A **stateful data source** used to construct a lazy [`Stream`].
