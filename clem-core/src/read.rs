@@ -118,8 +118,8 @@ impl<'a> Column<'a> {
         let stream = self.buffers.flat_map(move |buf| {
             buf.sector
                 .slice(self.mmap)
-                .map(|bytes| match I::Src::try_from(bytes) {
-                    Ok(src) => src.boxed(self.filters),
+                .map(|bytes| match I::Src::try_from_slice(bytes) {
+                    Ok(src) => src.with_filters(self.filters),
                     Err(e) => Outcome::Error(e).once(),
                 })
                 .map_err(Outcome::Error)
