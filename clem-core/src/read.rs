@@ -145,10 +145,12 @@ struct OptBitVec<'a> {
 ///
 /// [1]: https://doc.rust-lang.org/reference/dynamically-sized-types.html
 #[doc(hidden)] // Reachable via Read::Src for unsized readers
-    /// [`Stream`] over the `ends` sub-buffer yielding one `u64` cumulative end offset for each
-    /// [`Some`] or [`u64::MAX`] for [`None`].
-    ends: Stream<'a, u64>,
 pub struct Seq<'a> {
+    /// Byte [slice][1] over the `ends` sub-buffer yielding one `u64` cumulative end offset for each
+    /// [`Some`] or [`u64::MAX`] for [`None`].
+    ///
+    /// [1]: https://doc.rust-lang.org/std/primitive.slice.html
+    ends: &'a [u8],
     /// Concatenated data sub-buffer from which [`Some`] items are [deserialized](Deserialize).
     data: &'a [u8],
 }
