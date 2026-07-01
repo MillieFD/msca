@@ -147,6 +147,20 @@ where
     data: I::Src<'a>,
 }
 
+impl<'de, I> Deserialize<'de> for OptBitVec<'de, I>
+where
+    I: Read,
+    I::Src<'de>: Deserialize<'de, Ok= I::Src<'de>>,
+{
+    type Ok = Self;
+
+    fn deserialize(src: &mut &'de [u8]) -> Result<Self, Error> {
+        let mask = BitSlice::<u8, Lsb0>::deserialize(src)?;
+        let data = I::Src::deserialize(src)?;
+        Ok(Self { mask, data })
+    }
+}
+
 /// A **stateful cursor** over paired offset and value sub-buffers for a single [`Column`]; used to
 /// [`Deserialize`](Deserialize) [unsized][1] items.
 ///
