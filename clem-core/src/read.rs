@@ -271,7 +271,7 @@ pub trait Reader<'a, I> {
 
 impl<'a, I> Reader<'a, I> for &'a [u8]
 where
-    I: Deserialize + Evaluate,
+    I: for<'de> Deserialize<'de, Ok = I> + Evaluate,
 {
     fn with_filters<'f, F>(mut self, filters: &'f F) -> Stream<'a, I>
     where
