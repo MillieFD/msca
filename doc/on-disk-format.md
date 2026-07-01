@@ -119,9 +119,6 @@ allow the entire segment region to **self-describe**: a sequential reader can wa
 information contained solely in the segment headers and dispatch relevant segment body deserialisation based on the
 `variant` identifier. This is the basis for [manifest recovery](#durability-and-recovery).
 
-The header is excluded from the sector recorded in the [manifest](#manifest); the optimised random-access read path
-routes fearlessly to the relevant segment body region without boundary checks or variant verification.
-
 > [!TODO] Refactor Length to Next
 > The segment header currently encodes the segment body `length` instead of the `next` offset. A refactor is required to
 > bring the codebase in line with this specification document.
