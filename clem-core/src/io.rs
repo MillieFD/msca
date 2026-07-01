@@ -80,6 +80,9 @@ use std::ops::Add;
 use std::path::{Path, PathBuf};
 use std::{fmt, mem};
 
+use bitvec::order::Lsb0;
+use bitvec::slice::BitSlice;
+use bitvec::view::BitView;
 use memmap2::{Mmap, MmapOptions};
 use minicbor::{CborLen, Decode, Encode};
 use smol::fs::{self, OpenOptions};
