@@ -503,7 +503,9 @@ impl File {
 pub enum Error {
     /// CBOR decoding failure for a manifest or schema payload.
     Decode(minicbor::decode::Error),
-    /// The requested [`Filter`] is not compatible with the actual on-disk [` Column `] type.
+    /// The requested [`Filter`] is not compatible with the actual on-disk [`Column`][1] type.
+    ///
+    /// [1]: crate::read::Column
     Filter {
         /// The [`Filter`] applied by the caller.
         filter: Filter,
