@@ -661,12 +661,18 @@ pub trait Evaluate: Sized {
     /// Dispatch function that returns `true` if `self` satisfies the provided [`Filter`].
     fn assess(&self, filter: &Filter) -> Result<bool, io::Error>;
 
-    /// Returns [`Outcome::Include`] if `self` satisfies **every** [`Filter`].
-    fn evaluate<S>(self, filters: &S) -> Outcome<Self>
+    /// [Assess](Self::assess) `self` against multiple [filters](F):
+    ///
+    /// - [`Outcome::Include`] if `self` satisfies **every** [`Filter`].
+    /// - [`Outcome::Exclude`] if `self` fails **any** [`Filter`]
+    /// - [`Outcome::Error`] if **any** [`Filter`] could not be evaluated.
+    ///
+    /// [`Outcome::Exclude`] carries the rejected `self` for inspection if necessary.
+    fn evaluate<'a, F>(self, mut filters: F) -> Outcome<Self>
     where
-        for<'a> &'a S: IntoIterator<Item = &'a Filter>,
+        F: Iterator<Item = &'a Filter>,
     {
-        match filters.into_iter().try_fold(true, |acc, f| match acc {
+        match filters.try_fold(true, |keep, f| match keep {
             false => Ok(false), // short-circuit without evaluating the remaining filters
             true => self.assess(f),
         }) {
