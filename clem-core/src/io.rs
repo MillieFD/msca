@@ -1091,6 +1091,17 @@ pub trait Deserializer {
 
 /* ----------------------------------------------------------- Deserializer Trait Implementation */
 
+impl<'de, I> Deserialize<'de> for &'de I
+where
+    I: Deserialize<'de, Ok = &'de I> + ?Sized,
+{
+    type Ok = Self;
+
+    fn deserialize(src: &mut &'de [u8]) -> Result<Self::Ok, Error> {
+        I::deserialize(src)
+    }
+}
+
 impl Deserializer for &[u8] {
     fn deserialize_into<I>(&mut self) -> Result<I, Error>
     where
