@@ -644,20 +644,34 @@ where
 
 /* ---------------------------------------------------------------- Deserialize Trait Definition */
 
-/// A **type** that can be deserialized from a byte [source][1].
+/// A **type** that can be deserialized from a [byte source][1].
+///
+/// ### Lifetimes
+///
+/// The `'de` lifetime binds the [`Self::Ok`] output type to the source bytes, enabling zero-copy
+/// borrows for [unsized][2] types without an intermediate owned copy. [`Sized`] types return an
+/// owned [`Self`] directly without lifetime constraints.
 ///
 /// [1]: https://doc.rust-lang.org/std/primitive.slice.html
-pub trait Deserialize: Sized {
+/// [2]: https://doc.rust-lang.org/reference/dynamically-sized-types.html
+pub trait Deserialize<'de> {
+    /// Output following successful deserialisation.
+    ///
+    /// [`Sized`] types return [`Self`] directly; [unsized][1] types return `&'de Self`.
+    ///
+    /// [1]: https://doc.rust-lang.org/reference/dynamically-sized-types.html
+    type Ok;
+
     /// Remove the required number of bytes from the provided [source][1] and deserialize into
-    /// one instance of [`Self`]; advancing the source **in-situ** without an intermediate copy by
-    /// the number of bytes read.
+    /// one instance of [`Self::Ok`]; advancing the source **in-situ** without an intermediate copy
+    /// by the number of bytes read.
     ///
     /// ### Errors
     ///
     /// Returns [`Error::Truncated`] if `src` contains fewer than the requested number of bytes.
     ///
     /// [1]: https://doc.rust-lang.org/std/primitive.slice.html
-    fn deserialize(src: &mut &[u8]) -> Result<Self, Error>;
+    fn deserialize(src: &mut &'de [u8]) -> Result<Self::Ok, Error>;
 }
 
 /* ------------------------------------------------------------ Deserialize Trait Implementation */
