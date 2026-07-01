@@ -183,8 +183,10 @@ impl Serialize for Manifest {
     }
 }
 
-impl Deserialize for Manifest {
-    fn deserialize(src: &mut &[u8]) -> Result<Self, io::Error> {
+impl<'de> Deserialize<'de> for Manifest {
+    type Ok = Self;
+
+    fn deserialize(src: &mut &'de [u8]) -> Result<Self, io::Error> {
         // NOTE: one-shot decode from a pre-sized CBOR buffer; the slice is not advanced.
         minicbor::decode(src).map_err(io::Error::Decode)
     }
@@ -308,7 +310,7 @@ impl Buffer {
     pub(crate) unsafe fn disjoint<I, B>(&self, bounds: &B) -> Result<bool, io::Error>
     where
         B: RangeBounds<I>,
-        I: Deserialize + PartialOrd,
+        I: for<'de> Deserialize<'de, Ok = I> + PartialOrd,
     {
         let min: I = self.min.as_slice().deserialize_into()?;
         let max: I = self.max.as_slice().deserialize_into()?;
