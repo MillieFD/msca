@@ -168,7 +168,7 @@ pub enum Outcome<I> {
 }
 
 impl<I> Outcome<I> {
-    /// Converts [`Outcome`](Outcome)`<`[I](I)`>` into [`Outcome`](Outcome)`<`[O](O)`>` by applying
+    /// Converts [`Outcome`](Outcome)`<`[`I`](I)`>` into [`Outcome`](Outcome)`<`[`O`](O)`>` by applying
     /// the specified [closure](F) to the contained item.
     fn map<F, O>(self, f: F) -> Outcome<O>
     where
