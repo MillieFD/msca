@@ -1084,8 +1084,9 @@ impl<'de> Deserialize<'de> for BitSlice<u8, Lsb0> {
 
 /// A **source** that can be deserialized into a [supported data type](Deserialize).
 pub trait Deserializer {
-    /// Deserialize [`Self`] into an instance of the target type [`I`].
-    fn deserialize_into<I: Deserialize>(&mut self) -> Result<I, Error>;
+    /// Deserialize [`Self`] into an owned instance of the target type [`I`].
+    #[rustfmt::skip] // Single line where clause improves readability
+    fn deserialize_into<I>(&mut self) -> Result<I, Error> where I: for<'a> Deserialize<'a, Ok = I>;
 }
 
 /* ----------------------------------------------------------- Deserializer Trait Implementation */
