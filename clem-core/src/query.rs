@@ -251,8 +251,8 @@ impl Query {
     ///
     /// ### Guidance
     ///
-    /// This filter can be applied to any [equatable](Eq) type. [`Option`] columns test the inner
-    /// [`Some`] and exclude [`None`] items.
+    /// This filter can be applied to any [equatable](Eq) type. [`Option`] tests the inner [`Some`]
+    /// and retains [`None`] items; combine with [`Query::is_some`] to exclude [`None`] items.
     ///
     /// ```rust,ignore
     /// .eq("active", true)
