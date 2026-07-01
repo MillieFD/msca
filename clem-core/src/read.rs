@@ -281,13 +281,6 @@ where
         });
         Box::new(iter)
     }
-
-    fn try_from_slice(src: &'a [u8]) -> Result<Self, Error>
-    where
-        Self: Sized,
-    {
-        Ok(src)
-    }
 }
 
 impl<'a> Reader<'a, bool> for &'a BitSlice<u8, Lsb0> {
