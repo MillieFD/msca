@@ -168,9 +168,8 @@ pub enum Outcome<I> {
 }
 
 impl<I> Outcome<I> {
-    /// Map an [`Include`](Outcome::Include) [`Item`](I) through `f`, preserving
-    /// [`Exclude`](Outcome::Exclude) and [`Error`](Outcome::Error). Consumes [`self`](Outcome) so the
-    /// inner item can be moved into a wrapping type (for example [`Some`]) without cloning.
+    /// Converts [`Outcome`](Outcome)`<`[I](I)`>` into [`Outcome`](Outcome)`<`[O](O)`>` by applying
+    /// the specified [closure](F) to the contained item.
     fn map<F, O>(self, f: F) -> Outcome<O>
     where
         F: FnOnce(I) -> O,
