@@ -724,14 +724,6 @@ where
         Ok(*self == other.as_ref().deserialize_into()?)
     }
 
-    fn is_some(&self) -> Result<bool, io::Error> {
-        Ok(self.is_some())
-    }
-
-    fn is_none(&self) -> Result<bool, io::Error> {
-        Ok(self.is_none())
-    }
-
     fn assess(&self, filter: &Filter) -> Result<bool, io::Error> {
         match filter {
             Filter::Range { lb, ub } => self.range(lb, ub),
