@@ -97,7 +97,7 @@ impl Query {
             loop {
                 return match reader.next()? {
                     Outcome::Include(item) => Ok(item).into(),
-                    Outcome::Exclude => continue,
+                    Outcome::Exclude(..) => continue,
                     Outcome::Error(error) => Err(error).into(),
                 };
             }
@@ -681,7 +681,7 @@ pub trait Evaluate: Sized {
             true => self.assess(f),
         }) {
             Ok(true) => Outcome::Include(self),
-            Ok(false) => Outcome::Exclude,
+            Ok(false) => Outcome::Exclude(self),
             Err(e) => Outcome::Error(e),
         }
     }
@@ -860,7 +860,7 @@ mod tests {
         stream
             .filter_map(|outcome| match outcome {
                 Outcome::Include(item) => Some(item),
-                Outcome::Exclude => None,
+                Outcome::Exclude(..) => None,
                 Outcome::Error(error) => panic!("Read error → {error}"),
             })
             .collect()

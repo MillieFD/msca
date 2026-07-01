@@ -162,7 +162,7 @@ pub enum Outcome<I> {
     /// A [deserialized](Deserialize::deserialize) [`Item`](I) which satisfies every [`Filter`].
     Include(I),
     /// The [`Item`](I) was rejected by one or more [filters](Filter).
-    Exclude,
+    Exclude(I),
     /// An [`Error`] occurred during [deserialization](Deserialize) or [filtering](Filter).
     Error(Error),
 }
@@ -176,8 +176,8 @@ impl<I> Outcome<I> {
         F: FnOnce(I) -> O,
     {
         match self {
-            Self::Include(v) => Outcome::Include(f(v)),
-            Self::Exclude => Outcome::Exclude,
+            Self::Include(i) => Outcome::Include(f(i)),
+            Self::Exclude(i) => Outcome::Exclude(f(i)),
             Self::Error(e) => Outcome::Error(e),
         }
     }
