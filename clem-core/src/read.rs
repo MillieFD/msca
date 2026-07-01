@@ -133,11 +133,17 @@ impl<'a> Column<'a> {
 /// A **stateful cursor** over paired validity and value sub-buffers for a single [`Column`]; used
 /// to [`Deserialize`] optional non-niche items.
 #[doc(hidden)] // Reachable via Read::Src for optional non-niche readers
-struct OptBitVec<'a> {
-    /// [`Stream`] over the validity sub-buffer where `true` → [`Some`] and `false` → [`None`].
-    mask: Stream<'a, bool>,
-    /// Concatenated data sub-buffer from which [`Some`] items are [deserialized](Deserialize).
-    data: &'a [u8],
+pub struct OptBitVec<'a, I>
+where
+    I: Read,
+{
+    /// Byte [slice][1] over the validity sub-buffer where `true` → [`Some`] and `false` → [`None`].
+    ///
+    /// [1]: https://doc.rust-lang.org/std/primitive.slice.html
+    mask: &'a BitSlice<u8, Lsb0>,
+    /// A **stateful reader** over the concatenated data sub-buffer from which [`Some`] items are
+    /// [deserialized](Deserialize).
+    data: I::Src<'a>,
 }
 
 /// A **stateful cursor** over paired offset and value sub-buffers for a single [`Column`]; used to
