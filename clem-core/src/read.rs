@@ -479,27 +479,27 @@ impl Read for bool {
 }
 
 impl Read for Option<u8> {
-    type Src<'a> = OptBitVec<'a>;
+    type Src<'a> = OptBitVec<'a, u8>;
 }
 
 impl Read for Option<u16> {
-    type Src<'a> = OptBitVec<'a>;
+    type Src<'a> = OptBitVec<'a, u16>;
 }
 
 impl Read for Option<u32> {
-    type Src<'a> = OptBitVec<'a>;
+    type Src<'a> = OptBitVec<'a, u32>;
 }
 
 impl Read for Option<u64> {
-    type Src<'a> = OptBitVec<'a>;
+    type Src<'a> = OptBitVec<'a, u64>;
 }
 
 impl Read for Option<u128> {
-    type Src<'a> = OptBitVec<'a>;
+    type Src<'a> = OptBitVec<'a, u128>;
 }
 
 impl Read for Option<i8> {
-    type Src<'a> = OptBitVec<'a>;
+    type Src<'a> = OptBitVec<'a, i8>;
 }
 
 impl Read for Option<i16> {
@@ -507,27 +507,27 @@ impl Read for Option<i16> {
 }
 
 impl Read for Option<i32> {
-    type Src<'a> = OptBitVec<'a>;
+    type Src<'a> = OptBitVec<'a, i32>;
 }
 
 impl Read for Option<i64> {
-    type Src<'a> = OptBitVec<'a>;
+    type Src<'a> = OptBitVec<'a, i64>;
 }
 
 impl Read for Option<i128> {
-    type Src<'a> = OptBitVec<'a>;
+    type Src<'a> = OptBitVec<'a, i128>;
 }
 
 impl Read for Option<f32> {
-    type Src<'a> = OptBitVec<'a>;
+    type Src<'a> = OptBitVec<'a, f32>;
 }
 
 impl Read for Option<f64> {
-    type Src<'a> = OptBitVec<'a>;
+    type Src<'a> = OptBitVec<'a, f64>;
 }
 
 impl Read for Option<bool> {
-    type Src<'a> = OptBitVec<'a>;
+    type Src<'a> = OptBitVec<'a, bool>;
 }
 
 impl Read for Option<char> {
