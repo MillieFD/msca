@@ -236,7 +236,7 @@ impl<I> From<Error> for Outcome<I> {
 
 /// A **stateful data source** used to construct a lazy [`Stream`].
 #[doc(hidden)] // pub required for Query::column trait bounds; not intended as a stable API
-pub trait Reader<'a, I> {
+pub trait Reader<'a, I>: Deserialize<'a, Ok = Self> {
     /// Returns a new boxed [`Stream`] trait object **without** any [filters](Filter).
     ///
     /// The resulting [`Stream`] will never return [`Outcome::Exclude`] but [`Outcome::Error`]
@@ -259,12 +259,6 @@ pub trait Reader<'a, I> {
         Self: Sized,
         'f: 'a,
         &'f F: IntoIterator<Item = &'f Filter>;
-
-    /// Constructs a new instance of [`Self`] from the provided byte [slice][1].
-    ///
-    /// [1]: https://doc.rust-lang.org/std/primitive.slice.html
-    #[rustfmt::skip] // Single line where clause improves readability
-    fn try_from_slice(src: &'a [u8]) -> Result<Self, Error> where Self: Sized;
 }
 
 /* ----------------------------------------------------------------- Reader Trait Implementation */
