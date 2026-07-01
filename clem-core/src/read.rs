@@ -190,6 +190,12 @@ impl<I> Outcome<I> {
         let out = iter::once(self);
         Box::from(out)
     }
+    fn exclude(self) -> Self {
+        match self {
+            Outcome::Include(i) => Outcome::Exclude(i),
+            other => other,
+        }
+    }
 }
 
 impl<I> From<Error> for Outcome<I> {
