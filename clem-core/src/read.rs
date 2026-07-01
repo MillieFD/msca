@@ -254,13 +254,14 @@ pub trait Reader<'a, I> {
 
 /* ----------------------------------------------------------------- Reader Trait Implementation */
 
-impl<'a, I> Reader<I> for &'a [u8]
+impl<'a, I> Reader<'a, I> for &'a [u8]
 where
     I: Deserialize + Evaluate,
 {
-    fn boxed<F>(mut self, filters: &'a F) -> Stream<I>
+    fn with_filters<'f, F>(mut self, filters: &'f F) -> Stream<'a, I>
     where
-        &'a F: IntoIterator<Item = &'a Filter>,
+        'f: 'a,
+        &'f F: IntoIterator<Item = &'f Filter>,
     {
         let iter = iter::from_fn(move || {
             let f = filters.into_iter();
@@ -280,10 +281,11 @@ where
     }
 }
 
-impl<'a> Reader<bool> for &'a BitSlice<u8, Lsb0> {
-    fn boxed<F>(self, filters: &'a F) -> Stream<bool>
+impl<'a> Reader<'a, bool> for &'a BitSlice<u8, Lsb0> {
+    fn with_filters<'f, F>(self, filters: &'f F) -> Stream<'a, bool>
     where
-        &'a F: IntoIterator<Item = &'a Filter>,
+        'f: 'a,
+        &'f F: IntoIterator<Item = &'f Filter>,
     {
         let iter = self.iter().by_vals().map(move |bit| {
             let f = filters.into_iter();
