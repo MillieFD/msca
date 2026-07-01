@@ -76,7 +76,6 @@ use memmap2::Mmap;
 use crate::io::{Deserialize, Error};
 use crate::manifest::Buffer;
 use crate::query::{Evaluate, Filter};
-use crate::segment::Align;
 
 /* ------------------------------------------------------------------------------ Public Exports */
 
