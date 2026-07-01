@@ -658,16 +658,6 @@ pub trait Evaluate: Sized {
         })
     }
 
-    /// Returns `true` if `self` is [`Some`].
-    fn is_some(&self) -> Result<bool, io::Error> {
-        Ok(true) // NOTE: non-option types (default) return true; cannot be None by definition
-    }
-
-    /// Returns `true` if `self` is [`None`].
-    fn is_none(&self) -> Result<bool, io::Error> {
-        Ok(false) // NOTE: non-option types (default) return false; must be Some by definition
-    }
-
     /// Dispatch function that returns `true` if `self` satisfies the provided [`Filter`].
     fn assess(&self, filter: &Filter) -> Result<bool, io::Error>;
 
