@@ -554,6 +554,18 @@ impl Error {
         };
         Self::Truncated { expected, actual }
     }
+
+    /// Constructor for [`Error::Filter`] wrapping the incompatible [`Filter`] and actual [`Type`].
+    pub(crate) fn filter<I>(filter: &Filter) -> Self
+    where
+        I: Unfold,
+        Schema: Unfolder<I>,
+    {
+        Error::Filter {
+            filter: filter.clone(),
+            actual: Schema::unfold(),
+        }
+    }
 }
 
 impl fmt::Display for Error {
