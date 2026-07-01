@@ -744,8 +744,6 @@ impl Evaluate for bool {
     fn assess(&self, filter: &Filter) -> Result<bool, io::Error> {
         match filter {
             Filter::Eq(other) => Ok(other[0] == *self as u8),
-            Filter::IsSome => self.is_some(),
-            Filter::IsNone => self.is_none(),
             some => io::Error::Filter { filter: some.clone(), actual: Type::Bool }.into(),
         }
     }
