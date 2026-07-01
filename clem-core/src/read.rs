@@ -65,6 +65,7 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //! [5]: crate::query::Query
 
 use std::collections::HashSet;
+use std::num::NonZeroUsize;
 use std::slice::Iter;
 use std::{iter, num};
 
