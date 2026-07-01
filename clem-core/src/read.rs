@@ -189,6 +189,13 @@ impl<I> Outcome<I> {
         let out = iter::once(self);
         Box::from(out)
     }
+
+    /// Convert an included outcome into an excluded outcome without changing the inner [`item`](I).
+    ///
+    /// - [`Include`](Outcome::Include) converted to [`Exclude`](Outcome::Exclude)
+    /// - [`Exclude`](Outcome::Exclude) and [`Error`](Outcome::Error) remain unchanged
+    ///
+    /// The resulting [`Outcome`] is guaranteed to never contain [`Outcome::Include`].
     fn exclude(self) -> Self {
         match self {
             Outcome::Include(i) => Outcome::Exclude(i),
