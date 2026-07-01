@@ -149,7 +149,7 @@ where
 impl<'de, I> Deserialize<'de> for OptBitVec<'de, I>
 where
     I: Read,
-    I::Src<'de>: Deserialize<'de, Ok= I::Src<'de>>,
+    I::Src<'de>: Deserialize<'de, Ok = I::Src<'de>>,
 {
     type Ok = Self;
 
