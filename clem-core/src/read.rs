@@ -503,7 +503,7 @@ impl Read for Option<i8> {
 }
 
 impl Read for Option<i16> {
-    type Src<'a> = OptBitVec<'a>;
+    type Src<'a> = OptBitVec<'a, i16>;
 }
 
 impl Read for Option<i32> {
