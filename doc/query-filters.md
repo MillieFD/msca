@@ -34,17 +34,22 @@ Open or half-open ranges are also supported:
 .range("pressure", ..105.0) // pressure < 105.0  (no lower bound)
 ```
 
+Range is a value predicate: `Some` items from `Option` columns defer to the inner value, whereas `None` items – which
+cannot be meaningfully tested – are always retained. Combine with the [some](#option) filter to discard `None` items.
+
 ##### Equality
 
 Retain rows where the value in the specified column exactly equals a given value. Useful for boolean flags, integer
 codes, and enum discriminants.
 
 ```rust,ignore
-.eq("active", true)
-.eq("sensor_id", 42u32)
+.equal("active", true)
+.equal("sensor_id", 42u32)
 ```
 
-Equality on an orderable type is equivalent to `.range(col, v..=v)` and benefits from segment pruning.
+Equality on an orderable type is equivalent to `.range(col, v..=v)` and benefits from segment pruning. Equality is a
+value predicate: `Some` items from `Option` columns defer to the inner value, whereas `None` items – which cannot be
+meaningfully tested – are always retained. Combine with the [some](#option) filter to discard `None` items.
 
 ##### Option
 
@@ -151,4 +156,5 @@ across the candidate segments.
 | `.stride(n)`          | —               | ✓                | Decimation; no segment-level skip.      |
 
 [1]: read-cycle.md#phase-2-segment-pruning
+
 [2]: read-cycle.md#phase-3-lazy-zero-copy-reads
