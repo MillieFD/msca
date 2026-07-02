@@ -113,12 +113,12 @@ impl<'a> Column<'a> {
     pub(crate) fn stream<I>(self) -> Stream<'a, I>
     where
         I: Read + 'a,
-        I::Src<'a>: Reader<'a, I>,
+        I::Src<'a>: Deserialize<'a, Ok = I::Src<'a>> + Reader<'a, I>,
     {
         let stream = self.buffers.flat_map(move |buf| {
             buf.sector
                 .slice(self.mmap)
-                .map(|bytes| match I::Src::try_from_slice(bytes) {
+                .map(|mut bytes| match I::Src::deserialize(&mut bytes) {
                     Ok(src) => src.with_filters(self.filters),
                     Err(e) => Outcome::Error(e).once(),
                 })
