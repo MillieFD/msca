@@ -1169,10 +1169,10 @@ where
     }
 }
 
-impl Deserializer for &[u8] {
+impl<'de> Deserializer<'de> for &'de [u8] {
     fn deserialize_into<I>(&mut self) -> Result<I, Error>
     where
-        I: for<'de> Deserialize<'de, Ok = I>,
+        I: Deserialize<'de, Ok = I>,
     {
         I::deserialize(self)
     }
