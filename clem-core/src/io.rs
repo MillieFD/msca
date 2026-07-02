@@ -240,6 +240,12 @@ impl Serialize for Sector {
 /// [3]: https://doc.rust-lang.org/reference/dynamically-sized-types.html
 pub(crate) struct SizedBuf<'a>(&'a [u8]);
 
+impl<'a> AsRef<[u8]> for SizedBuf<'a> {
+    fn as_ref(&self) -> &[u8] {
+        self.0
+    }
+}
+
 /// Mutable region of the file header.
 ///
 /// Excludes immutable header elements such as the [magic bytes][1] and [version number][2]. See the
