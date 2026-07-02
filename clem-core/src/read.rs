@@ -236,7 +236,7 @@ impl<I> From<Error> for Outcome<I> {
 
 /// A **stateful data source** used to construct a lazy [`Stream`].
 #[doc(hidden)] // pub required for Query::column trait bounds; not intended as a stable API
-pub trait Reader<'a, I>: Deserialize<'a, Ok = Self> {
+pub trait Reader<'a, I> {
     /// Returns a new boxed [`Stream`] trait object **without** any [filters](Filter).
     ///
     /// The resulting [`Stream`] will never return [`Outcome::Exclude`] but [`Outcome::Error`]
