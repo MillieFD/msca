@@ -1567,16 +1567,16 @@ where
     type Buffer = Vec<u8>;
 
     fn size(&self) -> Result<NonZeroU64, Error> {
-        let prefix = size_of::<NonZeroU64>().try_into()?;
         // Recursively sum the sizes of all elements.
         self.iter()
             .try_fold(u64::MIN, |total, element| {
                 let size = element.size()?.get();
                 total.checked_add(size).ok_or(Error::Zero)
-            })?
-            .checked_add(prefix) // Add length prefix
-            .and_then(NonZeroU64::new)
+            })
+            .map(NonZeroU64::new)
+            .transpose()
             .ok_or(Error::Zero)
+            .flatten()
     }
 
     fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
@@ -1603,16 +1603,16 @@ where
     type Buffer = Vec<u8>;
 
     fn size(&self) -> Result<NonZeroU64, Error> {
-        let prefix = size_of::<NonZeroU64>().try_into()?;
         // Recursively sum the sizes of all elements.
         self.iter()
             .try_fold(u64::MIN, |total, entry| {
                 let size = entry.0.size()?.get() + entry.1.size()?.get();
                 total.checked_add(size).ok_or(Error::Zero)
-            })?
-            .checked_add(prefix) // Add length prefix
-            .and_then(NonZeroU64::new)
+            })
+            .map(NonZeroU64::new)
+            .transpose()
             .ok_or(Error::Zero)
+            .flatten()
     }
 
     fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
