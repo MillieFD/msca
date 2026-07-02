@@ -708,6 +708,17 @@ pub trait Deserialize<'de> {
 
 /* ------------------------------------------------------------ Deserialize Trait Implementation */
 
+impl<'de, I> Deserialize<'de> for &'de I
+where
+    I: Deserialize<'de, Ok = &'de I> + ?Sized,
+{
+    type Ok = Self;
+
+    fn deserialize(src: &mut &'de [u8]) -> Result<Self::Ok, Error> {
+        I::deserialize(src)
+    }
+}
+
 impl<'de> Deserialize<'de> for u8 {
     type Ok = Self;
 
