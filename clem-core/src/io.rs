@@ -174,7 +174,7 @@ impl Sector {
     pub fn slice<'a>(&self, mmap: &'a Mmap) -> Result<&'a [u8], Error> {
         let start = self.offset.try_into()?;
         let end = self.next().ok_or(number::Error::Zero)?.get().try_into()?;
-        mmap.get(start..end).ok_or(Error::Truncated {
+        mmap.get(start..end).ok_or_else(|| Error::Truncated {
             expected: end - start,
             actual: mmap.len().saturating_sub(start),
         })
@@ -299,13 +299,13 @@ impl<'de> Deserialize<'de> for Header {
         const N: usize = size_of_val(&MAGIC) + size_of_val(&VERSION);
         *src = src
             .split_first_chunk::<N>()
-            .ok_or(Error::Truncated { expected: HEADER, actual: src.len() })
+            .ok_or_else(|| Error::Truncated { expected: HEADER, actual: src.len() })
             .and_then(|data| match data.0.starts_with(&MAGIC) {
                 true => Ok(data),
                 false => Error::Magic.into(),
             })
             .and_then(|data| {
-                match data.0.last().ok_or(Error::Truncated {
+                match data.0.last().ok_or_else(|| Error::Truncated {
                     expected: size_of::<u8>(),
                     actual: data.0.len(),
                 })? {
@@ -686,7 +686,7 @@ impl<'de> Deserialize<'de> for u8 {
 
     fn deserialize(src: &mut &'de [u8]) -> Result<Self, Error> {
         src.split_first()
-            .ok_or(Error::Truncated {
+            .ok_or_else(|| Error::Truncated {
                 expected: size_of::<Self>(),
                 actual: src.len(),
             })
@@ -702,7 +702,7 @@ impl<'de> Deserialize<'de> for u16 {
 
     fn deserialize(src: &mut &'de [u8]) -> Result<Self, Error> {
         src.split_first_chunk()
-            .ok_or(Error::Truncated {
+            .ok_or_else(|| Error::Truncated {
                 expected: size_of::<Self>(),
                 actual: src.len(),
             })
@@ -718,7 +718,7 @@ impl<'de> Deserialize<'de> for u32 {
 
     fn deserialize(src: &mut &'de [u8]) -> Result<Self, Error> {
         src.split_first_chunk()
-            .ok_or(Error::Truncated {
+            .ok_or_else(|| Error::Truncated {
                 expected: size_of::<Self>(),
                 actual: src.len(),
             })
@@ -734,7 +734,7 @@ impl<'de> Deserialize<'de> for u64 {
 
     fn deserialize(src: &mut &'de [u8]) -> Result<Self, Error> {
         src.split_first_chunk()
-            .ok_or(Error::Truncated {
+            .ok_or_else(|| Error::Truncated {
                 expected: size_of::<Self>(),
                 actual: src.len(),
             })
@@ -750,7 +750,7 @@ impl<'de> Deserialize<'de> for u128 {
 
     fn deserialize(src: &mut &'de [u8]) -> Result<Self, Error> {
         src.split_first_chunk()
-            .ok_or(Error::Truncated {
+            .ok_or_else(|| Error::Truncated {
                 expected: size_of::<Self>(),
                 actual: src.len(),
             })
@@ -806,7 +806,7 @@ impl<'de> Deserialize<'de> for i8 {
 
     fn deserialize(src: &mut &'de [u8]) -> Result<Self, Error> {
         src.split_first_chunk()
-            .ok_or(Error::Truncated {
+            .ok_or_else(|| Error::Truncated {
                 expected: size_of::<Self>(),
                 actual: src.len(),
             })
@@ -822,7 +822,7 @@ impl<'de> Deserialize<'de> for i16 {
 
     fn deserialize(src: &mut &'de [u8]) -> Result<Self, Error> {
         src.split_first_chunk()
-            .ok_or(Error::Truncated {
+            .ok_or_else(|| Error::Truncated {
                 expected: size_of::<Self>(),
                 actual: src.len(),
             })
@@ -838,7 +838,7 @@ impl<'de> Deserialize<'de> for i32 {
 
     fn deserialize(src: &mut &'de [u8]) -> Result<Self, Error> {
         src.split_first_chunk()
-            .ok_or(Error::Truncated {
+            .ok_or_else(|| Error::Truncated {
                 expected: size_of::<Self>(),
                 actual: src.len(),
             })
@@ -854,7 +854,7 @@ impl<'de> Deserialize<'de> for i64 {
 
     fn deserialize(src: &mut &'de [u8]) -> Result<Self, Error> {
         src.split_first_chunk()
-            .ok_or(Error::Truncated {
+            .ok_or_else(|| Error::Truncated {
                 expected: size_of::<Self>(),
                 actual: src.len(),
             })
@@ -870,7 +870,7 @@ impl<'de> Deserialize<'de> for i128 {
 
     fn deserialize(src: &mut &'de [u8]) -> Result<Self, Error> {
         src.split_first_chunk()
-            .ok_or(Error::Truncated {
+            .ok_or_else(|| Error::Truncated {
                 expected: size_of::<Self>(),
                 actual: src.len(),
             })
@@ -926,7 +926,7 @@ impl<'de> Deserialize<'de> for f32 {
 
     fn deserialize(src: &mut &'de [u8]) -> Result<Self, Error> {
         src.split_first_chunk()
-            .ok_or(Error::Truncated {
+            .ok_or_else(|| Error::Truncated {
                 expected: size_of::<Self>(),
                 actual: src.len(),
             })
@@ -942,7 +942,7 @@ impl<'de> Deserialize<'de> for f64 {
 
     fn deserialize(src: &mut &'de [u8]) -> Result<Self, Error> {
         src.split_first_chunk()
-            .ok_or(Error::Truncated {
+            .ok_or_else(|| Error::Truncated {
                 expected: size_of::<Self>(),
                 actual: src.len(),
             })
@@ -958,7 +958,7 @@ impl<'de> Deserialize<'de> for char {
 
     fn deserialize(src: &mut &'de [u8]) -> Result<Self, Error> {
         let utf8 = u32::deserialize(src)?;
-        char::from_u32(utf8).ok_or(Error::Utf8(utf8))
+        char::from_u32(utf8).ok_or_else(|| Error::Utf8(utf8))
     }
 }
 
@@ -1059,7 +1059,7 @@ impl<'de> Deserialize<'de> for Option<char> {
         // NOTE: serialize trait encodes none using the u32::MAX niche
         match u32::deserialize(src)? {
             u32::MAX => Ok(None),
-            utf8 => char::from_u32(utf8).map(Some).ok_or(Error::Utf8(utf8)),
+            utf8 => char::from_u32(utf8).map(Some).ok_or_else(|| Error::Utf8(utf8)),
         }
     }
 }
