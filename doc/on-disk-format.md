@@ -275,10 +275,39 @@ categorical data such as sensor type, device ID, or location. It is possible for
 repeated value across an entire data segment. Instead of repeatedly encoding identical values, clem defaults to a
 **compact buffer** representation to improve storage density.
 
-> **Prefer binary segments for constant values**
+> **Prefer binary segments for constant values:**
 > Implementers are encouraged to use a `bin` segment for genuinely constant values that never change across the entire
 > file lifetime. This improves storage efficiency by eliminating an unnecessary column from the schema.
 
 Compact buffers contain exactly **one** value – regardless of the segment header `count` – and are therefore detected
 automatically by the file reader when the buffer header `size` limit is reached after deserialising a single value. The
 reader returns a looped iterator yielding this value `count` times.
+
+### Manifest
+
+A self-describing **CBOR** file manifest is written after the immutable segment region. The manifest lists all file
+segments by type, acting like the index of a book to enhance segment discovery and enable **O(1) random access**.
+
+```text
+[header] [segment 1] ... [segment N] [manifest] ... [EOF]
+```
+
+The manifest stores a lightweight **descriptor** for each on-disk [buffer](#columnar-data-buffers). These descriptors
+**do not** hold data directly; they exist to drive discovery and predicate pruning before any file IO occurs. Unordered
+items – such as IEEE-754 `NaN` – are excluded from the buffer statistics. Columns with no meaningful order leave the
+bounds unset.
+
+```text
+buffer descriptor
+├─ sector: Sector     // buffer location in the immutable region
+├─ count: NonZeroU64  // logical number of items in this buffer
+├─ min: LE bytes
+└─ max: LE bytes
+```
+
+Refer to the [manifest documentation](./manifest.md) for more details.
+
+> **Segment region offsets:**
+> File memory maps are tightly scoped to the immutable segment region. All manifest descriptor `sector` offsets are
+> therefore recorded relative to the start of the immutable segment region (excluding the file header) to enable direct
+> random access with no runtime offset arithmetic.
