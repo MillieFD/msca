@@ -246,6 +246,18 @@ impl<'a> AsRef<[u8]> for SizedBuf<'a> {
     }
 }
 
+impl<'a> Serialize for SizedBuf<'a> {
+
+    fn size(&self) -> Result<NonZeroU64, number::Error> {
+        self.0
+            .size()?
+            .get()
+            .checked_add(Self::PREFIX)
+            .and_then(NonZeroU64::new)
+            .ok_or(number::Error::Zero)
+    }
+}
+
 /// Mutable region of the file header.
 ///
 /// Excludes immutable header elements such as the [magic bytes][1] and [version number][2]. See the
