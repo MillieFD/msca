@@ -1101,6 +1101,20 @@ impl<'de> Deserialize<'de> for [u8] {
     }
 }
 
+impl<'de> Deserialize<'de> for SizedBuf<'de> {
+    type Ok = Self;
+
+    fn deserialize(src: &mut &'de [u8]) -> Result<Self::Ok, Error> {
+        let size: usize = NonZeroU64::deserialize(src)?.get().try_into()?;
+        src.split_at_checked(size)
+            .ok_or_else(|| Error::Truncated { expected: size, actual: src.len() })
+            .map(|data| {
+                *src = data.1;
+                Self(data.0)
+            })
+    }
+}
+
 impl<'de> Deserialize<'de> for BitSlice<u8, Lsb0> {
     type Ok = &'de BitSlice<u8, Lsb0>;
 
