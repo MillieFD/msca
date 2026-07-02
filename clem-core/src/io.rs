@@ -1178,6 +1178,15 @@ impl Deserializer for &[u8] {
     }
 }
 
+impl<'de> Deserializer<'de> for SizedBuf<'de> {
+    fn deserialize_into<I>(&mut self) -> Result<I, Error>
+    where
+        I: Deserialize<'de, Ok = I>,
+    {
+        self.0.deserialize_into()
+    }
+}
+
 /* ---------------------------------------------------------------------- Write Trait Definition */
 
 /// A **data type** that is written to the [clem](crate) file at a specific [location](Sector).
