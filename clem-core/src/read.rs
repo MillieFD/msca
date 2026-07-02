@@ -65,7 +65,6 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //! [5]: crate::query::Query
 
 use std::collections::HashSet;
-use std::num::NonZeroUsize;
 use std::slice::Iter;
 use std::{iter, num};
 
@@ -73,7 +72,7 @@ use bitvec::order::Lsb0;
 use bitvec::slice::BitSlice;
 use memmap2::Mmap;
 
-use crate::io::{Deserialize, Error};
+use crate::io::{Deserialize, Deserializer, Error, SizedBuf};
 use crate::manifest::Buffer;
 use crate::query::{Evaluate, Filter};
 
