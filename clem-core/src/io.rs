@@ -1138,10 +1138,22 @@ impl<'de> Deserialize<'de> for BitSlice<u8, Lsb0> {
 /* --------------------------------------------------------------- Deserializer Trait Definition */
 
 /// A **source** that can be deserialized into a [supported data type](Deserialize).
-pub trait Deserializer {
-    /// Deserialize [`Self`] into an owned instance of the target type [`I`].
+///
+/// ### Lifetimes
+///
+/// The `'de` lifetime binds each deserialized target to the underlying [data source][1] lifetime,
+/// enabling **zero-copy** borrows for [unsized][2] types.
+///
+/// [1]: https://doc.rust-lang.org/std/primitive.slice.html
+/// [2]: https://doc.rust-lang.org/reference/dynamically-sized-types.html
+pub trait Deserializer<'de> {
+    /// Consume the required number of bytes from [`Self`] and [`Deserialize`] into one owned
+    /// instance of the target type [`I`]; advancing the underlying [data source][1] **in-situ**
+    /// without an intermediate copy.
+    ///
+    /// [1]: https://doc.rust-lang.org/std/primitive.slice.html
     #[rustfmt::skip] // Single line where clause improves readability
-    fn deserialize_into<I>(&mut self) -> Result<I, Error> where I: for<'a> Deserialize<'a, Ok = I>;
+    fn deserialize_into<I>(&mut self) -> Result<I, Error> where I: Deserialize<'de, Ok = I>;
 }
 
 /* ----------------------------------------------------------- Deserializer Trait Implementation */
