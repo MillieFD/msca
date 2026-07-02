@@ -42,8 +42,10 @@
         - [x] Primitives deserialize from `&[u8]`
         - [x] External types deserialize from a composite reader
     - [x] Users can add `#[derive(Read)]` to their external types:
-        - [x] Generates a hidden `Ctx` struct w/ one column `Stream` per field; `Read::next` pulls each in lockstep.
-        - [x] Rejects the entire item if any sub-stream returns `Outcome::Excluded`.
+        - [x] Generates a hidden `Reader` struct w/ one `Stream` per field; `Iterator::next` pulls fields in lockstep.
+        - [x] Rebuilds the row from every field value.
+        - [x] Returns `Outcome::Include` if **all** sub-stream return `Outcome::Include`.
+        - [x] Returns `Outcome::Exclude` if **any** sub-stream return `Outcome::Exclude`.
         - [x] Surfaces `Outcome::Error` eagerly.
         - [x] `Read::boxed` hides the generated context from users behind the type-erased `Stream` trait object.
         - [x] `Query::read::<I>` reads the composite stream for `I`; mirrors `Data::accumulator`.
@@ -63,6 +65,10 @@
             - Read decodes each row via `str::from_utf8` into a borrowed `&str` or owned `String`.
         - [ ] Nested type support via `Flatten` reader; serialization collapses nested types into one on-disk layer.
         - [ ] Automatically bit-pack `Vec<bool>` during serialization; schema records the column type as `BitVec`.
+    - [x] Embed query filters into `Reader` construction for composability:
+        - [x] State machines hold sub-readers; each sub-stream is built lazily inside `with_filters`.
+        - [x] `OptBitVec` inspects the `Outcome::Exclude` wrapped item to ensure mask & data streams stay in lockstep.
+        - [x] Value filters on an optional column test `Some` only; `None` rows are retained (use `is_some` to remove).
     - [ ] Expand `#[derive(Data)]` to support enums by encoding the discriminant.
     - [ ] Add remaining query filters: `mask` + `limit` + `offset`
     - [x] `Query::read` and `Query::collect` are no longer async; update documentation.
