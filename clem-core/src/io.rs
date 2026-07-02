@@ -238,7 +238,7 @@ impl Serialize for Sector {
 /// [1]: Deserialize
 /// [2]: https://doc.rust-lang.org/std/primitive.slice.html
 /// [3]: https://doc.rust-lang.org/reference/dynamically-sized-types.html
-struct SizedBuf<'a>(&'a [u8]);
+pub(crate) struct SizedBuf<'a>(&'a [u8]);
 
 /// Mutable region of the file header.
 ///
