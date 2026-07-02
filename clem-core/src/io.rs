@@ -213,6 +213,33 @@ impl Serialize for Sector {
     }
 }
 
+/// A **fixed size** file region [deserialized][1] from a **length-prefixed** byte [slice][2].
+///
+/// ### Data Layout
+///
+/// It is not possible to predetermine the on-disk space required for [unsized][3] file elements
+/// such as [segments](crate::segment) and [buffers](crate::manifest::Buffer); the exact size depends upon runtime
+/// variables such as the number of [accumulated](crate::accumulate) items.
+///
+/// The [clem](crate) format is **self-describing** to improve data integrity and file robustness.
+/// Unsized regions therefore record a [`NonZeroU64`] length prefix that describes the exact
+/// number of additional bytes required to [`Read`] the region.
+///
+/// ### Guidance
+///
+/// The **eight-byte** length prefix is **not included** in the recorded byte size. Readers should:
+///
+/// 1. Begin by deserializing the length prefix.
+/// 2. Then read the specified number of additional bytes.
+///
+/// Empty **zero-length** regions are never [written](Write) to disk. The length prefix is therefore
+/// guaranteed to be non-zero. [`NonZeroU64`] is used to enforce this invariant.
+///
+/// [1]: Deserialize
+/// [2]: https://doc.rust-lang.org/std/primitive.slice.html
+/// [3]: https://doc.rust-lang.org/reference/dynamically-sized-types.html
+struct SizedBuf<'a>(&'a [u8]);
+
 /// Mutable region of the file header.
 ///
 /// Excludes immutable header elements such as the [magic bytes][1] and [version number][2]. See the
