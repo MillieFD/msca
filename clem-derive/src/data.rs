@@ -108,9 +108,7 @@ fn accumulate(src: &Ident, acc: &Ident, fields: &[Field<'_>]) -> TokenStream {
     // NOTE: crate::fields rejects empty structs; the first field is guaranteed to exist
     let head = idents[0];
     quote! {
-        impl ::clem::Accumulate for #acc {
-            type Item = #src;
-
+        impl ::clem::Accumulate<#src> for #acc {
             fn boxed(&self) -> ::clem::BoxAcc<#src> {
                 ::std::boxed::Box::new(#acc {
                     #( #idents: self.#idents.boxed(), )*
@@ -227,7 +225,7 @@ mod tests {
         let input: DeriveInput = parse_quote! { struct Row { a: u32, b: f64 } };
         let code = expand(&input).expect("Expansion failed").to_string();
         assert!(has(&code, "struct RowAccumulator"));
-        assert!(has(&code, "impl ::clem::Accumulate for RowAccumulator"));
+        assert!(has(&code, "impl ::clem::Accumulate<Row> for RowAccumulator"));
         assert!(has(&code, "fn boxed(&self) -> ::clem::BoxAcc<Row>"));
         assert!(has(&code, "impl ::clem::Serialize for RowAccumulator"));
         assert!(has(&code, "impl ::clem::Data for Row"));
