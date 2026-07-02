@@ -280,5 +280,5 @@ repeated value across an entire data segment. Instead of repeatedly encoding ide
 > file lifetime. This improves storage efficiency by eliminating an unnecessary column from the schema.
 
 Compact buffers contain exactly **one** value – regardless of the segment header `count` – and are therefore detected
-automatically by the file reader when the buffer header `next` offset is reached after deserialising a single value.
-The reader returns a looped iterator yielding this value `count` times.
+automatically by the file reader when the buffer header `size` limit is reached after deserialising a single value. The
+reader returns a looped iterator yielding this value `count` times.
