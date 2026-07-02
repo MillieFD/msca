@@ -175,6 +175,16 @@ pub struct Seq<'a> {
     data: &'a [u8],
 }
 
+impl<'de> Deserialize<'de> for Seq<'de> {
+    type Ok = Self;
+
+    fn deserialize(src: &mut &'de [u8]) -> Result<Self, Error> {
+        let ends = src.deserialize_into::<SizedBuf>()?.deserialize_into()?;
+        let data = src.deserialize_into::<SizedBuf>()?.deserialize_into()?;
+        Ok(Self { ends, data })
+    }
+}
+
 /* ------------------------------------------------------------------------- Read Stream Outcome */
 
 /// The result of [deserializing](Deserialize) one [`Item`](I) from a [`Read`](Read) [`Stream`].
