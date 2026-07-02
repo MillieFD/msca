@@ -154,8 +154,8 @@ where
     type Ok = Self;
 
     fn deserialize(src: &mut &'de [u8]) -> Result<Self, Error> {
-        let mask = BitSlice::<u8, Lsb0>::deserialize(src)?;
-        let data = I::Src::deserialize(src)?;
+        let mask = src.deserialize_into::<SizedBuf>()?.deserialize_into()?;
+        let data = src.deserialize_into::<SizedBuf>()?.deserialize_into()?;
         Ok(Self { mask, data })
     }
 }
