@@ -30,6 +30,7 @@ use bitvec::vec::BitVec;
 use minicbor::{CborLen, Decode, Encode};
 use static_assertions::const_assert;
 
+use crate::io::{SizedBuf, PREFIX};
 use crate::manifest::{self, Column, B};
 use crate::number::Error;
 use crate::schema::{size_of_opt, Unfold};
@@ -613,17 +614,18 @@ impl Accumulate<bool> for BitVec {
     }
 
     fn buffers(&self, offset: u64, columns: &mut Columns) -> Result<u64, Error> {
-        let prefix: u64 = manifest::Buffer::HEADER.try_into()?;
-        let buf = manifest::Buffer {
-            sector: Sector {
-                offset: offset.checked_add(prefix).ok_or(Error::Zero)?,
-                length: { self.size()?.get() - prefix }.try_into()?,
-            },
+        // TODO → move manifest::Buffer construction to accumulate::Compact & match variants?
+        let sector = Sector {
+            offset: offset.checked_add(PREFIX).ok_or(Error::Zero)?,
+            length: self.size()?,
+        };
+        let next = sector.next().ok_or(Error::Zero)?.align()?;
+        let buf = manifest::Buffer::Full {
+            sector,
             count: self.count().try_into()?,
             min: Accumulate::min(self).map(u128::from).unwrap_or(u128::MIN).serialize()?,
             max: Accumulate::max(self).map(u128::from).unwrap_or(u128::MAX).serialize()?,
         };
-        let next = buf.sector.next().ok_or(Error::Zero)?.align()?;
         columns.next().map(|column| column.buffers.push(buf));
         Ok(next)
     }
@@ -670,14 +672,16 @@ where
     }
 
     fn buffers(&self, offset: u64, columns: &mut Columns) -> Result<u64, Error> {
-        let prefix: u64 = manifest::Buffer::HEADER.try_into()?;
+        // TODO → move manifest::Buffer construction to accumulate::Compact & match variants?
         let min = [u8::MIN; B];
         let max = [u8::MAX; B];
-        let buf = manifest::Buffer {
-            sector: Sector {
-                offset: offset.checked_add(prefix).ok_or(Error::Zero)?,
-                length: { self.size()?.get() - prefix }.try_into()?,
-            },
+        let sector = Sector {
+            offset: offset.checked_add(PREFIX).ok_or(Error::Zero)?,
+            length: self.size()?,
+        };
+        let next = sector.next().ok_or(Error::Zero)?.align()?;
+        let buf = manifest::Buffer::Full {
+            sector,
             count: self.count().try_into()?,
             min: match Accumulate::min(self) {
                 Some(v) => min.serialize_push(&v)?,
@@ -688,7 +692,6 @@ where
                 None => max,
             },
         };
-        let next = buf.sector.next().ok_or(Error::Zero)?.align()?;
         columns.next().map(|column| column.buffers.push(buf));
         Ok(next)
     }
@@ -764,17 +767,18 @@ where
     }
 
     fn buffers(&self, offset: u64, columns: &mut Columns) -> Result<u64, Error> {
-        let prefix: u64 = manifest::Buffer::HEADER.try_into()?;
-        let buf = manifest::Buffer {
-            sector: Sector {
-                offset: offset.checked_add(prefix).ok_or(Error::Zero)?,
-                length: { self.size()?.get() - prefix }.try_into()?,
-            },
+        // TODO → move manifest::Buffer construction to accumulate::Compact & match variants?
+        let sector = Sector {
+            offset: offset.checked_add(PREFIX).ok_or(Error::Zero)?,
+            length: self.size()?,
+        };
+        let next = sector.next().ok_or(Error::Zero)?.align()?;
+        let buf = manifest::Buffer::Full {
+            sector,
             count: self.count().try_into()?,
             min: [u8::MIN; B],
             max: [u8::MAX; B],
         };
-        let next = buf.sector.next().ok_or(Error::Zero)?.align()?;
         columns.next().map(|column| column.buffers.push(buf));
         Ok(next)
     }
@@ -809,18 +813,19 @@ where
     }
 
     fn buffers(&self, offset: u64, columns: &mut Columns) -> Result<u64, Error> {
-        let prefix: u64 = manifest::Buffer::HEADER.try_into()?;
-        let buf = manifest::Buffer {
-            sector: Sector {
-                offset: offset.checked_add(prefix).ok_or(Error::Zero)?,
-                length: { self.size()?.get() - prefix }.try_into()?,
-            },
+        // TODO → move manifest::Buffer construction to accumulate::Compact & match variants?
+        let sector = Sector {
+            offset: offset.checked_add(PREFIX).ok_or(Error::Zero)?,
+            length: self.size()?,
+        };
+        let next = sector.next().ok_or(Error::Zero)?.align()?;
+        let buf = manifest::Buffer::Full {
+            sector,
             count: self.count().try_into()?,
             // NOTE: unsized collections are not meaningfully orderable; min and max are unpopulated
             min: [u8::MIN; B],
             max: [u8::MAX; B],
         };
-        let next = buf.sector.next().ok_or(Error::Zero)?.align()?;
         columns.next().map(|column| column.buffers.push(buf));
         Ok(next)
     }
@@ -893,17 +898,18 @@ where
     }
 
     fn buffers(&self, offset: u64, columns: &mut Columns) -> Result<u64, Error> {
-        let prefix: u64 = manifest::Buffer::HEADER.try_into()?;
-        let buf = manifest::Buffer {
-            sector: Sector {
-                offset: offset.checked_add(prefix).ok_or(Error::Zero)?,
-                length: { self.size()?.get() - prefix }.try_into()?,
-            },
+        // TODO → move manifest::Buffer construction to accumulate::Compact & match variants?
+        let sector = Sector {
+            offset: offset.checked_add(PREFIX).ok_or(Error::Zero)?,
+            length: self.size()?,
+        };
+        let next = sector.next().ok_or(Error::Zero)?.align()?;
+        let buf = manifest::Buffer::Full {
+            sector,
             count: self.count().try_into()?,
             min: [u8::MIN; B],
             max: [u8::MAX; B],
         };
-        let next = buf.sector.next().ok_or(Error::Zero)?.align()?;
         columns.next().map(|column| column.buffers.push(buf));
         Ok(next)
     }
