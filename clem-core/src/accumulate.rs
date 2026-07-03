@@ -1136,8 +1136,6 @@ pub trait Buffer: AsRef<[u8]> + AsMut<[u8]> + Into<Vec<u8>> {
     /// Writing always begins at the **start** of the buffer; chained calls overwrite. Chain
     /// sequential writes through [`Serialize::serialize_into`], which returns the advanced slice.
     fn serialize_push<I: Serialize>(self, item: &I) -> Result<Self, Error>;
-
-    fn serialize_push_aligned<I: Serialize>(self, item: &I) -> Result<Self, Error>;
 }
 
 /* ----------------------------------------------------------------- Buffer Trait Implementation */
@@ -1146,10 +1144,6 @@ impl Buffer for &mut [u8] {
     fn serialize_push<I: Serialize>(self, item: &I) -> Result<Self, Error> {
         item.serialize_into(self)
     }
-
-    fn serialize_push_aligned<I: Serialize>(self, item: &I) -> Result<Self, Error> {
-        item.serialize_into_aligned(self)
-    }
 }
 
 impl<const N: usize> Buffer for [u8; N] {
@@ -1157,21 +1151,11 @@ impl<const N: usize> Buffer for [u8; N] {
         item.serialize_into(&mut self)?;
         Ok(self)
     }
-
-    fn serialize_push_aligned<I: Serialize>(mut self, item: &I) -> Result<Self, Error> {
-        item.serialize_into_aligned(&mut self)?;
-        Ok(self)
-    }
 }
 
 impl Buffer for Vec<u8> {
     fn serialize_push<I: Serialize>(self, item: &I) -> Result<Self, Error> {
         item.extend(self)
-    }
-
-    fn serialize_push_aligned<I: Serialize>(mut self, item: &I) -> Result<Self, Error> {
-        item.serialize_into_aligned(&mut self)?;
-        Ok(self)
     }
 }
 
