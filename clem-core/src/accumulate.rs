@@ -1864,9 +1864,6 @@ where
     }
 
     fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
-        let prefix: u64 = size_of::<NonZeroU64>().try_into()?;
-        // NOTE: Self::size returns Error if Σ overflows u64 (not expected in production)
-        let buf = self.size()?.get().sub(prefix).to_le_bytes().serialize_into(buf)?;
         self.iter().try_fold(buf, |sink, entry| {
             let sink = entry.0.serialize_into(sink)?;
             entry.1.serialize_into(sink)
@@ -1886,16 +1883,10 @@ impl Serialize for BitVec {
     type Buffer = Vec<u8>;
 
     fn size(&self) -> Result<NonZeroU64, Error> {
-        // Each byte encodes 8 bits; round up (↑) BitVec::len to the nearest whole byte.
-        let payload: u64 = self.len().div_ceil(8).try_into()?;
-        // 8 byte NonZeroU64 length prefix
-        payload.checked_add(8).and_then(NonZeroU64::new).ok_or(Error::Zero)
+        self.chunks(8).len().try_into().map(NonZeroU64::new)?.ok_or(Error::Zero)
     }
 
     fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
-        let prefix: u64 = size_of::<NonZeroU64>().try_into()?;
-        // NOTE: Self::size returns Error if BitVec::len overflows u64 (not expected in production)
-        let buf = self.size()?.get().sub(prefix).to_le_bytes().serialize_into(buf)?;
         // Intermediate chunks contain 8 bits in Lsb0 order; the final chunk may contain ≤ 8 bits.
         // BitVec::load_le packs each chunk into one u8 in LE order, padding with zeros if the final
         // chunk is shorter than 8 bits. The resulting bytes are pushed into the provided buffer.
