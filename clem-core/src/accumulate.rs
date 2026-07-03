@@ -479,6 +479,26 @@ where
     }
 }
 
+/// Constructor for [`Compact::Empty`].
+impl<I> Default for Compact<I>
+where
+    I: Unfold,
+{
+    fn default() -> Self {
+        Self::Empty
+    }
+}
+
+/// Constructor for [`Compact::Lite`] wrapping the specified [`item`](I) with a count of one.
+impl<I> From<I> for Compact<I>
+where
+    I: Unfold,
+{
+    fn from(item: I) -> Self {
+        Self::Lite { item, count: 1 }
+    }
+}
+
 /* ----------------------------------------------------------------- Accumulate Trait Definition */
 
 /// An in-memory **data accumulator** that ingests [items](I) of the specified [`Type`][1] and
