@@ -248,7 +248,7 @@ pub trait Segment: Serialize {
 /* --------------------------------------------------------------------------- Alignment Helpers */
 
 /// A **numeric type** that can be rounded up to the next 64-bit SIMD [alignment boundary](self).
-#[doc(hidden)] // Reachable through Serialize::serialize_into_aligned
+#[doc(hidden)] // Reachable through SizedBuf serialization
 pub trait Align {
     /// Round `self` up ↑ to the next 64-bit SIMD [alignment boundary](self).
     ///
