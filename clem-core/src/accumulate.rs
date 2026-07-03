@@ -971,6 +971,158 @@ where
     }
 }
 
+impl<I> Accumulate<I> for Compact<I>
+where
+    I: Unfold + Clone + 'static,
+{
+    fn boxed(&self) -> BoxAcc<I> {
+        let buf = Self::default();
+        Box::new(buf)
+    }
+
+    fn push(&mut self, new: I) {
+        match self {
+            Self::Empty => *self = new.into(),
+            Self::Lite { item, count } if item.same(&new) => *count += 1,
+            Self::Lite { item, count } => Self::repeat(item, *count).push(new),
+            Self::Full(acc) => acc.push(new),
+        };
+    }
+
+    fn discard(&mut self) {
+        *self = Self::default();
+    }
+
+    fn is_empty(&self) -> bool {
+        match self {
+            Self::Empty => true,
+            Self::Lite { .. } => false,
+            Self::Full(acc) => acc.is_empty(),
+        }
+    }
+
+    fn count(&self) -> u64 {
+        match self {
+            Self::Empty => u64::MIN,
+            Self::Lite { count, .. } => *count,
+            Self::Full(acc) => acc.count(),
+        }
+    }
+
+    fn min(&self) -> Option<I> {
+        match self {
+            Self::Empty => None,
+            Self::Lite { item, .. } => item.clone().into(),
+            Self::Full(acc) => acc.min(),
+        }
+    }
+
+    fn max(&self) -> Option<I> {
+        match self {
+            Self::Empty => None,
+            Self::Lite { item, .. } => item.clone().into(),
+            Self::Full(acc) => acc.max(),
+        }
+    }
+}
+
+/* ----------------------------------------------------------- FromIterator Trait Implementation */
+
+// NOTE: iterator collect builds a byte-identical accumulator to sequential Accumulate::push calls
+
+impl<I> FromIterator<Vec<I>> for Seq<I>
+where
+    I: Unfold + 'static,
+{
+    fn from_iter<S>(src: S) -> Self
+    where
+        S: IntoIterator<Item = Vec<I>>,
+    {
+        let mut acc = Self::default();
+        src.into_iter().for_each(|item| acc.push(item));
+        acc
+    }
+}
+
+impl FromIterator<String> for Seq<u8> {
+    fn from_iter<S>(src: S) -> Self
+    where
+        S: IntoIterator<Item = String>,
+    {
+        let mut acc = Self::default();
+        src.into_iter().for_each(|item| acc.push(item));
+        acc
+    }
+}
+
+impl<I> FromIterator<Option<I>> for OptBitVec<I>
+where
+    I: Unfold + 'static,
+{
+    fn from_iter<S>(src: S) -> Self
+    where
+        S: IntoIterator<Item = Option<I>>,
+    {
+        let mut acc = Self::default();
+        src.into_iter().for_each(|item| acc.push(item));
+        acc
+    }
+}
+
+impl<I> FromIterator<Option<I>> for OptInSitu<I>
+where
+    Option<I>: Serialize,
+    I: Copy + PartialOrd + 'static,
+{
+    fn from_iter<S>(src: S) -> Self
+    where
+        S: IntoIterator<Item = Option<I>>,
+    {
+        let mut acc = Self::default();
+        src.into_iter().for_each(|item| acc.push(item));
+        acc
+    }
+}
+
+impl<I> FromIterator<Option<Vec<I>>> for OptSeq<I>
+where
+    I: Unfold + 'static,
+{
+    fn from_iter<S>(src: S) -> Self
+    where
+        S: IntoIterator<Item = Option<Vec<I>>>,
+    {
+        let mut acc = Self::default();
+        src.into_iter().for_each(|item| acc.push(item));
+        acc
+    }
+}
+
+impl FromIterator<Option<String>> for OptSeq<u8> {
+    fn from_iter<S>(src: S) -> Self
+    where
+        S: IntoIterator<Item = Option<String>>,
+    {
+        let mut acc = Self::default();
+        src.into_iter().for_each(|item| acc.push(item));
+        acc
+    }
+}
+
+impl<A, B> FromIterator<Option<Option<B>>> for Flatten<A>
+where
+    A: Accumulate<Option<B>> + Default + Serialize<Buffer = Vec<u8>> + 'static,
+{
+    fn from_iter<S>(src: S) -> Self
+    where
+        S: IntoIterator<Item = Option<Option<B>>>,
+    {
+        let mut acc = Self::default();
+        src.into_iter().for_each(|item| acc.push(item));
+        acc
+    }
+}
+
 /* --------------------------------------------------------------------- Buffer Trait Definition */
 
 /// A **buffer** that can hold the serialized byte representation of a value.
