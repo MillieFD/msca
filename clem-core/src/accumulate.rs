@@ -1171,7 +1171,7 @@ pub trait Serialize {
     /// types should specify a heap-allocated buffer to accommodate dynamic sizing at runtime.
     type Buffer: Buffer;
 
-    /// Returns the number of bytes required to encode `self`.
+    /// Returns the exact number of bytes required to encode `self`.
     fn size(&self) -> Result<NonZeroU64, Error>;
 
     /// Serialize `self` into the provided [`Buffer`].
@@ -1188,15 +1188,6 @@ pub trait Serialize {
         let buf = &mut sink;
         self.serialize_into(buf)?;
         Ok(sink)
-    }
-
-    /// Serialize `self` into the provided [`Buffer`] and [`Align`] to the next 64-bit boundary.
-    fn serialize_into_aligned<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
-        let pad = self.size()?.pad()?;
-        let buf = self.serialize_into(buf)?;
-        debug_assert!(buf.len() >= pad, "actual size < aligned size");
-        buf[..pad].fill(u8::MIN);
-        Ok(&mut buf[pad..])
     }
 }
 
@@ -2091,7 +2082,7 @@ impl<I> Serialize for Accumulator<I> {
         // 2. Align to the next 64-bit boundary
         buf[..Self::ALIGN].fill(u8::MIN);
         // 3. Serialize columnar data buffers
-        self.data.serialize_into_aligned(&mut buf[Self::ALIGN..])
+        self.data.serialize_into(&mut buf[Self::ALIGN..])
     }
 
     fn serialize(&self) -> Result<Self::Buffer, Error> {
