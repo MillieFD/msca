@@ -70,8 +70,8 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 
 use std::collections::btree_map::{BTreeMap, Entry};
 use std::fmt::{self, Display};
-use std::num;
 use std::num::NonZeroU64;
+use std::{iter, num};
 
 use bitvec::vec::BitVec;
 use minicbor::{CborLen, Decode, Encode};
