@@ -409,6 +409,63 @@ where
 #[doc(hidden)]
 pub struct Flatten<I>(#[n(0)] pub I);
 
+/// A **state machine** used to build [data buffers](Buffer) for the specified [`Column`].
+///
+/// ### Buffer Composition
+///
+/// Real-world applications often require the inclusion of columns with infrequently altered values.
+/// It is possible for a column to contain only **one** repeated value across an entire data
+/// segment. Instead of repeatedly encoding identical values, clem defaults to a **compact buffer**
+/// representation to improve storage density.
+// TODO → Add link to on-disk-format.md for more information.
+///
+/// ##### 1. Empty
+///
+/// Each column begins in the [`Empty`](Compact::Empty) state which is never written to disk. If an
+/// empty [`Buffer`] is encountered during the [write-cycle](crate::io), the entire data segment is
+/// discarded. This behaviour may change in future releases; using absent buffers to encode a
+/// type-dependant default value.
+///
+/// ##### 2. Lite
+///
+/// The column transitions to the [`Lite`](Compact::Lite) state when the first [`item`](I) is
+/// [pushed](Accumulate::push). This state holds the item directly and tracks the number of
+/// accumulated repetitions to coalesce homogenous runs. All subsequently [accumulated](Accumulate)
+/// items are compared against this value.
+///
+/// ##### 3. Full
+///
+/// The column transitions to the [`Full`](Compact::Full) state when a [pushed](Accumulate::push)
+/// item is not [bit-identical](Unfold::same) to the [accumulated](Accumulate) item; materialising
+/// the required [staging buffer](I::RawAcc) with the specified number of repeated items.
+///
+/// Buffer `Empty → Lite → Full` variant escalation is unidirectional; a `Lite` buffer can never
+/// return to the `Empty` state.
+///
+/// ### Guidance
+///
+/// Implementers are encouraged to use a `bin` segment for genuinely constant values that never
+/// change across the entire file lifetime. This improves storage efficiency by eliminating an
+/// unnecessary column from the schema.
+// TODO → add doc link to binary segment
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub(crate) enum Compact<I>
+where
+    I: Unfold,
+{
+    /// A buffer which does not contain any data; never written to disk.
+    Empty,
+    /// A buffer containing a single [`item`](I) repeated `count` times; used to coalesce homogenous
+    /// runs into an efficient on-disk representation to improve storage density.
+    Lite {
+        /// The single repeated value.
+        item: I,
+        /// The number of accumulated repetitions.
+        count: u64,
+    },
+    /// The materialised [staging buffer](I::RawAcc) holding every accumulated [`item`](I).
+    Full(I::RawAcc),
+}
 /* ----------------------------------------------------------------- Accumulate Trait Definition */
 
 /// An in-memory **data accumulator** that ingests [items](I) of the specified [`Type`][1] and
