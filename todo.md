@@ -132,7 +132,7 @@
     - [x] External user perspective round-trip tests for `#[derive(Data)]` and `#[derive(Read)]` in "tests" directory.
     - [x] No round-trip tests in `clem-core` and `clem-derive` crates; move to "tests" directory (external perspective).
 - [x] Remove all references to concurrency model `RwLock<Manifest>` in documentation; concurrency is deferred.
-- [ ] Alignment functions should use `core::num::next_multiple_of` for compiler optimisation.
+- [x] Alignment functions should use `core::num::next_multiple_of` for compiler optimisation.
 
 ### Extend Functionality (Priority III)
 
