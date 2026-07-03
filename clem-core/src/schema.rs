@@ -130,25 +130,25 @@ impl Schema {
         }
     }
 
-    /// Add a [`Column`] to [`self`](Schema) with the specified `name` and [`type`](A).
+    /// Add a [`Column`] to [`self`](Schema) with the specified `name` and [`type`](I).
     ///
-    /// Returns an empty [accumulator](BoxAcc) for **in-memory** data ingestion. This design ensures
-    /// schema verification is performed exactly once.
+    /// Returns an empty [accumulator](Compact) for **in-memory** data ingestion. This design
+    /// ensures schema verification is performed exactly once.
     #[doc(hidden)]
-    pub fn column<A, B>(&mut self, name: B) -> Result<BoxAcc<A>, Error>
+    pub fn column<I>(&mut self, name: impl Into<String>) -> Result<BoxAcc<I>, Error>
     where
-        A: Unfold,
-        Schema: Unfolder<A>,
-        String: From<B>,
+        I: Unfold + Clone + 'static,
+        Schema: Unfolder<I>,
     {
-        let name = String::from(name);
-        let col = Column::new::<A, Schema>();
+        let name = name.into();
+        let column = Column::new::<I, Schema>();
         match self.columns.entry(name) {
-            Entry::Vacant(entry) => entry.insert(col),
-            Entry::Occupied(entry) if entry.get() == &col => entry.into_mut(),
+            Entry::Vacant(entry) => entry.insert(column),
+            Entry::Occupied(entry) if entry.get() == &column => entry.into_mut(),
             Entry::Occupied(entry) => return Error::Collision { name: entry.key().clone() }.into(),
         };
-        Ok(Box::new(A::RawAcc::default()))
+        let acc = Compact::<I>::default().boxed();
+        Ok(acc)
     }
 
     /// [`Write`](Write) [`self`](Schema) to the provided [`File`](io::File) and return the on-disk
