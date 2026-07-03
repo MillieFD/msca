@@ -1202,6 +1202,31 @@ pub trait Serialize {
 
 /* -------------------------------------------------------------- Serialize Trait Implementation */
 
+/// Blanket [`&I`](I) implementation delegates to the referenced [`item`](I); allowing [`SizedBuf`]
+/// to add a **length prefix** and **zero-filled alignment padding** without an intermediate copy.
+impl<I> Serialize for &I
+where
+    I: Serialize + ?Sized,
+{
+    type Buffer = I::Buffer;
+
+    fn size(&self) -> Result<NonZeroU64, Error> {
+        I::size(self)
+    }
+
+    fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
+        I::serialize_into(self, buf)
+    }
+
+    fn serialize(&self) -> Result<Self::Buffer, Error> {
+        I::serialize(self)
+    }
+
+    fn extend(&self, sink: Vec<u8>) -> Result<Vec<u8>, Error> {
+        I::extend(self, sink)
+    }
+}
+
 impl<const N: usize> Serialize for [u8; N] {
     type Buffer = Self;
 
