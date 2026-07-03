@@ -6,9 +6,9 @@ The self-describing clem format has been carefully designed to maximise query pe
 remaining deterministic and portable across all platforms and architectures. This file does not describe the in-memory
 layout which may vary between platforms and releases.
 
-> [!NOTE] LE Byte Order
-> Byte order is **little-endian** throughout. All sizes and offsets are encoded using `u64`. Platform-dependent types
-> such as `usize` are deliberately omitted to ensure file portability.
+> **LE Byte Order Throughout:**
+> All sizes and offsets are encoded using `u64`. Platform-dependent types such as `usize` are deliberately omitted to
+> ensure file portability.
 
 This file describes how a single
 self-describing file is partitioned into segments, how those segments encode columnar data, and how a reader navigates
