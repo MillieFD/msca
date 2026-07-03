@@ -22,8 +22,8 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 
 use std::collections::BTreeMap;
 use std::fmt::{self, Debug};
+use std::iter;
 use std::num::*;
-use std::ops::Sub;
 
 use bitvec::field::BitField;
 use bitvec::vec::BitVec;
@@ -437,7 +437,7 @@ pub struct Flatten<I>(#[n(0)] pub I);
 ///
 /// The column transitions to the [`Full`](Compact::Full) state when a [pushed](Accumulate::push)
 /// item is not [bit-identical](Unfold::same) to the [accumulated](Accumulate) item; materialising
-/// the required [staging buffer](I::RawAcc) with the specified number of repeated items.
+/// the required [accumulator](`I::RawAcc`) with the specified number of repeated items.
 ///
 /// Buffer `Empty → Lite → Full` variant escalation is unidirectional; a `Lite` buffer can never
 /// return to the `Empty` state.
@@ -463,9 +463,22 @@ where
         /// The number of accumulated repetitions.
         count: u64,
     },
-    /// The materialised [staging buffer](I::RawAcc) holding every accumulated [`item`](I).
+    /// A buffer containing many different [items](I) collected into an [accumulator](I::RawAcc).
     Full(I::RawAcc),
 }
+
+impl<I> Compact<I>
+where
+    I: Unfold + Clone,
+{
+    /// Constructor for [`Compact::Full`] that materialises the required [accumulator](`I::RawAcc`)
+    /// containing the specified number of [repeated](iter::repeat_n) identical [items](I).
+    fn repeat(item: &I, count: u64) -> Self {
+        let acc = iter::repeat_n(item.clone(), count as usize).collect();
+        Self::Full(acc)
+    }
+}
+
 /* ----------------------------------------------------------------- Accumulate Trait Definition */
 
 /// An in-memory **data accumulator** that ingests [items](I) of the specified [`Type`][1] and
