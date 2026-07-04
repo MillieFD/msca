@@ -629,6 +629,16 @@ pub trait Unfold: Sized + PartialEq {
     {
         U::unfold()
     }
+
+    /// Construct an [accumulator](Self::RawAcc) containing exactly **one** [`item`](Self); used to
+    /// serialize single-value [`Compact::Lite`] without repeated [`Accumulate::push`] calls.
+    fn once(item: &Self) -> Self::RawAcc
+    where
+        Self: Clone,
+    {
+        let i = item.clone();
+        iter::once(i).collect()
+    }
 }
 
 /* ---------------------------------------------------------------- Unfold Trait Size Assertions */

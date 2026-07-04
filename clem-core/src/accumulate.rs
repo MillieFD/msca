@@ -2056,6 +2056,37 @@ where
     }
 }
 
+impl<I> Serialize for Compact<I>
+where
+    I: Unfold + Clone,
+{
+    type Buffer = Vec<u8>;
+
+    fn size(&self) -> Result<NonZeroU64, Error> {
+        match self {
+            Self::Empty => Error::Zero.into(),
+            Self::Lite { item, .. } => I::once(item).size(),
+            Self::Full(acc) => acc.size(),
+        }
+    }
+
+    fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
+        match self {
+            Self::Empty => Err(Error::Zero),
+            Self::Lite { item, .. } => I::once(item).serialize_into(buf),
+            Self::Full(acc) => acc.serialize_into(buf),
+        }
+    }
+
+    fn serialize(&self) -> Result<Self::Buffer, Error> {
+        match self {
+            Self::Empty => Err(Error::Zero),
+            Self::Lite { item, .. } => I::once(item).serialize(),
+            Self::Full(acc) => acc.serialize(),
+        }
+    }
+}
+
 impl<I> Serialize for Accumulator<I> {
     type Buffer = Vec<u8>;
 
