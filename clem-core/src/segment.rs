@@ -381,7 +381,7 @@ mod tests {
     #[test]
     fn schema_serialize_pads() {
         let mut schema = Schema::new("t");
-        schema.column::<u32, _>("v").expect("Column failed");
+        schema.column::<u32>("v").expect("Column failed");
         let bytes = schema.serialize().expect("Serialize failed");
         assert_eq!(bytes.len() % 8, 0);
         assert_eq!(bytes[0], Variant::Schema as u8);
