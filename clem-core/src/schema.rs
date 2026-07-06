@@ -630,6 +630,9 @@ pub trait Unfold: Sized + PartialEq {
         U::unfold()
     }
 
+    /// Returns `true` if [`self`](Self) and `other` are **bit-identical**.
+    fn same(&self, other: &Self) -> bool;
+
     /// Construct an [accumulator](Self::RawAcc) containing exactly **one** [`item`](Self); used to
     /// serialize single-value [`Compact::Lite`] without repeated [`Accumulate::push`] calls.
     fn once(item: &Self) -> Self::RawAcc
@@ -676,129 +679,234 @@ const_assert_ne!(size_of::<f64>(), size_of_opt::<f64>());
 impl Unfold for bool {
     type RawAcc = BitVec;
     type OptAcc = OptBitVec<Self>;
+
+    fn same(&self, other: &Self) -> bool {
+        self == other
+    }
 }
 
 impl Unfold for char {
     type RawAcc = Vec<Self>;
     type OptAcc = OptInSitu<Self>;
+
+    fn same(&self, other: &Self) -> bool {
+        self == other
+    }
 }
 
 impl Unfold for u8 {
     type RawAcc = Vec<Self>;
     type OptAcc = OptBitVec<Self>;
+
+    fn same(&self, other: &Self) -> bool {
+        self == other
+    }
 }
 
 impl Unfold for u16 {
     type RawAcc = Vec<Self>;
     type OptAcc = OptBitVec<Self>;
+
+    fn same(&self, other: &Self) -> bool {
+        self.to_le_bytes() == other.to_le_bytes()
+    }
 }
 
 impl Unfold for u32 {
     type RawAcc = Vec<Self>;
     type OptAcc = OptBitVec<Self>;
+
+    fn same(&self, other: &Self) -> bool {
+        self.to_le_bytes() == other.to_le_bytes()
+    }
 }
 
 impl Unfold for u64 {
     type RawAcc = Vec<Self>;
     type OptAcc = OptBitVec<Self>;
+
+    fn same(&self, other: &Self) -> bool {
+        self.to_le_bytes() == other.to_le_bytes()
+    }
 }
 
 impl Unfold for u128 {
     type RawAcc = Vec<Self>;
     type OptAcc = OptBitVec<Self>;
+
+    fn same(&self, other: &Self) -> bool {
+        self.to_le_bytes() == other.to_le_bytes()
+    }
 }
 
 impl Unfold for num::NonZeroU8 {
     type RawAcc = Vec<Self>;
     type OptAcc = OptInSitu<Self>;
+
+    fn same(&self, other: &Self) -> bool {
+        self.get().to_le_bytes() == other.get().to_le_bytes()
+    }
 }
 
 impl Unfold for num::NonZeroU16 {
     type RawAcc = Vec<Self>;
     type OptAcc = OptInSitu<Self>;
+
+    fn same(&self, other: &Self) -> bool {
+        self.get().to_le_bytes() == other.get().to_le_bytes()
+    }
 }
 
 impl Unfold for num::NonZeroU32 {
     type RawAcc = Vec<Self>;
     type OptAcc = OptInSitu<Self>;
+
+    fn same(&self, other: &Self) -> bool {
+        self.get().to_le_bytes() == other.get().to_le_bytes()
+    }
 }
 
 impl Unfold for num::NonZeroU64 {
     type RawAcc = Vec<Self>;
     type OptAcc = OptInSitu<Self>;
+
+    fn same(&self, other: &Self) -> bool {
+        self.get().to_le_bytes() == other.get().to_le_bytes()
+    }
 }
 
 impl Unfold for num::NonZeroU128 {
     type RawAcc = Vec<Self>;
     type OptAcc = OptInSitu<Self>;
+
+    fn same(&self, other: &Self) -> bool {
+        self.get().to_le_bytes() == other.get().to_le_bytes()
+    }
 }
 
 impl Unfold for i8 {
     type RawAcc = Vec<Self>;
     type OptAcc = OptBitVec<Self>;
+
+    fn same(&self, other: &Self) -> bool {
+        self.to_le_bytes() == other.to_le_bytes()
+    }
 }
 
 impl Unfold for i16 {
     type RawAcc = Vec<Self>;
     type OptAcc = OptBitVec<Self>;
+
+    fn same(&self, other: &Self) -> bool {
+        self.to_le_bytes() == other.to_le_bytes()
+    }
 }
 
 impl Unfold for i32 {
     type RawAcc = Vec<Self>;
     type OptAcc = OptBitVec<Self>;
+
+    fn same(&self, other: &Self) -> bool {
+        self.to_le_bytes() == other.to_le_bytes()
+    }
 }
 
 impl Unfold for i64 {
     type RawAcc = Vec<Self>;
     type OptAcc = OptBitVec<Self>;
+
+    fn same(&self, other: &Self) -> bool {
+        self.to_le_bytes() == other.to_le_bytes()
+    }
 }
 
 impl Unfold for i128 {
     type RawAcc = Vec<Self>;
     type OptAcc = OptBitVec<Self>;
+
+    fn same(&self, other: &Self) -> bool {
+        self.to_le_bytes() == other.to_le_bytes()
+    }
 }
 
 impl Unfold for num::NonZeroI8 {
     type RawAcc = Vec<Self>;
     type OptAcc = OptInSitu<Self>;
+
+    fn same(&self, other: &Self) -> bool {
+        self.get().to_le_bytes() == other.get().to_le_bytes()
+    }
 }
 
 impl Unfold for num::NonZeroI16 {
     type RawAcc = Vec<Self>;
     type OptAcc = OptInSitu<Self>;
+
+    fn same(&self, other: &Self) -> bool {
+        self.get().to_le_bytes() == other.get().to_le_bytes()
+    }
 }
 
 impl Unfold for num::NonZeroI32 {
     type RawAcc = Vec<Self>;
     type OptAcc = OptInSitu<Self>;
+
+    fn same(&self, other: &Self) -> bool {
+        self.get().to_le_bytes() == other.get().to_le_bytes()
+    }
 }
 
 impl Unfold for num::NonZeroI64 {
     type RawAcc = Vec<Self>;
     type OptAcc = OptInSitu<Self>;
+
+    fn same(&self, other: &Self) -> bool {
+        self.get().to_le_bytes() == other.get().to_le_bytes()
+    }
 }
 
 impl Unfold for num::NonZeroI128 {
     type RawAcc = Vec<Self>;
     type OptAcc = OptInSitu<Self>;
+
+    fn same(&self, other: &Self) -> bool {
+        self.get().to_le_bytes() == other.get().to_le_bytes()
+    }
 }
 
 impl Unfold for f32 {
     type RawAcc = Vec<Self>;
     type OptAcc = OptBitVec<Self>;
+
+    fn same(&self, other: &Self) -> bool {
+        // NOTE: compare by exact bit pattern unlike PartialEq
+        self.to_le_bytes() == other.to_le_bytes()
+    }
 }
 
 impl Unfold for f64 {
     type RawAcc = Vec<Self>;
     type OptAcc = OptBitVec<Self>;
+
+    fn same(&self, other: &Self) -> bool {
+        // NOTE: compare by exact bit pattern unlike PartialEq
+        self.to_le_bytes() == other.to_le_bytes()
+    }
 }
 
-impl<T> Unfold for Option<T>
+impl<I> Unfold for Option<I>
 where
-    T: Unfold + 'static,
+    I: Unfold + 'static,
 {
-    type RawAcc = T::OptAcc;
-    type OptAcc = Flatten<T::OptAcc>;
+    type RawAcc = I::OptAcc;
+    type OptAcc = Flatten<I::OptAcc>;
+
+    fn same(&self, other: &Self) -> bool {
+        match self {
+            None => other.is_none(),
+            Some(a) => other.as_ref().map_or(false, |b| a.same(&b)),
+        }
+    }
 }
 
 impl<T> Unfold for Vec<T>
@@ -807,11 +915,19 @@ where
 {
     type RawAcc = Seq<T>;
     type OptAcc = OptSeq<T>;
+
+    fn same(&self, other: &Self) -> bool {
+        self.iter().zip(other).all(|both| both.0.same(&both.1))
+    }
 }
 
 impl Unfold for String {
     type RawAcc = Seq<u8>;
     type OptAcc = OptSeq<u8>;
+
+    fn same(&self, other: &Self) -> bool {
+        self.as_bytes() == other.as_bytes()
+    }
 }
 
 /* ------------------------------------------------------------------- Unfolder Trait Definition */
