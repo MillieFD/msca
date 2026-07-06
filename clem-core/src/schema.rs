@@ -215,6 +215,10 @@ impl Serialize for Schema {
     }
 }
 
+impl Segment for Schema {
+    const VARIANT: Variant = Variant::Schema;
+}
+
 /* ---------------------------------------------------------------------------- Schema Internals */
 
 /// A minimal column **descriptor** that provides type metadata for reading and writing values.
