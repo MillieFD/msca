@@ -39,6 +39,7 @@ use std::fmt::{Display, Formatter};
 use std::num::NonZeroU64;
 
 use minicbor::{CborLen, Decode, Encode};
+use xxhash_rust::xxh3::xxh3_64;
 
 use crate::accumulate::Buffer;
 use crate::schema::number;
@@ -245,12 +246,41 @@ mod variant {
 
 /* -------------------------------------------------------------------- Segment Trait Definition */
 
-/// A self-describing on-disk **segment** prefixed by a [`Variant`] discriminant and an LE [`u64`]
-/// size field, followed by a variant-specific payload. See the [module level documentation](self).
-#[deprecated(note = "Segment trait is currently unneeded and available for repurposing.")]
-pub trait Segment: Serialize {
+/// A self-describing on-disk **segment**
+///
+/// ### Segment Composition
+///
+/// Data is recorded using self-describing segments which are immutable once written. Each segment
+/// begins with a minimal **segment header** consisting of a [`Variant`] identifier and `u64` size.
+///
+/// ```text
+/// [Variant] [Size] [Body] [Padding] [Checksum]
+/// ```
+///
+/// Up to seven bytes of padding are inserted after the segment body to maintain
+/// [64-bit alignment](Align), followed by a `u64` checksum calculated from the preceding bytes.
+///
+/// Refer to the [module level documentation](self) for more details.
+pub(crate) trait Segment: Serialize + Sized {
     /// On-disk variant identifier for [`Self`]. Stored in the first byte of the segment header.
     const VARIANT: Variant;
+    fn frame(&self) -> Result<Vec<u8>, number::Error> {
+        let head = Header::SIZE as u64;
+        let size = self.size()?.checked_add(head).ok_or(number::Error::Zero)?.align()?;
+        let full = size
+            .checked_add(size_of::<NonZeroU64>() as u64)
+            .ok_or(number::Error::Zero)?
+            .try_into()?;
+        let mut buf = vec![u8::MIN; full];
+        buf.as_mut_slice()
+            .serialize_push(&{ Self::VARIANT as u8 })?
+            .serialize_push(&{ size - head })?
+            .serialize_push(self)?;
+        buf.split_last_chunk_mut()
+            .map(|data| *data.1 = xxh3_64(data.0).to_le_bytes())
+            .ok_or(number::Error::Zero)?;
+        Ok(buf)
+    }
 }
 
 /* --------------------------------------------------------------------------- Alignment Helpers */
