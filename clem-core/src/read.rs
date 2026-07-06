@@ -111,11 +111,11 @@ impl<'a> Column<'a> {
     /// Refer to the [module-level documentation](self) for details.
     pub(crate) fn stream<I>(self) -> Stream<'a, I>
     where
-        I: Read + 'a,
+        I: Clone + Read + 'a,
         I::Src<'a>: Deserialize<'a, Ok = I::Src<'a>> + Reader<'a, I>,
     {
-        let stream = self.buffers.flat_map(move |buf| {
-            buf.sector
+        let stream = self.buffers.flat_map(move |buf| match buf {
+            Buffer::Full { sector, count, .. } => sector
                 .slice(self.mmap)
                 .map(|mut bytes| match I::Src::deserialize(&mut bytes) {
                     Ok(src) => src.with_filters(self.filters),
@@ -123,7 +123,23 @@ impl<'a> Column<'a> {
                 })
                 .map_err(Outcome::Error)
                 .unwrap_or_else(Outcome::once)
-                .take(buf.count.get() as usize)
+                .take(count.get() as usize),
+            Buffer::Lite { sector, count } => sector
+                .slice(self.mmap)
+                .map(|mut bytes| match I::Src::deserialize(&mut bytes) {
+                    Ok(src) => src.with_filters(self.filters),
+                    Err(e) => Outcome::Error(e).once(),
+                })
+                .map_err(Outcome::Error)
+                .unwrap_or_else(Outcome::once)
+                .next()
+                .ok_or_else(|| Error::Truncated {
+                    expected: count.get() as usize,
+                    actual: usize::MIN,
+                })
+                .unwrap_or_else(Outcome::Error)
+                .repeat(count.get() as usize)
+                .take(count.get() as usize),
         });
         Box::from(stream)
     }
