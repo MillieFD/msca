@@ -264,6 +264,22 @@ mod variant {
 pub(crate) trait Segment: Serialize + Sized {
     /// On-disk variant identifier for [`Self`]. Stored in the first byte of the segment header.
     const VARIANT: Variant;
+
+    /// Frame [`self`](Segment) into one complete on-disk segment.
+    ///
+    /// Serializes the [variant](Self::VARIANT) identifier, the payload [`size`](Header), and the
+    /// payload body in start-to-finish order; the buffer is [aligned](Align) so the trailing
+    /// checksum – and therefore the following segment – begins at a 64-bit boundary. Finally the
+    /// [checksum](Header::checksum) is computed over every preceding byte and appended, yielding
+    /// bytes ready to reach the disk in a single write.
+    ///
+    /// The `size` field records the exact payload byte count **including** the zero-filled
+    /// alignment padding.
+    ///
+    /// ### Errors
+    ///
+    /// Returns [`number::Error::Zero`] on `u64` overflow or an empty payload, or
+    /// [`number::Error::Convert`] if the framed footprint overflows `usize`.
     fn frame(&self) -> Result<Vec<u8>, number::Error> {
         let head = Header::SIZE as u64;
         let size = self.size()?.checked_add(head).ok_or(number::Error::Zero)?.align()?;
@@ -415,15 +431,43 @@ mod tests {
         assert_eq!(NonZeroU64::MIN.align().expect("Align failed"), 8);
     }
 
-    /// [`Schema`] segments are padded to a multiple of **eight** bytes; keeping `tail` aligned.
+    /// [`Segment::frame`] lays out `[variant][size][payload][checksum]`: the `size` field spans
+    /// the padded payload, the framed footprint reaches the next 64-bit boundary before the
+    /// trailing checksum, and the checksum covers every preceding byte.
     #[test]
-    fn schema_serialize_pads() {
+    fn frame_layout() {
         let mut schema = Schema::new("t");
         schema.column::<u32>("v").expect("Column failed");
-        let bytes = schema.serialize().expect("Serialize failed");
-        assert_eq!(bytes.len() % 8, 0);
+        let bytes = schema.frame().expect("Frame failed");
+        let head = Header::SIZE;
         assert_eq!(bytes[0], Variant::Schema as u8);
-        let length = u64::from_le_bytes(bytes[1..9].try_into().expect("Slice is 8 bytes"));
-        assert_eq!(length, bytes.len() as u64); // Length field spans the padded segment
+        let size = u64::from_le_bytes(bytes[1..head].try_into().expect("Size is 8 bytes")) as usize;
+        assert_eq!((head + size) % 8, 0); // Checksum begins at a 64-bit boundary
+        assert_eq!(bytes.len(), head + size + size_of::<u64>());
+        let at = bytes.len() - size_of::<u64>();
+        let sum = u64::from_le_bytes(bytes[at..].try_into().expect("Checksum is 8 bytes"));
+        assert_eq!(sum, Header::checksum(&bytes[..at]));
+    }
+
+    /// A single-byte mutation anywhere in the framed payload changes the computed
+    /// [checksum](Header::checksum); the trailing checksum field detects corruption.
+    #[test]
+    fn frame_checksum_detects_mutation() {
+        let mut schema = Schema::new("t");
+        schema.column::<u32>("v").expect("Column failed");
+        let bytes = schema.frame().expect("Frame failed");
+        let at = bytes.len() - size_of::<u64>();
+        let mut corrupt = bytes.clone();
+        corrupt[at - 1] ^= u8::MAX; // Flip a payload byte
+        assert_ne!(
+            Header::checksum(&corrupt[..at]),
+            Header::checksum(&bytes[..at])
+        );
+    }
+
+    /// [`Variant::try_from`] maps the manifest discriminant `0x00`.
+    #[test]
+    fn variant_manifest_byte() {
+        assert_eq!(Variant::try_from(0x00), Ok(Variant::Manifest));
     }
 }
