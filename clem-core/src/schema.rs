@@ -1016,11 +1016,8 @@ mod tests {
     #[test]
     fn column_collision() {
         let mut schema = Schema::new("test");
-        schema.column::<u32, &str>("a").expect("failed to initialise test column a");
-        let matches = matches!(
-            schema.column::<u64, &str>("a"),
-            Err(Error::Collision { .. })
-        );
+        schema.column::<u32>("a").expect("failed to initialise test column a");
+        let matches = matches!(schema.column::<u64>("a"), Err(Error::Collision { .. }));
         assert!(matches);
     }
 
@@ -1028,8 +1025,8 @@ mod tests {
     #[test]
     fn column_dedup() {
         let mut schema = Schema::new("test");
-        schema.column::<u32, &str>("a").expect("failed to initialise test column a");
-        assert!(schema.column::<u32, &str>("a").is_ok());
+        schema.column::<u32>("a").expect("failed to initialise test column a");
+        assert!(schema.column::<u32>("a").is_ok());
         assert_eq!(schema.columns.len(), 1);
     }
 
