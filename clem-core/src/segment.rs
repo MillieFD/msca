@@ -61,9 +61,10 @@ pub(crate) struct Header {
     /// Segment [`Variant`] identifier carried in the first byte of every segment header.
     #[n(0)]
     variant: Variant,
-    /// LE [`NonZeroU64`] encoding the size of the segment payload in bytes. Excludes the header.
+    /// LE [`NonZeroU64`] encoding the exact size of the segment body in bytes. Excludes the header
+    /// and checksum.
     #[n(1)]
-    length: NonZeroU64,
+    size: NonZeroU64,
 }
 
 impl Header {
@@ -87,7 +88,7 @@ impl Serialize for Header {
 
     fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], number::Error> {
         // SAFETY: Header::Buffer size is Σ of fixed-size fields; guaranteed to fit all data.
-        buf.serialize_push(&self.variant)?.serialize_push(&self.length)
+        buf.serialize_push(&self.variant)?.serialize_push(&self.size)
     }
 
     fn serialize(&self) -> Result<Self::Buffer, number::Error> {
