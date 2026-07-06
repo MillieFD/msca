@@ -503,9 +503,9 @@ impl File {
     /// [1]: https://doc.rust-lang.org/book/ch20-01-unsafe-rust.html
     /// [2]: std::sync::Arc
     /// [3]: crate::dataset::Dataset
-    pub(crate) unsafe fn mmap(&self, tail: NonZeroU64) -> Result<Mmap, Error> {
+    pub(crate) unsafe fn mmap(&self) -> Result<Mmap, Error> {
         let offset: u64 = HEADER.try_into()?;
-        let length: usize = { tail.get() - offset }.try_into()?;
+        let length: usize = { self.header.manifest.offset - offset }.try_into()?;
         // SAFETY: Undefined behaviour if mapped region is modified (refer to mmap documentation)
         unsafe { MmapOptions::new().offset(offset).len(length).map(&self.file).map_err(Error::Io) }
     }
