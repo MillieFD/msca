@@ -1221,35 +1221,7 @@ pub(crate) trait Write: Segment {
 
 /* ------------------------------------------------------------------ Write Trait Implementation */
 
-impl Write for Header {
-    type Ctx<'a> = (); // No context required. Header sector is known at compile time.
-
-    fn sector(&self, _: ()) -> Result<Sector, number::Error> {
-        Ok(Header::SECTOR)
-    }
-}
-
-impl Write for schema::Schema {
-    type Ctx<'a> = &'a Header;
-
-    fn sector(&self, ctx: &Header) -> Result<Sector, number::Error> {
-        Ok(Sector {
-            offset: ctx.tail.get(),
-            length: self.size()?,
-        })
-    }
-}
-
-impl<I> Write for Accumulator<I> {
-    type Ctx<'a> = &'a Header;
-
-    fn sector(&self, ctx: &Header) -> Result<Sector, number::Error> {
-        Ok(Sector {
-            offset: ctx.tail.get(),
-            length: self.size()?,
-        })
-    }
-}
+impl<S> Write for S where S: Segment {}
 
 /* --------------------------------------------------------------------------------------- Tests */
 
