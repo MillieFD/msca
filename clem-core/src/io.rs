@@ -88,10 +88,11 @@ use minicbor::{CborLen, Decode, Encode};
 use smol::fs::{self, OpenOptions};
 use smol::io::{AsyncRead, AsyncReadExt, AsyncSeek, AsyncSeekExt, AsyncWrite, AsyncWriteExt};
 
-use crate::accumulate::{Accumulator, Buffer};
-use crate::manifest::{Manifest, Pending};
+use crate::accumulate::Buffer;
+use crate::manifest::Manifest;
 use crate::query::Filter;
 use crate::schema::{Type, Unfold, Unfolder};
+use crate::segment::{self, Align, Segment, Variant};
 use crate::{number, schema, Schema, Serialize};
 
 /* ------------------------------------------------------------------------------ Public Exports */
@@ -1196,44 +1197,25 @@ impl<'de> Deserializer<'de> for SizedBuf<'de> {
 
 /* ---------------------------------------------------------------------- Write Trait Definition */
 
-/// A **data type** that is written to the [clem](crate) file at a specific [location](Sector).
-pub(crate) trait Write: Serialize {
-    /// Additional context required to determine the target [`Sector`].
-    type Ctx<'a>;
-
-    /// Returns a suitable [`Sector`] to write [`Self`].
+/// A **data type** that is written to the [clem](crate) file during the [write-cycle](self).
+pub(crate) trait Write: Segment {
+    /// Write [`Self`] to the [`file`](F). Returns the written [`Sector`] for subsequent function
+    /// chaining.
     ///
-    /// This function is purely predictive; no file IO is executed. Implementing types can leverage
-    /// the associated [`Context`](Self::Ctx) type for dynamic sector identification at runtime.
+    /// ### Errors
     ///
-    /// Sector `offset` is calculated relative to the immutable segment region; excludes the file
-    /// header. Refer to the [write-cycle](self) documentation for more details regarding the
-    /// [clem](crate) file layout.
-    fn sector(&self, ctx: Self::Ctx<'_>) -> Result<Sector, number::Error>;
-
-    /// Write [`Self`] to the file at the [`Sector`](Self::sector) computed from [`Ctx`](Self::Ctx).
-    ///
-    /// Returns the written [`Sector`] for subsequent function chaining.
-    async fn write_to_file<F>(&self, file: &mut F, ctx: Self::Ctx<'_>) -> Result<Sector, Error>
+    /// - [`Error::Io`] if the underlying [`seek`](Sector::seek_to_start) or
+    ///   [`write`](AsyncWriteExt::write_all) fails.
+    /// - [`Error::Number`] if the [`Sector`] overflows `u64` or `usize`.
+    async fn write<F>(&self, file: &mut F, offset: u64) -> Result<Sector, Error>
     where
         F: AsyncSeek + AsyncWrite + Unpin,
     {
-        let sector = self.sector(ctx)?;
+        let buf = self.frame()?;
+        let sector = Sector::new(offset, buf.size()?)?;
         sector.seek_to_start(file).await?;
-        file.write_all(self.serialize()?.as_ref()).await?;
+        file.write_all(&buf).await?;
         Ok(sector)
-    }
-
-    /// Write [`Self`] to the file at the specified [`Sector`](Self::sector).
-    ///
-    /// Returns the [`next`](Sector::next) offset for subsequent function chaining.
-    async fn write_at_sector<F>(&self, file: &mut F, sector: &Sector) -> Result<NonZeroU64, Error>
-    where
-        F: AsyncSeek + AsyncWrite + Unpin,
-    {
-        sector.seek_to_start(file).await?;
-        file.write_all(self.serialize()?.as_ref()).await?;
-        sector.next().ok_or(number::Error::Zero).map_err(Error::from)
     }
 }
 
