@@ -214,17 +214,17 @@ impl Serialize for Sector {
     }
 }
 
-/// A **fixed size** file region [deserialized][1] from a **length-prefixed** byte [slice][2].
+/// A **serialisation primitive** for size-prefixed file regions.
 ///
 /// ### Data Layout
 ///
 /// It is not possible to predetermine the on-disk space required for [unsized][3] file elements
-/// such as [segments](crate::segment) and [buffers](crate::manifest::Buffer); the exact size depends upon runtime
-/// variables such as the number of [accumulated](crate::accumulate) items.
+/// such as [segments](segment) and [buffers][1]; the exact size depends upon runtime variables such
+/// as the number of [accumulated](crate::accumulate) items.
 ///
 /// The [clem](crate) format is **self-describing** to improve data integrity and file robustness.
-/// Unsized regions therefore record a [`NonZeroU64`] length prefix that describes the exact
-/// number of additional bytes required to [`Read`] the region.
+/// Unsized regions therefore record a [`NonZeroU64`] size prefix that describes the exact number of
+/// additional bytes required to [`Read`] the region.
 ///
 /// ### Guidance
 ///
@@ -233,17 +233,29 @@ impl Serialize for Sector {
 /// 1. Begin by deserializing the length prefix.
 /// 2. Then read the specified number of additional bytes.
 ///
-/// Empty **zero-length** regions are never [written](Write) to disk. The length prefix is therefore
-/// guaranteed to be non-zero. [`NonZeroU64`] is used to enforce this invariant.
+/// The removed bytes may include padding to the next [64-bit alignment boundary](Align). Empty
+/// **zero-length** regions are never [written](Write) to disk. The size prefix is therefore
+/// [non-zero](num::NonZero) to enforce this invariant.
 ///
-/// [1]: Deserialize
+/// [1]: crate::manifest::Buffer
 /// [2]: https://doc.rust-lang.org/std/primitive.slice.html
 /// [3]: https://doc.rust-lang.org/reference/dynamically-sized-types.html
-pub(crate) struct SizedBuf<'a>(&'a [u8]);
+#[doc(hidden)] // Reachable through the #[derive(Data)] macro; not part of the stable public API.
+pub struct SizedBuf<I>(I);
 
-impl<'a> AsRef<[u8]> for SizedBuf<'a> {
+impl<I> SizedBuf<I> {
+    /// Wrap the provided [`item`](I) for **length-prefixed** serialization.
+    pub const fn new(item: I) -> Self {
+        Self(item)
+    }
+}
+
+impl<I> AsRef<[u8]> for SizedBuf<I>
+where
+    I: AsRef<[u8]>,
+{
     fn as_ref(&self) -> &[u8] {
-        self.0
+        self.0.as_ref()
     }
 }
 
