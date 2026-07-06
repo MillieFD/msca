@@ -272,9 +272,6 @@ pub(crate) struct Header {
     /// Byte offset immediately following the last committed [`Segment`]; calculated relative to
     /// the immutable segment region excluding the file [`Header`].
     #[n(0)]
-    pub tail: NonZeroU64,
-    /// On-disk location of the encoded [`Manifest`].
-    #[n(1)]
     pub manifest: Sector,
 }
 
