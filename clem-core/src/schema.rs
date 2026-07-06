@@ -1049,4 +1049,27 @@ mod tests {
             Type::Sequence { subtype: Box::new(Type::U8) }
         );
     }
+
+    /// [`Unfold::same`] compares floating point values by exact bit pattern: a repeated
+    /// [`NaN`](f64::NAN) payload is `same` while distinct payloads are not, unlike [`PartialEq`].
+    #[test]
+    fn same_compares_float_bits() {
+        assert!(f64::NAN.same(&f64::NAN));
+        assert!(f64::INFINITY.same(&f64::INFINITY));
+        assert!(!f64::INFINITY.same(&f64::NEG_INFINITY));
+        assert!(!1.0f64.same(&2.0));
+        assert!(!f32::NAN.same(&f32::from_bits(f32::NAN.to_bits() | 1)));
+    }
+
+    /// [`Unfold::same`] recurses through [`Option`] and [`Vec`] layers so bit-pattern semantics
+    /// propagate into optional and unsized columns.
+    #[test]
+    fn same_recurses_layers() {
+        assert!(Some(f64::NAN).same(&Some(f64::NAN)));
+        assert!(None::<f64>.same(&None));
+        assert!(!Some(f64::NAN).same(&None));
+        assert!(vec![f32::NAN, 1.0].same(&vec![f32::NAN, 1.0]));
+        assert!(!vec![1.0f32].same(&vec![1.0, 1.0]));
+        assert!(String::from("a").same(&String::from("a")));
+    }
 }
