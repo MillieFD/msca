@@ -863,7 +863,7 @@ mod tests {
     /// Build a single-segment `u32` [`Column`] descriptor with the given statistics. The `min` and
     /// `max` statistics are [serialized](Serialize) into their fixed-size [`[u8; B]`](B) arrays.
     fn column(min: u32, max: u32, count: u64) -> Column {
-        let buffer = manifest::Buffer {
+        let buffer = manifest::Buffer::Full {
             sector: Sector {
                 offset: u64::MIN,
                 length: NonZeroU64::MIN,
@@ -879,20 +879,11 @@ mod tests {
         }
     }
 
-    /// Build a single-column [`Query`] named `v` over the provided serialized bytes.
-    fn query(bytes: &[u8], ty: Type, count: u64) -> Query {
+    /// Build a single-column [`Query`] named `v` over the provided serialized bytes and
+    /// [`Buffer`](manifest::Buffer) descriptor.
+    fn with(bytes: &[u8], ty: Type, buffer: manifest::Buffer) -> Query {
         let mut mmap = MmapMut::map_anon(bytes.len().max(1)).expect("Anonymous map failed");
         mmap[..bytes.len()].copy_from_slice(bytes);
-        let header = manifest::Buffer::HEADER as u64;
-        let buffer = manifest::Buffer {
-            sector: Sector {
-                offset: header,
-                length: NonZeroU64::new(bytes.len() as u64 - header).expect("Empty body"),
-            },
-            count: NonZeroU64::new(count).expect("Zero rows"),
-            min: [u8::MIN; B],
-            max: [u8::MAX; B],
-        };
         let column = Column {
             ty,
             buffers: vec![buffer],
@@ -903,6 +894,33 @@ mod tests {
             columns: BTreeMap::from([(String::from("v"), column)]),
             stride: num::NonZeroU32::MIN,
         }
+    }
+
+    /// Build a single-column [`Query`] named `v` over the provided serialized bytes.
+    fn query(bytes: &[u8], ty: Type, count: u64) -> Query {
+        let buffer = manifest::Buffer::Full {
+            sector: Sector {
+                offset: u64::MIN,
+                length: NonZeroU64::new(bytes.len() as u64).expect("Empty body"),
+            },
+            count: NonZeroU64::new(count).expect("Zero rows"),
+            min: [u8::MIN; B],
+            max: [u8::MAX; B],
+        };
+        with(bytes, ty, buffer)
+    }
+
+    /// Build a single-column [`Query`] named `v` whose descriptor is a compact
+    /// [`Lite`](manifest::Buffer::Lite) buffer over a one-row serialized body.
+    fn lite(bytes: &[u8], ty: Type, count: u64) -> Query {
+        let buffer = manifest::Buffer::Lite {
+            sector: Sector {
+                offset: u64::MIN,
+                length: NonZeroU64::new(bytes.len() as u64).expect("Empty body"),
+            },
+            count: NonZeroU64::new(count).expect("Zero rows"),
+        };
+        with(bytes, ty, buffer)
     }
 
     #[test]
@@ -938,6 +956,40 @@ mod tests {
         let bytes = vec![1u32].serialize().expect("Serialize failed");
         let query = query(&bytes, Type::U32, 1);
         assert!(matches!(query.column::<u16>("v"), Err(Error::Type { .. })));
+    }
+
+    /// A [`Lite`](manifest::Buffer::Lite) descriptor repeats its single deserialized value exactly
+    /// `count` times without further file access.
+    #[test]
+    fn lite_column_repeats_value() {
+        let bytes = vec![7u32].serialize().expect("Serialize failed");
+        let query = lite(&bytes, Type::U32, 3);
+        let rows = collected(query.column::<u32>("v").expect("Column failed"));
+        assert_eq!(rows, [7, 7, 7]);
+    }
+
+    /// Filters are evaluated **once** against a [`Lite`](manifest::Buffer::Lite) value; an
+    /// excluded value repeats as [`Exclude`](Outcome::Exclude) so composite readers remain in
+    /// lockstep.
+    #[test]
+    fn lite_column_filters_once() {
+        let bytes = vec![7u32].serialize().expect("Serialize failed");
+        let query = lite(&bytes, Type::U32, 3).range("v", 10u32..20).expect("Range failed");
+        let outcomes: Vec<Outcome<u32>> = query.column("v").expect("Column failed").collect();
+        assert_eq!(outcomes.len(), 3); // Excluded rows still repeat for lockstep
+        assert!(outcomes.iter().all(|out| matches!(out, Outcome::Exclude(7))));
+    }
+
+    /// An all-[`None`] optional column round-trips through a [`Lite`](manifest::Buffer::Lite)
+    /// descriptor over a one-row mask-only body.
+    #[test]
+    fn lite_option_all_none() {
+        let mut acc: OptBitVec<u32> = OptBitVec::default();
+        acc.push(None); // One row: the compact body for an all-None column
+        let bytes = acc.serialize().expect("Serialize failed");
+        let query = lite(&bytes, Type::option(Type::U32), 3);
+        let rows = collected(query.column::<Option<u32>>("v").expect("Column failed"));
+        assert_eq!(rows, [None, None, None]);
     }
 
     /// A bit-packed [`bool`] column streams back exactly `count` bits (no trailing padding bits).

@@ -388,4 +388,39 @@ pub(crate) struct Index {
 /* --------------------------------------------------------------------------------------- Tests */
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+    use super::*;
+
+    /// Both [`Buffer`] variants round-trip through their tagged CBOR representation.
+    #[test]
+    fn buffer_cbor_round_trips() {
+        let sector = Sector::new(8u64, 16u64).expect("Sector::new failed");
+        let count = NonZeroU64::new(3).expect("Count is zero");
+        let full = Buffer::Full {
+            sector,
+            count,
+            min: [u8::MIN; B],
+            max: [u8::MAX; B],
+        };
+        let lite = Buffer::Lite { sector, count };
+        for buf in [full, lite] {
+            let mut bytes = vec![u8::MIN; minicbor::len(&buf)];
+            let mut sink = bytes.as_mut_slice();
+            // SAFETY: minicbor::encode is infallible when writing to &mut [u8]
+            minicbor::encode(&buf, &mut sink).expect("Infallible buffer CBOR encode failed");
+            let out: Buffer = minicbor::decode(&bytes).expect("Buffer CBOR decode failed");
+            assert_eq!(out, buf);
+        }
+    }
+
+    /// [`Lite`](Buffer::Lite) descriptors carry no statistics and are never provably disjoint.
+    #[test]
+    fn lite_never_disjoint() {
+        let sector = Sector::new(8u64, 16u64).expect("Sector::new failed");
+        let count = NonZeroU64::new(3).expect("Count is zero");
+        let lite = Buffer::Lite { sector, count };
+        // SAFETY: Lite descriptors return before any type-dependent statistic is deserialized
+        let disjoint = unsafe { lite.disjoint(&(10u32..20)) }.expect("Disjoint failed");
+        assert!(!disjoint);
+    }
+}

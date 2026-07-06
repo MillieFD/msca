@@ -168,25 +168,26 @@ mod tests {
     use super::*;
     use crate::tests::has;
 
-    /// [`expand`] emits the hidden context and one implementation per generated trait.
+    /// [`expand`] emits the hidden reader and one implementation per generated trait.
     #[test]
     fn expand_emits_impls() {
         let input: DeriveInput = parse_quote! { struct Row { a: u32, b: f64 } };
         let code = expand(&input).expect("Expansion failed").to_string();
-        assert!(has(&code, "struct RowContext<'a>"));
-        assert!(has(&code, "TryFrom<&'a ::clem::Query> for RowContext<'a>"));
+        assert!(has(&code, "struct RowReader<'a>"));
+        assert!(has(&code, "TryFrom<&'a ::clem::Query> for RowReader<'a>"));
+        assert!(has(&code, "Iterator for RowReader<'a>"));
         assert!(has(&code, "impl ::clem::Read for Row"));
     }
 
-    /// [`expand`] propagates the source visibility to the generated context.
+    /// [`expand`] propagates the source visibility to the generated reader.
     ///
-    /// The context appears in the public `Read::Ctx` GAT. A `pub` source must therefore yield a
-    /// `pub` context to avoid leaking a private type through the public interface.
+    /// The reader appears in the public `Read::Reader` GAT. A `pub` source must therefore yield a
+    /// `pub` reader to avoid leaking a private type through the public interface.
     #[test]
     fn expand_context_inherits_visibility() {
         let input: DeriveInput = parse_quote! { pub struct Row { a: u32, b: f64 } };
         let code = expand(&input).expect("Expansion failed").to_string();
-        assert!(has(&code, "pub struct RowContext<'a>"));
+        assert!(has(&code, "pub struct RowReader<'a>"));
     }
 
     /// [`expand`] output parses as valid Rust.

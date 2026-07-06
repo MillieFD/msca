@@ -2194,21 +2194,24 @@ mod tests {
     /// [`Align::align`] rounds [`size`](Serialize::size) up ↑ to the next 64-bit boundary.
     #[test]
     fn aligned_rounds_size() {
-        let data: Vec<u16> = vec![1, 2, 3]; // 8 byte prefix + 6 byte payload
+        let data: Vec<u16> = vec![1, 2, 3]; // 6 byte payload; excludes the length prefix
         let size = data.size().expect("Size failed");
-        assert_eq!(size.get(), 14);
-        assert_eq!(size.align().expect("Align failed"), 16);
+        assert_eq!(size.get(), 6);
+        assert_eq!(size.align().expect("Align failed"), 8);
     }
 
-    /// [`Serialize::serialize_into_aligned`] adds zero-bytes up to the next 64-bit boundary.
+    /// [`SizedBuf`] frames the payload behind its length prefix and adds zero-bytes up to the
+    /// next 64-bit boundary; an empty payload is a genuine error rather than a zero prefix.
     #[test]
-    fn serialize_into_aligned_pads() {
+    fn sized_buf_frames_payload() {
         let data: Vec<u16> = vec![1, 2, 3];
-        let mut buf = [0xFFu8; 16];
-        let rest = data.serialize_into_aligned(&mut buf).expect("Align failed");
-        assert!(rest.is_empty());
-        assert_eq!(buf[..8], 6u64.to_le_bytes()); // Length prefix excludes padding
-        assert_eq!(buf[14..], [u8::MIN; 2]); // Trailing bytes are zero-filled
+        let framed = SizedBuf::new(&data);
+        assert_eq!(framed.size().expect("Size failed").get(), 16); // 8 prefix + 6 payload → 8
+        let bytes = framed.serialize().expect("Serialize failed");
+        assert_eq!(bytes[..8], 6u64.to_le_bytes()); // Length prefix excludes padding
+        assert_eq!(bytes[14..], [u8::MIN; 2]); // Trailing bytes are zero-filled
+        let none: Vec<u16> = Vec::new();
+        assert!(SizedBuf::new(&none).size().is_err()); // Empty regions are omitted, never framed
     }
 
     /// [`OptBitVec`] aligns the value buffer to the boundary following the validity mask and stores
@@ -2218,15 +2221,28 @@ mod tests {
         let mut acc: OptBitVec<u32> = OptBitVec::default();
         [Some(1u32), None, Some(3)].into_iter().for_each(|v| acc.push(v));
         let bytes = acc.serialize().expect("Serialize failed");
-        assert_eq!(bytes.len(), 40); // [prefix 8][mask 9 → 16][data 16]
-        assert_eq!(acc.size().expect("Size failed").get(), 40); // Composite is self-padded
-        assert_eq!(bytes[..8], 32u64.to_le_bytes()); // Outer prefix spans padded interior
-        assert_eq!(bytes[8..16], 1u64.to_le_bytes()); // Mask length prefix records exact size
-        assert_eq!(bytes[16], 0b101); // Mask bits in Lsb0 order
-        assert_eq!(bytes[17..24], [u8::MIN; 7]); // Mask padding bytes are zero-filled
-        assert_eq!(bytes[24..32], 8u64.to_le_bytes()); // Value length prefix excludes None rows
-        assert_eq!(bytes[32..36], 1u32.to_le_bytes()); // Only Some values are stored, contiguously
-        assert_eq!(bytes[36..40], 3u32.to_le_bytes());
+        assert_eq!(bytes.len(), 32); // [mask 9 → 16][data 16]
+        assert_eq!(acc.size().expect("Size failed").get(), 32); // Body excludes the outer prefix
+        assert_eq!(SizedBuf::new(&acc).size().expect("Size failed").get(), 40); // Framed body
+        assert_eq!(bytes[..8], 1u64.to_le_bytes()); // Mask length prefix records exact size
+        assert_eq!(bytes[8], 0b101); // Mask bits in Lsb0 order
+        assert_eq!(bytes[9..16], [u8::MIN; 7]); // Mask padding bytes are zero-filled
+        assert_eq!(bytes[16..24], 8u64.to_le_bytes()); // Value length prefix excludes None rows
+        assert_eq!(bytes[24..28], 1u32.to_le_bytes()); // Only Some values are stored, contiguously
+        assert_eq!(bytes[28..32], 3u32.to_le_bytes());
+    }
+
+    /// An all-[`None`] [`OptBitVec`] omits the empty value sub-buffer entirely: the body carries
+    /// only the framed validity mask and zero-length regions never reach the disk.
+    #[test]
+    fn opt_bit_vec_layout_all_none() {
+        let mut acc: OptBitVec<u32> = OptBitVec::default();
+        [None, None, None::<u32>].into_iter().for_each(|v| acc.push(v));
+        let bytes = acc.serialize().expect("Serialize failed");
+        assert_eq!(bytes.len(), 16); // [mask 9 → 16]; the empty data sub-buffer is omitted
+        assert_eq!(bytes[..8], 1u64.to_le_bytes()); // Mask length prefix records exact size
+        assert_eq!(bytes[8], 0b000); // Every row is None
+        assert_eq!(bytes[9..], [u8::MIN; 7]); // Mask padding bytes are zero-filled
     }
 
     /// [`Seq`] offsets terminate on the boundary; data follows without intermediate padding.
@@ -2236,14 +2252,14 @@ mod tests {
         acc.push(vec![97, 98, 99]);
         acc.push(vec![100, 101]);
         let bytes = acc.serialize().expect("Serialize failed");
-        assert_eq!(bytes.len(), 48); // [prefix 8][offsets 24][data 13 → 16]
-        assert_eq!(bytes[..8], 40u64.to_le_bytes()); // Outer prefix spans padded interior
-        assert_eq!(bytes[8..16], 16u64.to_le_bytes()); // Offsets length prefix records exact size
-        assert_eq!(bytes[16..24], 3u64.to_le_bytes()); // Zero-based cumulative end of row 0
-        assert_eq!(bytes[24..32], 5u64.to_le_bytes()); // Zero-based cumulative end of row 1
-        assert_eq!(bytes[32..40], 5u64.to_le_bytes()); // Data length prefix records exact size
-        assert_eq!(bytes[40..45], [97, 98, 99, 100, 101]);
-        assert_eq!(bytes[45..48], [u8::MIN; 3]); // Data padding bytes are zero-filled
+        assert_eq!(bytes.len(), 40); // [offsets 24][data 13 → 16]
+        assert_eq!(SizedBuf::new(&acc).size().expect("Size failed").get(), 48); // Framed body
+        assert_eq!(bytes[..8], 16u64.to_le_bytes()); // Offsets length prefix records exact size
+        assert_eq!(bytes[8..16], 3u64.to_le_bytes()); // Zero-based cumulative end of row 0
+        assert_eq!(bytes[16..24], 5u64.to_le_bytes()); // Zero-based cumulative end of row 1
+        assert_eq!(bytes[24..32], 5u64.to_le_bytes()); // Data length prefix records exact size
+        assert_eq!(bytes[32..37], [97, 98, 99, 100, 101]);
+        assert_eq!(bytes[37..40], [u8::MIN; 3]); // Data padding bytes are zero-filled
     }
 
     /// [`Accumulate::buffers`] records exact sector lengths and returns aligned offsets.
@@ -2253,8 +2269,11 @@ mod tests {
         let mut col = Column::from(u16::with_unfolder::<Schema>());
         let next = data.buffers(0, &mut std::iter::once(&mut col)).expect("Buffers failed");
         assert_eq!(next, 16); // Next buffer begins at 64-bit alignment boundary
-        assert_eq!(col.buffers[0].sector.offset, 8); // Body starts after the header prefix
-        assert_eq!(col.buffers[0].sector.length.get(), 6); // Body excludes the prefix and padding
+        let manifest::Buffer::Full { sector, .. } = &col.buffers[0] else {
+            panic!("Buffer descriptor is not Full")
+        };
+        assert_eq!(sector.offset, 8); // Body starts after the header prefix
+        assert_eq!(sector.length.get(), 6); // Body excludes the prefix and padding
     }
 
     /// [`OptBitVec`] records the data buffer at its aligned offset inside the composite region.
@@ -2265,8 +2284,11 @@ mod tests {
         let mut col = Column::from(u32::with_unfolder::<Schema>());
         let next = acc.buffers(0, &mut std::iter::once(&mut col)).expect("Buffers failed");
         assert_eq!(next, 40); // Aligned end of the composite region
-        assert_eq!(col.buffers[0].sector.offset, 8); // Whole body starts after the header prefix
-        assert_eq!(col.buffers[0].sector.length.get(), 32); // Body spans the mask and data regions
+        let manifest::Buffer::Full { sector, .. } = &col.buffers[0] else {
+            panic!("Buffer descriptor is not Full")
+        };
+        assert_eq!(sector.offset, 8); // Whole body starts after the header prefix
+        assert_eq!(sector.length.get(), 32); // Body spans the mask and data regions
     }
 
     /// [`Seq<u8>`] accumulates a [`String`] into the identical layout as its raw UTF-8 bytes.
@@ -2298,5 +2320,110 @@ mod tests {
         let text = text.serialize().expect("Serialize failed");
         let bytes = bytes.serialize().expect("Serialize failed");
         assert_eq!(text, bytes);
+    }
+
+    /// [`Compact`] counts repetitions of one value in place without materialising the inner
+    /// accumulator.
+    #[test]
+    fn compact_counts_repetitions() {
+        let mut acc: Compact<u32> = Compact::default();
+        assert!(acc.is_empty());
+        [5, 5, 5].into_iter().for_each(|v| acc.push(v));
+        assert!(matches!(acc, Compact::Lite { count: 3, .. }));
+        assert!(!acc.is_empty());
+        assert_eq!(acc.count(), 3);
+    }
+
+    /// A [`Lite`](Compact::Lite) column serializes as a **one-row** compact body regardless of the
+    /// repetition count.
+    #[test]
+    fn compact_lite_serializes_one_row() {
+        let mut acc: Compact<u32> = Compact::default();
+        [5, 5, 5].into_iter().for_each(|v| acc.push(v));
+        let one = vec![5u32].serialize().expect("Serialize failed");
+        assert_eq!(acc.size().expect("Size failed").get(), 4);
+        assert_eq!(acc.serialize().expect("Serialize failed"), one);
+    }
+
+    /// The first differing push collects the repeated run into a materialised
+    /// [`Full`](Compact::Full) state that is byte-identical to a hand-built inner accumulator.
+    #[test]
+    fn compact_materialises_full() {
+        let mut acc: Compact<u32> = Compact::default();
+        [5, 5, 5, 7].into_iter().for_each(|v| acc.push(v));
+        assert!(matches!(acc, Compact::Full(..)));
+        assert_eq!(acc.count(), 4);
+        let full = vec![5u32, 5, 5, 7].serialize().expect("Serialize failed");
+        assert_eq!(acc.serialize().expect("Serialize failed"), full);
+    }
+
+    /// An all-[`None`] optional column stays [`Lite`](Compact::Lite) and serializes as a one-row
+    /// mask-only body; the empty data sub-buffer is omitted entirely.
+    #[test]
+    fn compact_all_none_lite_body() {
+        let mut acc: Compact<Option<u32>> = Compact::default();
+        [None, None, None::<u32>].into_iter().for_each(|v| acc.push(v));
+        assert!(matches!(acc, Compact::Lite { count: 3, .. }));
+        let bytes = acc.serialize().expect("Serialize failed");
+        assert_eq!(bytes.len(), 16); // [mask 9 → 16]; one None row, data omitted
+        assert_eq!(bytes[..8], 1u64.to_le_bytes()); // Mask length prefix records exact size
+        assert_eq!(bytes[8], 0b0); // The single row is None
+    }
+
+    /// [`Unfold::same`] compares the exact bit pattern: a repeated [`f64::NAN`] niche column stays
+    /// [`Lite`](Compact::Lite), while a differing bit pattern materialises
+    /// [`Full`](Compact::Full).
+    #[test]
+    fn compact_float_bits_drive_state() {
+        let mut nan: Compact<f64> = Compact::default();
+        [f64::NAN, f64::NAN].into_iter().for_each(|v| nan.push(v));
+        assert!(matches!(nan, Compact::Lite { count: 2, .. }));
+        let mut inf: Compact<f64> = Compact::default();
+        [f64::INFINITY, f64::INFINITY].into_iter().for_each(|v| inf.push(v));
+        assert!(matches!(inf, Compact::Lite { count: 2, .. }));
+        inf.push(f64::NEG_INFINITY);
+        assert!(matches!(inf, Compact::Full(..)));
+    }
+
+    /// [`Accumulate::discard`] returns the column to the [`Empty`](Compact::Empty) state.
+    #[test]
+    fn compact_discard_resets_empty() {
+        let mut acc: Compact<u32> = Compact::default();
+        [5, 7].into_iter().for_each(|v| acc.push(v));
+        assert!(matches!(acc, Compact::Full(..)));
+        acc.discard();
+        assert!(matches!(acc, Compact::Empty));
+        assert!(acc.is_empty());
+    }
+
+    /// The single [`Lite`](Compact::Lite) value serves as both the minimum and maximum statistic.
+    #[test]
+    fn compact_min_max_lite() {
+        let mut acc: Compact<u32> = Compact::default();
+        [5, 5].into_iter().for_each(|v| acc.push(v));
+        assert_eq!(Accumulate::min(&acc), Some(5));
+        assert_eq!(Accumulate::max(&acc), Some(5));
+    }
+
+    /// [`Compact::buffers`] registers a [`Buffer::Lite`](manifest::Buffer::Lite) descriptor whose
+    /// sector spans the one-row body; materialising emits [`Buffer::Full`](manifest::Buffer::Full)
+    /// instead.
+    #[test]
+    fn compact_buffers_emit_lite() {
+        let mut acc: Compact<u16> = Compact::default();
+        [7, 7, 7].into_iter().for_each(|v| acc.push(v));
+        let mut col = Column::from(u16::with_unfolder::<Schema>());
+        let next = acc.buffers(0, &mut std::iter::once(&mut col)).expect("Buffers failed");
+        assert_eq!(next, 16); // Aligned end of the one-row compact body
+        let manifest::Buffer::Lite { sector, count } = &col.buffers[0] else {
+            panic!("Buffer descriptor is not Lite")
+        };
+        assert_eq!(sector.offset, 8); // Body starts after the header prefix
+        assert_eq!(sector.length.get(), 2); // Body spans exactly one serialized u16
+        assert_eq!(count.get(), 3); // Repetition count spans every accumulated row
+        acc.push(9); // Materialise the inner accumulator
+        let mut col = Column::from(u16::with_unfolder::<Schema>());
+        acc.buffers(0, &mut std::iter::once(&mut col)).expect("Buffers failed");
+        assert!(matches!(col.buffers[0], manifest::Buffer::Full { .. }));
     }
 }

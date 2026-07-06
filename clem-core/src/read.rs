@@ -608,4 +608,67 @@ impl Read for &str {
 /* --------------------------------------------------------------------------------------- Tests */
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+    use super::*;
+
+    /// Append a length-prefixed, 64-bit-aligned sized region to `out`, mirroring the on-disk
+    /// [`SizedBuf`](crate::io) layout independently of the production serializer.
+    fn sized(payload: &[u8], out: &mut Vec<u8>) {
+        out.extend_from_slice(&(payload.len() as u64).to_le_bytes());
+        out.extend_from_slice(payload);
+        let pad = (8 - (payload.len() & 7)) & 7;
+        out.resize(out.len() + pad, 0);
+    }
+
+    /// [`Seq::deserialize`] splits the composite body into its raw `ends` and `data` sub-buffers.
+    #[test]
+    fn seq_deserialize_splits_ends_and_data() {
+        let mut buf = Vec::new();
+        sized(&3u64.to_le_bytes(), &mut buf); // one cumulative end offset
+        sized(b"abc", &mut buf);
+        let mut src = buf.as_slice();
+        let seq = Seq::deserialize(&mut src).expect("Deserialize failed");
+        assert_eq!(seq.ends, &3u64.to_le_bytes());
+        assert_eq!(seq.data, b"abc");
+    }
+
+    /// [`OptBitVec::deserialize`] splits the composite body into its validity `mask` and value
+    /// `data` sub-buffers; the mask marks rows 0 and 2 as present.
+    #[test]
+    fn opt_bit_vec_deserialize_splits_mask_and_data() {
+        let mut buf = Vec::new();
+        sized(&[0b0000_0101], &mut buf);
+        let data = [1u32.to_le_bytes(), 3u32.to_le_bytes()].concat();
+        sized(&data, &mut buf);
+        let mut src = buf.as_slice();
+        let opt = OptBitVec::<u32>::deserialize(&mut src).expect("Deserialize failed");
+        assert!(opt.mask[0] && !opt.mask[1] && opt.mask[2]);
+        assert_eq!(opt.data, data.as_slice());
+    }
+
+    /// [`OptBitVec::deserialize`] accepts the omitted value sub-buffer written by an all-[`None`]
+    /// column; the exhausted source yields an empty data cursor.
+    #[test]
+    fn opt_bit_vec_deserialize_omitted_data() {
+        let mut buf = Vec::new();
+        sized(&[0b0000_0000], &mut buf);
+        let mut src = buf.as_slice();
+        let opt = OptBitVec::<u32>::deserialize(&mut src).expect("Deserialize failed");
+        assert!(!opt.mask[0]);
+        assert!(opt.data.is_empty());
+    }
+
+    /// [`Outcome::repeat`] yields the cloned item exactly `n` times; excluded values repeat as
+    /// [`Outcome::Exclude`] to keep composite readers in lockstep.
+    #[test]
+    fn outcome_repeat_clones() {
+        let items: Vec<u32> = Outcome::Include(7u32)
+            .repeat(3)
+            .map(|out| out.result().expect("Repeat yielded an error"))
+            .collect();
+        assert_eq!(items, [7, 7, 7]);
+        let excluded: Vec<Outcome<u32>> = Outcome::Exclude(7u32).repeat(2).collect();
+        assert_eq!(excluded.len(), 2);
+        assert!(excluded.iter().all(|out| matches!(out, Outcome::Exclude(7))));
+    }
+}

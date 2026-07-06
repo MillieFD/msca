@@ -1316,4 +1316,109 @@ mod tests {
         assert_eq!(HEADER % 8, 0);
         assert!(ALIGN < 8);
     }
+
+    /// [`[u8]`][1] deserialization is a no-op yielding the whole [source][1] as the payload; leaf
+    /// buffers are framed externally by their [`Sector`], so the entire slice is the value and the
+    /// source is fully consumed.
+    ///
+    /// [1]: https://doc.rust-lang.org/std/primitive.slice.html
+    #[test]
+    fn deserialize_slice_takes_whole_source() {
+        let data = [1u8, 2, 3];
+        let mut src = data.as_slice();
+        let payload = <[u8]>::deserialize(&mut src).expect("Deserialize failed");
+        assert_eq!(payload, &[1, 2, 3]);
+        assert!(src.is_empty());
+    }
+
+    /// [`BitSlice`] deserialization views the whole [source][1] as bits with no length header.
+    ///
+    /// [1]: https://doc.rust-lang.org/std/primitive.slice.html
+    #[test]
+    fn deserialize_bit_slice_views_whole_source() {
+        let data = [0b0000_0101u8];
+        let mut src = data.as_slice();
+        let bits = BitSlice::<u8, Lsb0>::deserialize(&mut src).expect("Deserialize failed");
+        assert!(bits[0] && !bits[1] && bits[2]);
+        assert!(src.is_empty());
+    }
+
+    /// [`SizedBuf`] serialization writes the payload behind a length prefix recording the exact
+    /// payload size, padded to the next 64-bit boundary; deserialization recovers the payload and
+    /// fully consumes the source.
+    #[test]
+    fn sized_buf_round_trips() {
+        let bytes = SizedBuf::new(*b"abc").serialize().expect("Serialize failed");
+        assert_eq!(
+            bytes,
+            [3, 0, 0, 0, 0, 0, 0, 0, b'a', b'b', b'c', 0, 0, 0, 0, 0]
+        );
+        let mut src = bytes.as_slice();
+        let region = SizedBuf::deserialize(&mut src).expect("Deserialize failed");
+        assert_eq!(region.0, b"abc");
+        assert!(src.is_empty());
+    }
+
+    /// [`SizedBuf::size`] predicts exactly the number of bytes written by
+    /// [`SizedBuf::serialize`]: prefix plus payload plus alignment padding.
+    #[test]
+    fn sized_buf_size_matches_bytes_written() {
+        let short = SizedBuf::new(*b"abc");
+        let exact = SizedBuf::new(u64::MAX.to_le_bytes());
+        assert_eq!(short.size().expect("Size failed").get(), 16);
+        assert_eq!(short.serialize().expect("Serialize failed").len(), 16);
+        assert_eq!(exact.size().expect("Size failed").get(), 16);
+        assert_eq!(exact.serialize().expect("Serialize failed").len(), 16);
+    }
+
+    /// [`SizedBuf::deserialize`] consumes the zero-filled padding after each payload, landing each
+    /// sequential read on the next 64-bit alignment boundary.
+    #[test]
+    fn sized_buf_deserialize_skips_padding() {
+        let mut buf = Vec::new();
+        buf.extend_from_slice(&3u64.to_le_bytes());
+        buf.extend_from_slice(b"abc\0\0\0\0\0"); // Payload padded to the next boundary
+        buf.extend_from_slice(&1u64.to_le_bytes());
+        buf.extend_from_slice(b"z\0\0\0\0\0\0\0"); // Writers pad every region, including the last
+        let mut src = buf.as_slice();
+        let first = SizedBuf::deserialize(&mut src).expect("First deserialize failed");
+        let second = SizedBuf::deserialize(&mut src).expect("Second deserialize failed");
+        assert_eq!(first.0, b"abc");
+        assert_eq!(second.0, b"z");
+        assert!(src.is_empty());
+    }
+
+    /// [`SizedBuf`] rejects an empty payload; zero-length regions are never written because
+    /// writers omit empty regions entirely.
+    #[test]
+    fn sized_buf_empty_errors() {
+        assert!(SizedBuf::new(Vec::<u8>::new()).serialize().is_err());
+        assert!(SizedBuf::new(Vec::<u8>::new()).size().is_err());
+    }
+
+    /// [`SizedBuf::deserialize`] rejects a zero length prefix; empty regions are omitted by
+    /// writers so a zero prefix indicates corruption.
+    #[test]
+    fn sized_buf_zero_prefix_errors() {
+        let bytes = u64::MIN.to_le_bytes();
+        assert!(SizedBuf::deserialize(&mut bytes.as_slice()).is_err());
+    }
+
+    /// [`SizedBuf::deserialize`] rejects a source shorter than its recorded length prefix.
+    #[test]
+    fn sized_buf_truncated_errors() {
+        let mut buf = Vec::new();
+        buf.extend_from_slice(&10u64.to_le_bytes());
+        buf.extend_from_slice(b"abc"); // Three payload bytes; prefix records ten
+        assert!(SizedBuf::deserialize(&mut buf.as_slice()).is_err());
+    }
+
+    /// The blanket [`Serialize`] implementation for references delegates to the referenced item;
+    /// a borrowed payload frames identically to its owned counterpart.
+    #[test]
+    fn sized_buf_ref_delegates() {
+        let owned = SizedBuf::new(*b"abc").serialize().expect("Owned serialize failed");
+        let borrowed = SizedBuf::new(&*b"abc").serialize().expect("Borrowed serialize failed");
+        assert_eq!(owned, borrowed);
+    }
 }
