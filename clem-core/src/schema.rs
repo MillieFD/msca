@@ -708,7 +708,7 @@ impl Unfold for u16 {
     type OptAcc = OptBitVec<Self>;
 
     fn same(&self, other: &Self) -> bool {
-        self.to_le_bytes() == other.to_le_bytes()
+        self == other
     }
 }
 
@@ -717,7 +717,7 @@ impl Unfold for u32 {
     type OptAcc = OptBitVec<Self>;
 
     fn same(&self, other: &Self) -> bool {
-        self.to_le_bytes() == other.to_le_bytes()
+        self == other
     }
 }
 
@@ -726,7 +726,7 @@ impl Unfold for u64 {
     type OptAcc = OptBitVec<Self>;
 
     fn same(&self, other: &Self) -> bool {
-        self.to_le_bytes() == other.to_le_bytes()
+        self == other
     }
 }
 
@@ -735,7 +735,7 @@ impl Unfold for u128 {
     type OptAcc = OptBitVec<Self>;
 
     fn same(&self, other: &Self) -> bool {
-        self.to_le_bytes() == other.to_le_bytes()
+        self == other
     }
 }
 
@@ -744,7 +744,8 @@ impl Unfold for num::NonZeroU8 {
     type OptAcc = OptInSitu<Self>;
 
     fn same(&self, other: &Self) -> bool {
-        self.get().to_le_bytes() == other.get().to_le_bytes()
+        let other = other.get();
+        self.get().same(&other)
     }
 }
 
@@ -753,7 +754,8 @@ impl Unfold for num::NonZeroU16 {
     type OptAcc = OptInSitu<Self>;
 
     fn same(&self, other: &Self) -> bool {
-        self.get().to_le_bytes() == other.get().to_le_bytes()
+        let other = other.get();
+        self.get().same(&other)
     }
 }
 
@@ -762,7 +764,8 @@ impl Unfold for num::NonZeroU32 {
     type OptAcc = OptInSitu<Self>;
 
     fn same(&self, other: &Self) -> bool {
-        self.get().to_le_bytes() == other.get().to_le_bytes()
+        let other = other.get();
+        self.get().same(&other)
     }
 }
 
@@ -771,7 +774,8 @@ impl Unfold for num::NonZeroU64 {
     type OptAcc = OptInSitu<Self>;
 
     fn same(&self, other: &Self) -> bool {
-        self.get().to_le_bytes() == other.get().to_le_bytes()
+        let other = other.get();
+        self.get().same(&other)
     }
 }
 
@@ -780,7 +784,8 @@ impl Unfold for num::NonZeroU128 {
     type OptAcc = OptInSitu<Self>;
 
     fn same(&self, other: &Self) -> bool {
-        self.get().to_le_bytes() == other.get().to_le_bytes()
+        let other = other.get();
+        self.get().same(&other)
     }
 }
 
@@ -789,7 +794,7 @@ impl Unfold for i8 {
     type OptAcc = OptBitVec<Self>;
 
     fn same(&self, other: &Self) -> bool {
-        self.to_le_bytes() == other.to_le_bytes()
+        self == other
     }
 }
 
@@ -798,7 +803,7 @@ impl Unfold for i16 {
     type OptAcc = OptBitVec<Self>;
 
     fn same(&self, other: &Self) -> bool {
-        self.to_le_bytes() == other.to_le_bytes()
+        self == other
     }
 }
 
@@ -807,7 +812,7 @@ impl Unfold for i32 {
     type OptAcc = OptBitVec<Self>;
 
     fn same(&self, other: &Self) -> bool {
-        self.to_le_bytes() == other.to_le_bytes()
+        self == other
     }
 }
 
@@ -816,7 +821,7 @@ impl Unfold for i64 {
     type OptAcc = OptBitVec<Self>;
 
     fn same(&self, other: &Self) -> bool {
-        self.to_le_bytes() == other.to_le_bytes()
+        self == other
     }
 }
 
@@ -825,7 +830,7 @@ impl Unfold for i128 {
     type OptAcc = OptBitVec<Self>;
 
     fn same(&self, other: &Self) -> bool {
-        self.to_le_bytes() == other.to_le_bytes()
+        self == other
     }
 }
 
@@ -834,7 +839,8 @@ impl Unfold for num::NonZeroI8 {
     type OptAcc = OptInSitu<Self>;
 
     fn same(&self, other: &Self) -> bool {
-        self.get().to_le_bytes() == other.get().to_le_bytes()
+        let other = other.get();
+        self.get().same(&other)
     }
 }
 
@@ -843,7 +849,8 @@ impl Unfold for num::NonZeroI16 {
     type OptAcc = OptInSitu<Self>;
 
     fn same(&self, other: &Self) -> bool {
-        self.get().to_le_bytes() == other.get().to_le_bytes()
+        let other = other.get();
+        self.get().same(&other)
     }
 }
 
@@ -852,7 +859,8 @@ impl Unfold for num::NonZeroI32 {
     type OptAcc = OptInSitu<Self>;
 
     fn same(&self, other: &Self) -> bool {
-        self.get().to_le_bytes() == other.get().to_le_bytes()
+        let other = other.get();
+        self.get().same(&other)
     }
 }
 
@@ -861,7 +869,8 @@ impl Unfold for num::NonZeroI64 {
     type OptAcc = OptInSitu<Self>;
 
     fn same(&self, other: &Self) -> bool {
-        self.get().to_le_bytes() == other.get().to_le_bytes()
+        let other = other.get();
+        self.get().same(&other)
     }
 }
 
@@ -870,7 +879,8 @@ impl Unfold for num::NonZeroI128 {
     type OptAcc = OptInSitu<Self>;
 
     fn same(&self, other: &Self) -> bool {
-        self.get().to_le_bytes() == other.get().to_le_bytes()
+        let other = other.get();
+        self.get().same(&other)
     }
 }
 
