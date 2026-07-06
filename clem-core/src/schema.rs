@@ -605,7 +605,7 @@ where
 // TODO [1] link to procedural macro documentation
 // TODO [2] link to procedural macro user guide
 #[doc(hidden)]
-pub trait Unfold: Sized + PartialEq {
+pub trait Unfold: Sized {
     /// The [accumulator](Accumulate) type used to ingest values of [`Self`] directly.
     // NOTE: Buffer must be a growable Vec; compiler cannot predict the number of accumulated items
     type RawAcc: Accumulate<Self>
