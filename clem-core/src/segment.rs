@@ -125,11 +125,16 @@ mod variant {
     #[non_exhaustive] // To accommodate future segment variants.
     #[repr(u8)] // To map discriminant values directly ⇄ variant byte in the segment header.
     pub enum Variant {
-        /// A [`Schema`] segment describing the [structure](crate::schema::Schema) of encoded data.
+        /// The file [`Manifest`][1] written immediately after the immutable segment region.
+        ///
+        /// [1]: crate::manifest::Manifest
         #[n(0)]
+        Manifest = 0x00, // DO NOT alter discriminant value (breaking change)
+        /// A [`Schema`] segment describing the [structure](crate::schema::Schema) of encoded data.
+        #[n(1)]
         Schema = 0x01, // DO NOT alter discriminant value (breaking change)
         /// A [`Data`] segment encoding columnar buffers for a specified schema instance.
-        #[n(1)]
+        #[n(2)]
         Data = 0x02, // DO NOT alter discriminant value (breaking change)
     }
 
@@ -138,6 +143,7 @@ mod variant {
     impl Display for Variant {
         fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
             match self {
+                Self::Manifest => write!(f, "Manifest"),
                 Self::Schema => write!(f, "Schema"),
                 Self::Data => write!(f, "Data"),
             }
@@ -149,6 +155,7 @@ mod variant {
 
         fn try_from(byte: u8) -> Result<Self, Error> {
             match byte {
+                x if x == Self::Manifest as u8 => Ok(Self::Manifest),
                 x if x == Self::Schema as u8 => Ok(Self::Schema),
                 x if x == Self::Data as u8 => Ok(Self::Data),
                 other => Error::Unknown { found: other }.into(),
