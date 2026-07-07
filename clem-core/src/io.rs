@@ -562,7 +562,9 @@ pub enum Error {
     ///
     /// [1]: https://xxhash.com
     Checksum,
-    /// CBOR decoding failure for a manifest or schema payload.
+    /// Underlying [`decode::Error`][1] from a [`CBOR`](minicbor) decode operation.
+    ///
+    /// [1]: minicbor::decode::Error
     Decode(minicbor::decode::Error),
     /// The requested [`Filter`] is not compatible with the actual on-disk [`Column`][1] type.
     ///
