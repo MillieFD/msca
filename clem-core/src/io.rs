@@ -1204,6 +1204,50 @@ impl<'de> Deserializer<'de> for SizedBuf<'de> {
     }
 }
 
+/* ------------------------------------------------------------------- Checksum Trait Definition */
+
+/// A [`Segment`] with a `u64` [`XXH3`][2] checksum suffix to [`verify`](Self::verify) the validity
+/// of every preceding byte in the [slice].
+///
+/// [1]: https://doc.rust-lang.org/std/primitive.slice.html
+/// [2]: https://xxhash.com
+pub(crate) trait Checksum {
+    /// Calculate the [`XXH3`][1] checksum and [`Serialize`] into the provided buffer.
+    ///
+    /// [1]: https://xxhash.com
+    fn checksum(buf: &mut [u8]) -> Result<&mut [u8], number::Error> {
+        const N: usize = size_of::<u64>();
+        buf.split_last_chunk_mut::<N>()
+            .map(|data| xxh3_64(data.0).serialize_into(data.1))
+            .ok_or(number::Error::Zero)
+            .flatten()?;
+        Ok(buf)
+    }
+
+    /// Split the [`XXH3`][1] checksum suffix from the provided byte [slice][2] and verify against a
+    /// calculated checksum from the preceding bytes.
+    ///
+    /// ### Errors
+    ///
+    /// - [`Error::Truncated`] if the buffer is shorter than the `u64` checksum.
+    /// - [`Error::Checksum`] if the recorded checksum does not match the computed checksum.
+    ///
+    /// [1]: https://xxhash.com
+    /// [2]: https://doc.rust-lang.org/std/primitive.slice.html
+    fn verify(buf: &[u8]) -> Result<&[u8], Error> {
+        buf.split_last_chunk()
+            .map(|b| match u64::from_le_bytes(*b.1) == xxh3_64(b.0) {
+                true => Ok(b.0),
+                false => Err(Error::Checksum),
+            })
+            .ok_or_else(|| Error::Truncated {
+                expected: size_of::<u64>(),
+                actual: buf.len(),
+            })
+            .flatten()
+    }
+}
+
 /* ---------------------------------------------------------------------- Write Trait Definition */
 
 /// A **data type** that is written to the [clem](crate) file during the [write-cycle](self).
