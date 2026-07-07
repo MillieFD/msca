@@ -153,7 +153,7 @@ impl Query {
     /// [1]: Deserialize::deserialize
     pub fn column<'a, I>(&'a self, name: &str) -> Result<Stream<'a, I>, Error>
     where
-        I: Read + 'a,
+        I: Read + Clone + 'a,
         I::Src<'a>: Deserialize<'a, Ok = I::Src<'a>> + Reader<'a, I>,
         Schema: Unfolder<I>,
     {
