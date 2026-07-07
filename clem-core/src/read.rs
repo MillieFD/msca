@@ -238,6 +238,23 @@ impl<I> Outcome<I> {
         iter::once(self).into_box()
     }
 
+    /// Construct a [`Stream`] that yields [`self`](Outcome) exactly `n` times; [`Include`][1] and
+    /// [`Exclude`][2] clone the inner item while [`Error`][3] yields [`once`](Self::once).
+    ///
+    /// [1]: Outcome::Include
+    /// [2]: Outcome::Exclude
+    /// [3]: Outcome::Error
+    fn repeat<'a>(self, n: usize) -> Stream<'a, I>
+    where
+        I: Clone + 'a,
+    {
+        match self {
+            Self::Include(item) => iter::repeat_n(item, n).map(Outcome::Include).into_box(),
+            Self::Exclude(item) => iter::repeat_n(item, n).map(Outcome::Exclude).into_box(),
+            Self::Error(error) => Self::Error(error).once(),
+        }
+    }
+
     /// Convert an included outcome into an excluded outcome without changing the inner [`item`](I).
     ///
     /// - [`Include`](Outcome::Include) converted to [`Exclude`](Outcome::Exclude)
