@@ -360,11 +360,10 @@ impl<'de> Deserialize<'de> for Header {
                     &other => Error::Version(other).into(),
                 }
             })?;
-        let tail = NonZeroU64::deserialize(src)?;
         let offset = u64::deserialize(src)?;
         let length = NonZeroU64::deserialize(src)?;
         let manifest = Sector { offset, length };
-        Ok(Self { tail, manifest })
+        Ok(Self { manifest })
     }
 }
 
