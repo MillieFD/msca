@@ -331,7 +331,7 @@ impl Serialize for Header {
     }
 
     fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], number::Error> {
-        buf.serialize_push(&self.tail)?.serialize_push(&self.manifest)
+        buf.serialize_push(&self.manifest)
     }
 
     fn serialize(&self) -> Result<Self::Buffer, number::Error> {
