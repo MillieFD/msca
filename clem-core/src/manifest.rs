@@ -266,33 +266,53 @@ impl From<Type> for Column {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode, CborLen)]
 #[doc(hidden)] // Reachable through Accumulate::buffers for the #[derive(Data)] macro.
-pub struct Buffer {
-    /// Location of the [`Buffer`] on disk.
-    ///
-    /// Sector `offset` is calculated relative to the immutable segment region, excluding the file
-    /// header. Refer to the [write-cycle](self) documentation for more details regarding the
-    /// [clem](crate) file layout.
+pub enum Buffer {
+    /// A buffer containing **more than one** distinct item.
     #[n(0)]
-    pub sector: Sector,
-    /// Number of data entries.
-    ///
-    /// Empty buffers are never written to disk. [`NonZeroU64`] is used to enforce this invariant.
+    Full {
+        /// Location of the [`Buffer`] on disk.
+        ///
+        /// Sector `offset` is calculated relative to the immutable segment region, excluding the
+        /// [file](io::File) [header](io::Header). Refer to the [write-cycle](self) documentation
+        /// for more details.
+        #[n(0)]
+        sector: Sector,
+        /// Number of data entries.
+        ///
+        /// Empty buffers are never written to disk; this invariant is enforced by [`NonZeroU64`].
+        #[n(1)]
+        count: NonZeroU64,
+        /// Minimum value recorded in this buffer; used for segment-level predicate pruning.
+        ///
+        /// [Serialized](Serialize) LE bytes into a fixed-size array with trailing zeros.
+        /// [Deserialize] according to the [`Type`] specified by the [`Schema`]. Defaults to unset
+        /// bits if no orderable statistic is available e.g. for non-orderable types.
+        #[cbor(n(2), with = "minicbor::bytes")]
+        min: [u8; B],
+        /// Maximum value recorded in this buffer; used for segment-level predicate pruning.
+        ///
+        /// [Serialized](Serialize) LE bytes into a fixed-size array with trailing zeros.
+        /// [Deserialize] according to the [`Type`] specified by the [`Schema`]. Defaults to set
+        /// bits if no orderable statistic is available e.g. for non-orderable types.
+        #[cbor(n(3), with = "minicbor::bytes")]
+        max: [u8; B],
+    },
+    /// A compact buffer containing exactly **one** item repeated `count` times.
     #[n(1)]
-    pub count: NonZeroU64,
-    /// Minimum value recorded in this buffer; used for segment-level predicate pruning.
-    ///
-    /// [Serialized](Serialize) LE bytes into a fixed-size array with trailing zeros. [Deserialize]
-    /// according to the [`Type`] specified by the [`Schema`]. Defaults to unset bits if no
-    /// orderable statistic is available e.g. for non-orderable types.
-    #[cbor(n(2), with = "minicbor::bytes")]
-    pub min: [u8; B],
-    /// Maximum value recorded in this buffer; used for segment-level predicate pruning.
-    ///
-    /// [Serialized](Serialize) LE bytes into a fixed-size array with trailing zeros. [Deserialize]
-    /// according to the [`Type`] specified by the [`Schema`]. Defaults to set bits if no orderable
-    /// statistic is available e.g. for non-orderable types.
-    #[cbor(n(3), with = "minicbor::bytes")]
-    pub max: [u8; B],
+    Lite {
+        /// Location of the [`Buffer`] on disk.
+        ///
+        /// Sector `offset` is calculated relative to the immutable segment region, excluding the
+        /// [file](io::File) [header](io::Header). Refer to the [write-cycle](self) documentation
+        /// for more details.
+        #[n(0)]
+        sector: Sector,
+        /// Logical number of repetitions of the single [Serialized](Serialize) item.
+        ///
+        /// Empty buffers are never written to disk; this invariant is enforced by [`NonZeroU64`].
+        #[n(1)]
+        count: NonZeroU64,
+    },
 }
 
 impl Buffer {
