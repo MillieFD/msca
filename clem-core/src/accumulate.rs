@@ -986,7 +986,7 @@ where
         match self {
             Self::Empty => *self = new.into(),
             Self::Lite { item, count } if item.same(&new) => *count += 1,
-            Self::Lite { item, count } => Self::repeat(item, *count).push(new),
+            Self::Lite { item, count } => *self = Self::upgrade(item, count, new),
             Self::Full(acc) => acc.push(new),
         };
     }
