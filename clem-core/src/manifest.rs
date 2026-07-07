@@ -285,19 +285,30 @@ pub enum Buffer {
 impl Buffer {
     /// Returns `true` if [`self`](Buffer) is provably disjoint from the specified [`Range`].
     ///
+    /// - [`Buffer::Full`] are evaluated using `min` and `max` statistics.
+    /// - [`Buffer::Lite`] do not carry statistics and therefore never provably disjoint
+    ///
+    /// Compact buffers always return `false` from this function; the repeated value is instead
+    /// [evaluated][2] **exactly once** during [`Stream`](crate::Stream) initialisation.
+    ///
     /// ### ⚠️ Safety
     ///
     /// This function is marked as [unsafe][1] due to the potential for undefined behaviour if the
     /// requested type [`I`] does not match the actual [`Column`](Column) [`Type`].
     ///
     /// [1]: https://doc.rust-lang.org/book/ch20-01-unsafe-rust.html
+    /// [2]: crate::query::Evaluate
     pub(crate) unsafe fn disjoint<I, B>(&self, bounds: &B) -> Result<bool, io::Error>
     where
         B: RangeBounds<I>,
         I: for<'de> Deserialize<'de, Ok = I> + PartialOrd,
     {
-        let min: I = self.min.as_slice().deserialize_into()?;
-        let max: I = self.max.as_slice().deserialize_into()?;
+        let (min, max) = match self {
+            Buffer::Full { min, max, .. } => (min, max),
+            Buffer::Lite { .. } => return Ok(false), // no statistics to evaluate
+        };
+        let min: I = min.as_slice().deserialize_into()?;
+        let max: I = max.as_slice().deserialize_into()?;
         let above = match bounds.end_bound() {
             Bound::Included(v) => &min > v,
             Bound::Excluded(v) => &min >= v,
