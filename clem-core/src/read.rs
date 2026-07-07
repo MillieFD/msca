@@ -75,6 +75,7 @@ use memmap2::Mmap;
 use crate::io::{Deserialize, Deserializer, Error, SizedBuf};
 use crate::manifest::Buffer;
 use crate::query::{Evaluate, Filter};
+use crate::Boxed;
 
 /* ------------------------------------------------------------------------------ Public Exports */
 
@@ -114,34 +115,35 @@ impl<'a> Column<'a> {
         I: Clone + Read + 'a,
         I::Src<'a>: Deserialize<'a, Ok = I::Src<'a>> + Reader<'a, I>,
     {
-        let stream = self.buffers.flat_map(move |buf| match buf {
-            Buffer::Full { sector, count, .. } => sector
-                .slice(self.mmap)
-                .map(|mut bytes| match I::Src::deserialize(&mut bytes) {
-                    Ok(src) => src.with_filters(self.filters),
-                    Err(e) => Outcome::Error(e).once(),
-                })
-                .map_err(Outcome::Error)
-                .unwrap_or_else(Outcome::once)
-                .take(count.get() as usize),
-            Buffer::Lite { sector, count } => sector
-                .slice(self.mmap)
-                .map(|mut bytes| match I::Src::deserialize(&mut bytes) {
-                    Ok(src) => src.with_filters(self.filters),
-                    Err(e) => Outcome::Error(e).once(),
-                })
-                .map_err(Outcome::Error)
-                .unwrap_or_else(Outcome::once)
-                .next()
-                .ok_or_else(|| Error::Truncated {
-                    expected: count.get() as usize,
-                    actual: usize::MIN,
-                })
-                .unwrap_or_else(Outcome::Error)
-                .repeat(count.get() as usize)
-                .take(count.get() as usize),
-        });
-        Box::from(stream)
+        self.buffers
+            .flat_map(move |buf| match buf {
+                Buffer::Full { sector, count, .. } => sector
+                    .slice(self.mmap)
+                    .map(|mut bytes| match I::Src::deserialize(&mut bytes) {
+                        Ok(src) => src.with_filters(self.filters),
+                        Err(e) => Outcome::Error(e).once(),
+                    })
+                    .map_err(Outcome::Error)
+                    .unwrap_or_else(Outcome::once)
+                    .take(count.get() as usize),
+                Buffer::Lite { sector, count } => sector
+                    .slice(self.mmap)
+                    .map(|mut bytes| match I::Src::deserialize(&mut bytes) {
+                        Ok(src) => src.with_filters(self.filters),
+                        Err(e) => Outcome::Error(e).once(),
+                    })
+                    .map_err(Outcome::Error)
+                    .unwrap_or_else(Outcome::once)
+                    .next()
+                    .ok_or_else(|| Error::Truncated {
+                        expected: count.get() as usize,
+                        actual: usize::MIN,
+                    })
+                    .unwrap_or_else(Outcome::Error)
+                    .repeat(count.get() as usize)
+                    .take(count.get() as usize),
+            })
+            .into_box()
     }
 }
 
@@ -233,8 +235,7 @@ impl<I> Outcome<I> {
     where
         I: 'a,
     {
-        let out = iter::once(self);
-        Box::from(out)
+        iter::once(self).into_box()
     }
 
     /// Convert an included outcome into an excluded outcome without changing the inner [`item`](I).
@@ -297,14 +298,14 @@ where
         'f: 'a,
         &'f F: IntoIterator<Item = &'f Filter>,
     {
-        let iter = iter::from_fn(move || {
+        iter::from_fn(move || {
             let f = filters.into_iter();
             I::deserialize(&mut self)
                 .map(|item| item.evaluate(f))
                 .unwrap_or_else(Outcome::Error)
                 .into()
-        });
-        Box::new(iter)
+        })
+        .into_box()
     }
 }
 
@@ -314,12 +315,58 @@ impl<'a> Reader<'a, bool> for &'a BitSlice<u8, Lsb0> {
         'f: 'a,
         &'f F: IntoIterator<Item = &'f Filter>,
     {
-        let iter = self.iter().by_vals().map(move |bit| {
-            let f = filters.into_iter();
-            bit.evaluate(f)
-        });
-        Box::new(iter)
+        self.iter()
+            .by_vals()
+            .map(move |bit| {
+                let f = filters.into_iter();
+                bit.evaluate(f)
+            })
+            .into_box()
     }
+}
+
+impl<'a, I> Reader<'a, Option<I>> for OptBitVec<'a, I>
+where
+    I: Read + Evaluate + 'a,
+    I::Src<'a>: Reader<'a, I>,
+{
+    fn with_filters<'f, F>(self, filters: &'f F) -> Stream<'a, Option<I>>
+    where
+        'f: 'a,
+        &'f F: IntoIterator<Item = &'f Filter>,
+    {
+        // Validity is resolved against the mask: `is_some` drops `None` rows and `is_none` drops
+        // every present row. Only value predicates reach the value reader, which cannot assess an
+        // always-present value and rightly rejects the `is_some` / `is_none` markers.
+        let some = filters.into_iter().any(|f| matches!(f, Filter::IsSome));
+        let none = filters.into_iter().any(|f| matches!(f, Filter::IsNone));
+        let mut mask = self.mask.boxed();
+        let mut data = self.data.boxed();
+        // Assess one present value against the value predicates, wrapping the survivor in [`Some`].
+        let present = move |value: Outcome<I>| {
+            let assessed = match value {
+                Outcome::Include(v) | Outcome::Exclude(v) => {
+                    let values = filters.into_iter().filter(|f| !f.validity());
+                    v.evaluate(values)
+                }
+                Outcome::Error(e) => return Outcome::Error(e),
+            };
+            match assessed {
+                Outcome::Include(v) if none => Outcome::Exclude(Some(v)),
+                other => other.map(Some),
+            }
+        };
+        iter::from_fn(move || {
+            Some(match mask.next()? {
+                Outcome::Include(true) | Outcome::Exclude(true) => present(data.next()?),
+                Outcome::Include(false) | Outcome::Exclude(false) if some => Outcome::Exclude(None),
+                Outcome::Include(false) | Outcome::Exclude(false) => Outcome::Include(None),
+                Outcome::Error(e) => Outcome::Error(e),
+            })
+        })
+        .into_box()
+    }
+}
 
     fn try_from_slice(src: &'a [u8]) -> Result<Self, Error>
     where
