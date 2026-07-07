@@ -577,6 +577,9 @@ pub enum Error {
     Number(number::Error),
     /// Underlying [`Error`](schema::Error) from schema registration or validation.
     Schema(schema::Error),
+    /// Underlying [`Error`](segment::Error) from [`Segment`] operations such as
+    /// [serialisation](Serialize) or [deserialisation](Deserialize).
+    Segment(segment::Error),
     /// Underlying [`TryFromSliceError`] while parsing a slice into a fixed-size array.
     Slice(TryFromSliceError),
     /// A read operation attempted to access bytes beyond the end of the input slice.
@@ -634,6 +637,7 @@ impl fmt::Display for Error {
             Self::Magic => f.write_str("File is not a valid clem dataset"),
             Self::Number(e) => write!(f, "Number error → {e}"),
             Self::Schema(e) => write!(f, "Schema error → {e}"),
+            Self::Segment(e) => write!(f, "Segment error → {e}"),
             Self::Slice(e) => write!(f, "Try from slice error → {e}"),
             Self::Truncated { .. } => write!(f, "Read was truncated → {self:?}"),
             Self::Utf8(e) => write!(f, "Invalid UTF8 scalar value → {e}"),
@@ -680,6 +684,12 @@ impl From<schema::Error> for Error {
             schema::Error::Number(err) => Self::Number(err),
             other => Self::Schema(other),
         }
+    }
+}
+
+impl From<segment::Error> for Error {
+    fn from(e: segment::Error) -> Self {
+        Self::Segment(e)
     }
 }
 
