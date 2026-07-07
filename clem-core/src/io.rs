@@ -323,6 +323,15 @@ impl Header {
     }
 }
 
+impl From<Sector> for Header {
+    /// Construct a new [file](File) [header](Self) using the provided [`Manifest`] sector.
+    ///
+    /// Refer to the [trait](From) and [module](io) documentation for more details.
+    fn from(manifest: Sector) -> Self {
+        Self { manifest }
+    }
+}
+
 impl Serialize for Header {
     type Buffer = [u8; size_of::<Self>()];
 
