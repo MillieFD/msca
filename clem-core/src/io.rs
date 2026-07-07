@@ -558,6 +558,10 @@ impl File {
 #[derive(Debug)]
 #[non_exhaustive] // To accommodate potential future error cases.
 pub enum Error {
+    /// The computed [`XXH3`][1] checksum does not match the on-disk checksum suffix.
+    ///
+    /// [1]: https://xxhash.com
+    Checksum,
     /// CBOR decoding failure for a manifest or schema payload.
     Decode(minicbor::decode::Error),
     /// The requested [`Filter`] is not compatible with the actual on-disk [`Column`][1] type.
@@ -631,6 +635,7 @@ impl Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::Checksum => write!(f, "Checksum error"),
             Self::Decode(e) => write!(f, "CBOR decode error → {e}"),
             Self::Filter { filter, actual } => write!(f, "{filter} cannot evaluate {actual}"),
             Self::Io(e) => write!(f, "File IO error → {e}"),
