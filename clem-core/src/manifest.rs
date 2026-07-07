@@ -118,31 +118,8 @@ impl Manifest {
     }
 }
 
-/// [`Write`] [`Context`](Write::Ctx) for the [`Manifest`]; carries the file [`Header`] and
-/// [`size`][1] of the incoming [`Segment`][2].
-///
-/// The new manifest is written prior to the incoming segment at an offset that preserves sufficient
-/// space without overwriting the existing on-disk manifest.
-///
-/// ```text
-///                                      Incoming Segment Sector
-///                                     ├───────────────────────┤
-/// [Header] [Segment 0] ... [Segment N] ... [Prev Manifest] ... [New Manifest]
-///                                tail ↑   ↑ manifest.offset
-/// ```
-///
-/// Refer to the [write-cycle](io) documentation for more details.
-///
-/// [1]: crate::segment::Segment::size
-/// [2]: crate::segment::Segment
-pub(crate) struct Pending<'a> {
-    /// File [`Header`] reference used to read the current `tail` and `manifest` sectors.
-    pub header: &'a Header,
-    /// Total [`size`][1] of the incoming [`Segment`][2] in bytes.
-    ///
-    /// [1]: crate::segment::Segment::size
-    /// [2]: crate::segment::Segment
-    pub size: NonZeroU64,
+impl Segment for Manifest {
+    const VARIANT: Variant = Variant::Manifest;
 }
 
 impl Write for Manifest {
