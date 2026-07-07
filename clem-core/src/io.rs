@@ -1264,31 +1264,7 @@ pub(crate) trait Checksum {
 
 /* ---------------------------------------------------------------------- Write Trait Definition */
 
-/// A **data type** that is written to the [clem](crate) file during the [write-cycle](self).
-pub(crate) trait Write: Segment {
-    /// Write [`Self`] to the [`file`](F). Returns the written [`Sector`] for subsequent function
-    /// chaining.
-    ///
-    /// ### Errors
-    ///
-    /// - [`Error::Io`] if the underlying [`seek`](Sector::seek_to_start) or
-    ///   [`write`](AsyncWriteExt::write_all) fails.
-    /// - [`Error::Number`] if the [`Sector`] overflows `u64` or `usize`.
-    async fn write<F>(&self, file: &mut F, offset: u64) -> Result<Sector, Error>
-    where
-        F: AsyncSeek + AsyncWrite + Unpin,
-    {
-        let buf = self.frame()?;
-        let sector = Sector::new(offset, buf.size()?)?;
-        sector.seek_to_start(file).await?;
-        file.write_all(&buf).await?;
-        Ok(sector)
-    }
 }
-
-/* ------------------------------------------------------------------ Write Trait Implementation */
-
-impl<S> Write for S where S: Segment {}
 
 /* --------------------------------------------------------------------------------------- Tests */
 

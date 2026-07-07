@@ -297,6 +297,25 @@ pub(crate) trait Segment: Serialize + Sized {
             .ok_or(number::Error::Zero)?;
         Ok(buf)
     }
+
+    /// Write [`Self`] to the [`file`](F). Returns the written [`Sector`] for subsequent function
+    /// chaining.
+    ///
+    /// ### Errors
+    ///
+    /// - [`Error::Io`](io::Error::Io) if the underlying [`seek`](Sector::seek_to_start) or
+    ///   [`write`](AsyncWriteExt::write_all) fails.
+    /// - [`Error::Number`](io::Error::Number) if the [`Sector`] overflows `u64` or `usize`.
+    async fn write<F>(&self, file: &mut F, offset: u64) -> Result<Sector, io::Error>
+    where
+        F: AsyncSeek + AsyncWrite + Unpin,
+    {
+        let buf = self.wrap(offset)?;
+        let sector = Sector::new(offset, buf.size()?)?;
+        sector.seek_to_start(file).await?;
+        file.write_all(&buf).await?;
+        Ok(sector)
+    }
 }
 
 /* --------------------------------------------------------------------------- Alignment Helpers */
