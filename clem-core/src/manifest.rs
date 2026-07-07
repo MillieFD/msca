@@ -17,9 +17,10 @@ use std::ops::RangeBounds;
 use minicbor::{CborLen, Decode, Encode};
 use smol::io::{AsyncRead, AsyncReadExt, AsyncSeek};
 
-use crate::io::{Deserializer, Header, Write};
+use crate::io::{Checksum, Deserializer};
 use crate::schema::number::Error;
 use crate::schema::Type;
+use crate::segment::{Header, Segment, Variant};
 use crate::{io, Deserialize, Sector, Serialize};
 
 /* ------------------------------------------------------------------------------ Public Exports */
@@ -122,37 +123,7 @@ impl Segment for Manifest {
     const VARIANT: Variant = Variant::Manifest;
 }
 
-impl Write for Manifest {
-    type Ctx<'a> = Pending<'a>;
-
-    /// Returns a suitable [`Sector`] to write the updated [`Manifest`].
-    ///
-    /// 1. Reserves space for the incoming [`Segment`]
-    /// 2. Does not overwrite the existing manifest
-    ///
-    /// This function is purely predictive; no file IO is executed.
-    ///
-    /// ```text
-    /// [Header] [Segment 0] ... [Segment N] [New Segment] ... [New Manifest]
-    ///                                tail ↑                 ↑ manifest.offset
-    /// ```
-    ///
-    /// Refer to the [write-cycle](io) documentation for more details.
-    ///
-    /// ### Errors
-    ///
-    /// Returns [`Error::Zero`](Error::Zero) if a `u64` overflow occurs while calculating
-    /// [`size`](NonZeroU64) or [`offset`](NonZeroU64) for the relevant file regions.
-    fn sector(&self, pending: Pending) -> Result<Sector, Error> {
-        let offset = match pending.header.manifest.length < pending.size {
-            true => pending.header.tail.checked_add(pending.size.get()),
-            false => pending.header.manifest.next(),
-        }
-        .ok_or(Error::Zero)?
-        .get();
-        Ok(Sector { offset, length: self.size()? })
-    }
-}
+impl Checksum for Manifest {}
 
 impl Serialize for Manifest {
     type Buffer = Vec<u8>;
