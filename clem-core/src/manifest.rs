@@ -389,6 +389,35 @@ pub(crate) struct Index {
 mod tests {
     use super::*;
 
+    /// A manifest segment round-trips: [`frame`](Segment::wrap) then [`verify`](Checksum::verify)
+    /// the checksum and [`deserialize`](Deserialize::deserialize) the payload to recover the
+    /// original [`Manifest`].
+    #[test]
+    fn manifest_segment_round_trips() {
+        let manifest = Manifest::default();
+        let bytes = manifest.wrap(0).expect("Frame failed");
+        let region = Manifest::verify(&bytes).expect("Checksum failed");
+        let out = Manifest::deserialize(&mut &region[Header::SIZE..]).expect("Deserialize failed");
+        assert_eq!(out, manifest);
+    }
+
+    /// Corrupting any framed byte is detected by [`verify`](Checksum::verify) as
+    /// [`io::Error::Checksum`].
+    #[test]
+    fn manifest_checksum_detects_corruption() {
+        let mut bytes = Manifest::default().wrap(0).expect("Frame failed");
+        bytes[Header::SIZE] ^= u8::MAX; // Flip the first payload byte
+        let err = Manifest::verify(&bytes).expect_err("Corruption undetected");
+        assert!(matches!(err, io::Error::Checksum));
+    }
+
+    /// A region shorter than one trailing checksum is rejected with [`io::Error::Truncated`].
+    #[test]
+    fn manifest_verify_rejects_short_region() {
+        let err = Manifest::verify([u8::MIN; 4].as_slice()).expect_err("Short region accepted");
+        assert!(matches!(err, io::Error::Truncated { .. }));
+    }
+
     /// Both [`Buffer`] variants round-trip through their tagged CBOR representation.
     #[test]
     fn buffer_cbor_round_trips() {
