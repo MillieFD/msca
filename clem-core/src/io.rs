@@ -519,26 +519,32 @@ impl File {
         unsafe { MmapOptions::new().offset(offset).len(length).map(&self.file).map_err(Error::Io) }
     }
 
-    /// Append a new [`Segment`] to the file according to the [write-cycle](self).
+    /// Append a new [`Segment`] to the file and return the written [`Sector`].
     ///
-    /// Returns a read-only [`Mmap`] covering the immutable segment region.
-    // TODO → Add error list & mmap safety section to fn doc comment
-    pub(crate) async fn write<S>(&mut self, seg: S, sector: &Sector) -> Result<Mmap, Error>
+    /// ### Errors
+    ///
+    /// - [`Error::Io`] if any underlying [seek][1] or [write][2] operations fail.
+    /// - [`Error::Number`] if the segment `size` or `offset` overflow `u64`.
+    ///
+    /// Refer to the [write-cycle](self) documentation for more details.
+    ///
+    /// [1]: Sector::seek_to_start
+    /// [2]: Segment::write
+    pub(crate) async fn write<S>(&mut self, seg: S) -> Result<Sector, Error>
     where
-        S: for<'a> Write<Ctx<'a> = &'a Header>,
+        S: Register + Segment,
     {
-        // Phase 2: Append the new manifest; updated in-memory before File::write
-        let pending = Pending { header: &self.header, size: seg.size()? };
-        self.header.manifest = self.manifest.write_to_file(&mut self.file, pending).await?;
-        // Phase 3: Overwrite the file header manifest sector
-        self.header.write_to_file(&mut self.file, ()).await?;
-        // Phase 4: Append the new segment
-        self.header.tail = seg.write_at_sector(&mut self.file, sector).await?;
-        // Phase 5: Overwrite the file header tail pointer
-        self.header.write_to_file(&mut self.file, ()).await?;
+        // Phase 1: Append the new segment, overwriting the on-disk manifest
+        let sec = seg.write(&mut self.file, self.header.manifest.offset).await?;
+        // Phase 2: Register the segment to the in-memory manifest
+        let next = seg.register(&sec, &mut self.manifest)?.next().ok_or(number::Error::Zero)?.get();
+        // Phase 3: Append the new manifest directly after the new segment
+        self.header.manifest = self.manifest.write(&mut self.file, next).await?;
+        // Phase 4: Overwrite the file header manifest sector
+        Header::SECTOR.seek_to_start(&mut self.file).await?;
+        self.file.write_all(&self.header.serialize()?).await?;
         self.file.flush().await?;
-        // SAFETY: Undefined behaviour if mapped region is modified (refer to mmap documentation)
-        unsafe { self.mmap(self.header.tail) }
+        Ok(sec)
     }
 }
 
