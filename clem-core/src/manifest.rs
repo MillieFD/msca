@@ -224,8 +224,8 @@ impl From<Type> for Column {
 /// A minimal columnar buffer **descriptor** that specifies:
 ///
 /// 1. [`Sector`] where the buffer is located on disk.
-/// 2. Number of data entries e.g. for index arithmetic.
-/// 3. Buffer statistics such as `min` and `max` for predicate pruning.
+/// 2. Logical number of data entries e.g. for index arithmetic.
+/// 3. Statistics such as `min` and `max` for predicate pruning.
 ///
 /// This type does **not** contain the actual buffer data; it is a lightweight descriptor for buffer
 /// discovery and access without holding buffer contents in memory. Data is stored via contiguous
