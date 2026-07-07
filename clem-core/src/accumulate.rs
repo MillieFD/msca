@@ -473,9 +473,11 @@ where
     I: Unfold + Clone,
 {
     /// Constructor for [`Compact::Full`] that materialises the required [accumulator](`I::RawAcc`)
-    /// containing the specified number of [repeated](iter::repeat_n) identical [items](I).
-    fn repeat(item: &I, count: u64) -> Self {
-        let acc = iter::repeat_n(item.clone(), count as usize).collect();
+    /// containing the specified number of [repeated](iter::repeat_n) identical [items](I) followed
+    /// by the one new item.
+    fn upgrade(item: &I, count: &u64, new: I) -> Self {
+        let one = iter::once(new);
+        let acc = iter::repeat_n(item.clone(), *count as usize).chain(one).collect();
         Self::Full(acc)
     }
 }
