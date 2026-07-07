@@ -301,18 +301,8 @@ impl Header {
     };
 
     /// Create a new [clem](crate) file [`Header`] pointing to the provided manifest [`Sector`].
-    ///
-    /// ```text
-    /// [Header] [Manifest]
-    ///         ↑ tail & manifest.offset
-    /// ```
-    ///
-    /// The `tail` and `manifest.offset` pointers are guaranteed to align exactly.
-    fn new(manifest: Sector) -> Result<Self, Error> {
-        Ok(Self {
-            tail: manifest.offset.try_into()?,
-            manifest,
-        })
+    fn new(manifest: Sector) -> Self {
+        Self { manifest }
     }
 
     /// [`Deserialize`] the file [`Header`] using the provided file [`Reader`](AsyncRead).
