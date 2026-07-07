@@ -1262,8 +1262,15 @@ pub(crate) trait Checksum {
     }
 }
 
-/* ---------------------------------------------------------------------- Write Trait Definition */
+/* ------------------------------------------------------------------- Register Trait Definition */
 
+/// An on-disk **data structure** that can be recorded to the file [`Manifest`].
+pub(crate) trait Register {
+    /// Consume `self` and generate a corresponding **descriptor** that is appended to the file
+    /// [`Manifest`] after being [written](Segment::write) to disk.
+    ///
+    /// Returns the [`Sector`] for subsequent function chaining.
+    fn register(self, sector: Sector, manifest: &mut Manifest) -> Result<Sector, number::Error>;
 }
 
 /* --------------------------------------------------------------------------------------- Tests */
