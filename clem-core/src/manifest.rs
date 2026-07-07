@@ -109,8 +109,7 @@ impl Manifest {
             .deserialize_into()
     }
 
-    /// Reconstructs a [`Manifest`] by walking segments in `data` up to the specified `tail`
-    /// offset.
+    /// Reconstruct a [`Manifest`] by walking the self-describing segment region.
     ///
     /// Used to recover a corrupt or truncated manifest by replaying intact segments. Each segment
     /// header is decoded sequentially and re-registered in a fresh [`Manifest`].
