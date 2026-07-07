@@ -1276,7 +1276,7 @@ pub(crate) trait Register {
     /// [`Manifest`] after being [written](Segment::write) to disk.
     ///
     /// Returns the [`Sector`] for subsequent function chaining.
-    fn register(self, sector: Sector, manifest: &mut Manifest) -> Result<Sector, number::Error>;
+    fn register<'a>(self, s: &'a Sector, m: &mut Manifest) -> Result<&'a Sector, number::Error>;
 }
 
 /* --------------------------------------------------------------------------------------- Tests */
