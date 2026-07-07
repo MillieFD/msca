@@ -77,16 +77,36 @@ pub(crate) struct Manifest {
 
 impl Manifest {
     /// [`Deserialize`] a file [`Manifest`] from the provided [`File`](AsyncRead) at the specified
-    /// [`Sector`].
+    /// [`Sector`], verifying the segment framing recorded by the [write-cycle](io).
+    ///
+    /// ### Errors
+    ///
+    /// - [`Error::Truncated`][1] if the sector length is too small to contain a segment [`Header`].
+    /// - [`Error::Checksum`][2] if computed checksum does not match the on-disk checksum suffix.
+    /// - [`Error::Decode`][3] from the underlying manifest [`CBOR`](minicbor) decode operation.
+    /// - [`Error::Io`][4] from the underlying [`seek`][5] and [`read`][6] operations.
+    ///
+    /// [1]: io::Error::Truncated
+    /// [2]: io::Error::Checksum
+    /// [3]: io::Error::Decode
+    /// [4]: io::Error::Io
+    /// [5]: Sector::seek_to_start
+    /// [6]: AsyncReadExt::read_exact
     pub async fn from_file<F>(file: &mut F, sector: Sector) -> Result<Self, io::Error>
     where
         F: AsyncRead + AsyncSeek + Unpin + ?Sized,
     {
-        let size = sector.length.get() as usize;
+        let size = sector.length.get().try_into()?;
         let mut buf = vec![0u8; size];
         sector.seek_to_start(file).await?;
         file.read_exact(&mut buf).await?;
-        Manifest::deserialize(&mut &buf[..])
+        Manifest::verify(&buf)?
+            .get(Header::SIZE..)
+            .ok_or_else(|| io::Error::Truncated {
+                expected: Header::SIZE,
+                actual: buf.len(),
+            })?
+            .deserialize_into()
     }
 
     /// Reconstructs a [`Manifest`] by walking segments in `data` up to the specified `tail`
