@@ -394,13 +394,13 @@ impl File {
     /// Create a new [clem](crate) file with read and write permissions at the specified
     /// [`path`](P).
     ///
-    /// The file is initialised in a valid empty state with a default [`Manifest`] and no
-    /// [`Segments`](Segment) or [`Metadata`][1]. The tail and manifest offset pointers are
-    /// guaranteed to align exactly.
+    /// The file is initialised in a valid empty state with a default [`Manifest`] segment and no
+    /// data segments or [`Metadata`][1]. The manifest [`Segment`] is written immediately after the
+    /// file [`Header`].
     ///
     /// ```text
     /// [Header] [Manifest]
-    ///         ↑ tail & manifest.offset
+    ///         ↑ manifest.offset
     /// ```
     ///
     /// Implementors must ensure that the provided [`path`](P) remains valid and accessible for the
@@ -422,12 +422,6 @@ impl File {
         P: AsRef<Path>,
     {
         let path = path.as_ref().to_path_buf();
-        let manifest = Manifest::default();
-        let sector = Sector {
-            offset: HEADER as u64, // Manifest directly after header (no segments)
-            length: manifest.size()?,
-        };
-        let header = Header::new(sector)?;
         let mut file = OpenOptions::new()
             .read(true)
             .write(true)
@@ -437,9 +431,12 @@ impl File {
             .await?;
         file.write_all(&MAGIC).await?;
         file.write_all(&[VERSION]).await?;
+        // NOTE: manifest is written directly after the file header (no immutable segments)
+        let manifest = Manifest::default();
+        let header: Header = manifest.write(&mut file, HEADER as u64).await?.into();
+        Header::SECTOR.seek_to_start(&mut file).await?;
         file.write_all(&header.serialize()?).await?;
         file.write_all(&[u8::MIN; ALIGN]).await?;
-        file.write_all(&manifest.serialize()?).await?;
         file.flush().await?;
         Ok(Self { file, header, manifest, path })
     }
