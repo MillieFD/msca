@@ -344,7 +344,8 @@ where
 
 /* ------------------------------------------------------------------------------ Specific Error */
 
-/// Errors returned by [`Segment`] encoding and decoding.
+/// Errors returned by [`Segment`] operations such as [serialisation](Serialize) and
+/// [deserialisation](Deserialize).
 ///
 /// Enum variants cover various granular error cases that may arise when working with segments.
 /// Users should consider handling errors explicitly wherever possible to provide meaningful error
