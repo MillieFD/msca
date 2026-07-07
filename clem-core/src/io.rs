@@ -281,8 +281,10 @@ impl<'a> Serialize for SizedBuf<'a> {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Copy, Clone, Eq, PartialEq, PartialOrd, Hash, Encode, Decode, CborLen)]
 pub(crate) struct Header {
-    /// Byte offset immediately following the last committed [`Segment`]; calculated relative to
-    /// the immutable segment region excluding the file [`Header`].
+    /// On-disk location of the encoded [`Manifest`] which is always immediately after the immutable
+    /// segment region.
+    ///
+    /// New segments are appended from the manifest `offset` during the [write-cycle](crate::io).
     #[n(0)]
     pub manifest: Sector,
 }
