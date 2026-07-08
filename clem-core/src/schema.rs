@@ -201,8 +201,7 @@ impl Serialize for Schema {
     type Buffer = Vec<u8>;
 
     fn size(&self) -> Result<NonZeroU64, number::Error> {
-        let size = { segment::Header::SIZE + minicbor::len(self) }.align()?;
-        size.try_into().map_err(number::Error::Convert)
+        minicbor::len(self).try_into().map(NonZeroU64::new)?.ok_or(number::Error::Zero)
     }
 
     fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], number::Error> {
