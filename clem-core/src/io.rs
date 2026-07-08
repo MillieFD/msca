@@ -537,7 +537,12 @@ impl File {
         // Phase 1: Append the new segment, overwriting the on-disk manifest
         let sec = seg.write(&mut self.file, self.header.manifest.offset).await?;
         // Phase 2: Register the segment to the in-memory manifest
-        let next = seg.register(&sec, &mut self.manifest)?.next().ok_or(number::Error::Zero)?.get();
+        let next = seg
+            .register(&sec, &mut self.manifest)
+            .map_err(Into::into)?
+            .next()
+            .ok_or(number::Error::Zero)?
+            .get();
         // Phase 3: Append the new manifest directly after the new segment
         self.header.manifest = self.manifest.write(&mut self.file, next).await?;
         // Phase 4: Overwrite the file header manifest sector

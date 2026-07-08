@@ -219,6 +219,21 @@ impl Segment for Schema {
     const VARIANT: Variant = Variant::Schema;
 }
 
+impl Register for Schema {
+    type Error = io::Error;
+
+    fn register<'a>(self, s: &'a Sector, m: &mut Manifest) -> Result<&'a Sector, io::Error> {
+        let name = self.name.clone();
+        let columns = self.columns.iter().map(Schema::map).collect();
+        // SAFETY: double-checks entry is vacant to prevent accidental overwrite
+        match m.schemas.entry(name) {
+            Entry::Occupied(e) => return Error::Collision { name: e.key().clone() }.into(),
+            Entry::Vacant(e) => e.insert(manifest::Schema { columns, sector: *s }),
+        };
+        Ok(s)
+    }
+}
+
 /* ---------------------------------------------------------------------------- Schema Internals */
 
 /// A minimal column **descriptor** that provides type metadata for reading and writing values.
