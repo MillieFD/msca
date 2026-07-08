@@ -22,9 +22,8 @@ use std::sync::Arc;
 
 use memmap2::Mmap;
 
-use crate::io::{File, Write, HEADER};
+use crate::io::File;
 use crate::query::{self, Query};
-use crate::schema::number;
 use crate::{io, Accumulate, Accumulator, Data, Schema};
 
 /* ------------------------------------------------------------------------------ Public Exports */
@@ -65,7 +64,7 @@ impl Dataset {
         P: AsRef<Path>,
     {
         let file = File::create(path).await?;
-        let mmap = unsafe { file.mmap(file.header.tail)? }.into();
+        let mmap = unsafe { file.mmap()? }.into();
         Ok(Self { file, mmap })
     }
 
@@ -91,7 +90,7 @@ impl Dataset {
         P: AsRef<Path>,
     {
         let file = File::open(path).await?;
-        let mmap = unsafe { file.mmap(file.header.tail)? }.into();
+        let mmap = unsafe { file.mmap()? }.into();
         Ok(Self { file, mmap })
     }
 
@@ -151,7 +150,7 @@ impl Dataset {
             .checked_sub(HEADER as u64)
             .ok_or(number::Error::Zero)?;
         accumulator.data.buffers(offset, &mut columns)?;
-        self.mmap = self.file.write(accumulator, &sector).await?.into();
+        self.mmap = unsafe { self.file.mmap()? }.into();
         Ok(count)
     }
 
