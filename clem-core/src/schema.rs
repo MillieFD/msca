@@ -151,38 +151,48 @@ impl Schema {
         Ok(acc)
     }
 
-    /// [`Write`](Write) [`self`](Schema) to the provided [`File`](io::File) and return the on-disk
+    /// [`Write`](File::write) [`self`](Schema) to the provided [`Dataset`] and return the on-disk
     /// schema segment [`Sector`].
     ///
     /// ### Deduplication
     ///
-    /// Name conflicts are resolved by comparing the new and existing column layouts; returning the
-    /// existing [`Sector`] without file [`IO`](io) if both underlying definitions are identical or
-    /// [`Error::Collision`] if the underlying definitions differ. New schemas are written eagerly
-    /// to disk.
+    /// Name conflicts are resolved by comparing the new and existing column layouts **before** file
+    /// [`IO`](io); returning the existing [`Sector`] if both underlying definitions are identical
+    /// or [`Error::Collision`] if the underlying definitions differ. New schemas are written
+    /// eagerly to disk before being [registered](Register) to the [`Manifest`].
     ///
     /// ### Errors
     ///
-    /// - [`Error::Collision`] if a different schema is already registered with the requested `name`
+    /// - [`Error::Collision`] if a different schema is already registered with the same `name`.
     /// - [`io::Error::Io`] if the underlying [write-cycle](io) fails.
-    /// - [`io::Error::Number`] if the [aligned](Align) [size](Serialize::size) overflows `u64`.
+    /// - [`io::Error::Number`] if the [size](Serialize::size) overflows `u64`.
     pub(crate) async fn finish(self, dataset: &mut Dataset) -> Result<Sector, io::Error> {
-        let sector = self.sector(&dataset.file.header)?;
-        let columns = self.columns.iter().map(Schema::map).collect();
         let name = self.name.clone();
         match dataset.file.manifest.schemas.entry(name) {
-            Entry::Vacant(e) => e.insert(manifest::Schema { columns, sector }),
-            Entry::Occupied(e) if e.get().columns == columns => return Ok(e.get().sector),
-            Entry::Occupied(e) => return Error::Collision { name: e.key().clone() }.into(),
-        };
-        dataset.mmap = dataset.file.write(self, &sector).await?.into();
-        Ok(sector)
+            Entry::Occupied(e) => self.occupied(e),
+            Entry::Vacant(..) => dataset.file.write(self).await,
+        }
     }
 
-    /// Map the provided [`Key`](String) to a new empty [`manifest::Column`]
-    fn map(entry: (&String, &Column)) -> (String, manifest::Column) {
-        let name = entry.0.clone();
-        let column = entry.1.ty.clone().into();
+    /// Compare `self` against the provided [`Occupied`] entry for deduplication.
+    ///
+    /// Returns the existing on-disk schema [`Sector`] if both underlying definitions are identical,
+    /// or [`Error::Collision`] if the underlying definitions differ.
+    fn occupied(&self, entry: Occupied) -> Result<Sector, io::Error> {
+        match entry.get().columns == self.columns.iter().map(Schema::map).collect() {
+            true => Ok(entry.get().sector),
+            false => Error::Collision { name: entry.key().clone() }.into(),
+        }
+    }
+
+    /// Map the provided [`Key`](K) to a new empty [`manifest::Column`]
+    fn map<K, I>(entry: (K, I)) -> (String, manifest::Column)
+    where
+        K: Into<String>,
+        I: Into<Column>,
+    {
+        let name = entry.0.into();
+        let column = entry.1.into().ty.into();
         (name, column)
     }
 }
