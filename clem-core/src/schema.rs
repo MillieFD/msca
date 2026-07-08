@@ -219,6 +219,8 @@ impl Segment for Schema {
     const VARIANT: Variant = Variant::Schema;
 }
 
+impl Checksum for Schema {}
+
 impl Register for Schema {
     type Error = io::Error;
 
