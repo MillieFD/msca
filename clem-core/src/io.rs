@@ -1272,11 +1272,16 @@ pub(crate) trait Checksum {
 
 /// An on-disk **data structure** that can be recorded to the file [`Manifest`].
 pub(crate) trait Register {
+    /// The [`Error`][1] type returned by [`register`](Self::register) on failure.
+    ///
+    /// [1]: std::error::Error
+    type Error: Into<Error>;
+
     /// Consume `self` and generate a corresponding **descriptor** that is appended to the file
     /// [`Manifest`] after being [written](Segment::write) to disk.
     ///
     /// Returns the [`Sector`] for subsequent function chaining.
-    fn register<'a>(self, s: &'a Sector, m: &mut Manifest) -> Result<&'a Sector, number::Error>;
+    fn register<'a>(self, s: &'a Sector, m: &mut Manifest) -> Result<&'a Sector, Self::Error>;
 }
 
 /* --------------------------------------------------------------------------------------- Tests */
