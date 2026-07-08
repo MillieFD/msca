@@ -86,13 +86,14 @@ use bitvec::view::BitView;
 use memmap2::{Mmap, MmapOptions};
 use minicbor::{CborLen, Decode, Encode};
 use smol::fs::{self, OpenOptions};
-use smol::io::{AsyncRead, AsyncReadExt, AsyncSeek, AsyncSeekExt, AsyncWrite, AsyncWriteExt};
+use smol::io::{AsyncRead, AsyncReadExt, AsyncSeek, AsyncSeekExt, AsyncWriteExt};
+use xxhash_rust::xxh3::xxh3_64;
 
 use crate::accumulate::Buffer;
 use crate::manifest::Manifest;
 use crate::query::Filter;
 use crate::schema::{Type, Unfold, Unfolder};
-use crate::segment::{self, Align, Segment, Variant};
+use crate::segment::{self, Align, Segment};
 use crate::{number, schema, Schema, Serialize};
 
 /* ------------------------------------------------------------------------------ Public Exports */
@@ -218,8 +219,8 @@ impl Serialize for Sector {
 ///
 /// ### Data Layout
 ///
-/// It is not possible to predetermine the on-disk space required for [unsized][3] file elements
-/// such as [segments](segment) and [buffers][1]; the exact size depends upon runtime variables such
+/// It is not possible to predetermine the on-disk space required for [unsized][1] file elements
+/// such as [segments](segment) and [buffers][2]; the exact size depends upon runtime variables such
 /// as the number of [accumulated](crate::accumulate) items.
 ///
 /// The [clem](crate) format is **self-describing** to improve data integrity and file robustness.
@@ -228,18 +229,19 @@ impl Serialize for Sector {
 ///
 /// ### Guidance
 ///
-/// The **eight-byte** length prefix is **not included** in the recorded byte size. Readers should:
+/// The **eight-byte** size prefix is **not included** in the recorded byte size. Readers should:
 ///
-/// 1. Begin by deserializing the length prefix.
-/// 2. Then read the specified number of additional bytes.
+/// 1. Begin by deserializing the size prefix.
+/// 2. Read the specified number of additional bytes.
+/// 3. Remove **0-7** padding bytes from the end of the extracted [slice][3].
 ///
 /// The removed bytes may include padding to the next [64-bit alignment boundary](Align). Empty
-/// **zero-length** regions are never [written](Write) to disk. The size prefix is therefore
+/// **zero-length** regions are never [written](Segment::write) to disk; the size prefix is
 /// [non-zero](num::NonZero) to enforce this invariant.
 ///
-/// [1]: crate::manifest::Buffer
-/// [2]: https://doc.rust-lang.org/std/primitive.slice.html
-/// [3]: https://doc.rust-lang.org/reference/dynamically-sized-types.html
+/// [1]: https://doc.rust-lang.org/reference/dynamically-sized-types.html
+/// [2]: crate::manifest::Buffer
+/// [3]: https://doc.rust-lang.org/std/primitive.slice.html
 #[doc(hidden)] // Reachable through the #[derive(Data)] macro; not part of the stable public API.
 pub struct SizedBuf<I>(I);
 
@@ -276,15 +278,37 @@ where
     }
 }
 
-impl<'a> Serialize for SizedBuf<'a> {
+impl<I> Serialize for SizedBuf<I>
+where
+    I: Serialize,
+{
+    type Buffer = Vec<u8>;
 
     fn size(&self) -> Result<NonZeroU64, number::Error> {
-        self.0
+        self.as_ref()
             .size()?
             .get()
+            .align()?
             .checked_add(Self::PREFIX)
             .and_then(NonZeroU64::new)
             .ok_or(number::Error::Zero)
+    }
+
+    fn serialize_into<'b>(&self, buf: &'b mut [u8]) -> Result<&'b mut [u8], number::Error> {
+        let size = self.as_ref().size()?.get();
+        let pad = size.pad()?;
+        let buf = self.as_ref().serialize_into(size.serialize_into(buf)?)?;
+        debug_assert!(buf.len() >= pad, "actual size < aligned size");
+        buf[..pad].fill(u8::MIN);
+        Ok(&mut buf[pad..])
+    }
+
+    fn serialize(&self) -> Result<Self::Buffer, number::Error> {
+        let size = self.size()?.get().try_into()?;
+        let buf = vec![0u8; size].serialize_push(self)?;
+        // NOTE: cannot use static assertion as size is dependent on runtime data accumulation.
+        debug_assert_eq!(buf.len(), size, "actual size ≠ predicted size");
+        Ok(buf)
     }
 }
 
