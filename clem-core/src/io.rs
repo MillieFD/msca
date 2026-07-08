@@ -250,6 +250,11 @@ impl<I> SizedBuf<I> {
     }
 }
 
+impl<I> SizedBuf<I> {
+    /// Size of the [`NonZeroU64`] prefix in bytes.
+    pub(crate) const PREFIX: u64 = size_of::<NonZeroU64>() as u64;
+}
+
 impl<I> From<I> for SizedBuf<I> {
     fn from(item: I) -> Self {
         Self(item)
