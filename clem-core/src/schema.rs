@@ -931,7 +931,7 @@ where
     type OptAcc = OptSeq<T>;
 
     fn same(&self, other: &Self) -> bool {
-        self.iter().zip(other).all(|both| both.0.same(&both.1))
+        self.len() == other.len() && self.iter().zip(other).all(|both| both.0.same(&both.1))
     }
 }
 
