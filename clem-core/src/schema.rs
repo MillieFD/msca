@@ -204,15 +204,10 @@ impl Serialize for Schema {
         minicbor::len(self).try_into().map(NonZeroU64::new)?.ok_or(number::Error::Zero)
     }
 
-    fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], number::Error> {
-        let pad = { segment::Header::SIZE + minicbor::len(self) }.pad()?;
-        let buf = buf.serialize_push(&{ Variant::Schema as u8 })?;
-        // NOTE: Self::size returns Error if usize overflows u64 (not expected in production)
-        let mut buf = self.size()?.get().to_le_bytes().serialize_into(buf)?;
-        // SAFETY: minicbor::encode is infallible when writing to Vec<u8>
-        minicbor::encode(self, &mut buf).expect("Infallible manifest CBOR encode failed");
-        buf[..pad].fill(u8::MIN);
-        Ok(&mut buf[pad..])
+    fn serialize_into<'a>(&self, mut buf: &'a mut [u8]) -> Result<&'a mut [u8], number::Error> {
+        // SAFETY: minicbor::encode is infallible when writing to &mut [u8]
+        minicbor::encode(self, &mut buf).expect("Infallible schema CBOR encode failed");
+        Ok(buf)
     }
 
     fn serialize(&self) -> Result<Self::Buffer, number::Error> {
