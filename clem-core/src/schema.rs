@@ -82,6 +82,10 @@ use crate::accumulate::{Accumulate, BoxAcc, Buffer, Flatten, OptBitVec, OptInSit
 use crate::io::{self, Write};
 use crate::segment::Variant;
 use crate::{manifest, segment, Align, Dataset, Sector, Serialize};
+/// Shorthand [`OccupiedEntry`] for a [`Schema`][1] that already exists in the [`Schema`].
+///
+/// [1]: manifest::Schema
+type Occupied<'a> = OccupiedEntry<'a, String, manifest::Schema>;
 
 /* ------------------------------------------------------------------------------ Public Exports */
 
