@@ -256,6 +256,12 @@ impl<I> From<I> for SizedBuf<I> {
     }
 }
 
+impl<I> AsRef<I> for SizedBuf<I> {
+    fn as_ref(&self) -> &I {
+        &self.0
+    }
+}
+
 impl<I> AsRef<[u8]> for SizedBuf<I>
 where
     I: AsRef<[u8]>,
