@@ -403,6 +403,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::io::{self, Checksum};
     use crate::schema::Schema;
 
     /// [`Align::align`] rounds up ↑ to the next multiple of **eight**; idempotent at boundaries.
@@ -434,38 +435,36 @@ mod tests {
         assert_eq!(NonZeroU64::MIN.align().expect("Align failed"), 8);
     }
 
-    /// [`Segment::frame`] lays out `[variant][size][payload][checksum]`: the `size` field spans
-    /// the padded payload, the framed footprint reaches the next 64-bit boundary before the
-    /// trailing checksum, and the checksum covers every preceding byte.
+    /// [`Segment::wrap`] lays out `[variant][size][payload][checksum]` densely for an off-hot-path
+    /// [`Schema`] segment: the `size` field spans exactly the payload with no trailing padding, the
+    /// framed footprint is the header plus payload plus checksum, and the trailing
+    /// [checksum](Checksum::verify) covers every preceding byte.
     #[test]
     fn frame_layout() {
         let mut schema = Schema::new("t");
         schema.column::<u32>("v").expect("Column failed");
-        let bytes = schema.frame().expect("Frame failed");
+        let bytes = schema.wrap(0).expect("Frame failed");
         let head = Header::SIZE;
         assert_eq!(bytes[0], Variant::Schema as u8);
         let size = u64::from_le_bytes(bytes[1..head].try_into().expect("Size is 8 bytes")) as usize;
-        assert_eq!((head + size) % 8, 0); // Checksum begins at a 64-bit boundary
+        assert_eq!(size, schema.size().expect("Size failed").get() as usize); // Dense: no padding
         assert_eq!(bytes.len(), head + size + size_of::<u64>());
-        let at = bytes.len() - size_of::<u64>();
-        let sum = u64::from_le_bytes(bytes[at..].try_into().expect("Checksum is 8 bytes"));
-        assert_eq!(sum, Header::checksum(&bytes[..at]));
+        let body = Schema::verify(&bytes).expect("Checksum failed"); // Trailing checksum verifies
+        assert_eq!(body, &bytes[..bytes.len() - size_of::<u64>()]);
     }
 
-    /// A single-byte mutation anywhere in the framed payload changes the computed
-    /// [checksum](Header::checksum); the trailing checksum field detects corruption.
+    /// A single-byte mutation anywhere in the framed payload changes the computed checksum, so
+    /// [`Checksum::verify`] rejects the corrupt frame while accepting the intact one.
     #[test]
     fn frame_checksum_detects_mutation() {
         let mut schema = Schema::new("t");
         schema.column::<u32>("v").expect("Column failed");
-        let bytes = schema.frame().expect("Frame failed");
-        let at = bytes.len() - size_of::<u64>();
+        let bytes = schema.wrap(0).expect("Frame failed");
         let mut corrupt = bytes.clone();
+        let at = corrupt.len() - size_of::<u64>();
         corrupt[at - 1] ^= u8::MAX; // Flip a payload byte
-        assert_ne!(
-            Header::checksum(&corrupt[..at]),
-            Header::checksum(&bytes[..at])
-        );
+        assert!(Schema::verify(&bytes).is_ok()); // Intact frame verifies
+        assert!(matches!(Schema::verify(&corrupt), Err(io::Error::Checksum)));
     }
 
     /// [`Variant::try_from`] maps the manifest discriminant `0x00`.
