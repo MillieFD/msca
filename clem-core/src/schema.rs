@@ -265,6 +265,18 @@ impl Column {
     }
 }
 
+impl From<Type> for Column {
+    fn from(ty: Type) -> Self {
+        Column { ty }
+    }
+}
+
+impl From<&Self> for Column {
+    fn from(column: &Self) -> Self {
+        column.ty.clone().into()
+    }
+}
+
 /// A minimal type **descriptor** that provides a stable and extensible representation for
 /// platform-agnostic Rust primitives; used when walking the type graph for schema encoding.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
