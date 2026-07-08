@@ -24,13 +24,6 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //! Multimodality and schema evolution are realised by appending additional schema segments. Data
 //! storage and file extensibility are realised by appending additional data segments. Format
 //! extensibility may be achieved via the introduction of new segment variants in future releases.
-//!
-//! ### Module Boundary
-//!
-//! This module performs in-memory ⇄ byte-buffer transformations **only**. See the
-//! [IO module](crate::io) for interaction with the underlying [`File`][1].
-//!
-//! [1]: crate::io::File
 
 #![doc = include_str!("../../doc/simd-alignment.md")]
 
@@ -39,11 +32,12 @@ use std::fmt::{Display, Formatter};
 use std::num::NonZeroU64;
 
 use minicbor::{CborLen, Decode, Encode};
-use xxhash_rust::xxh3::xxh3_64;
+use smol::io::{AsyncSeek, AsyncWrite, AsyncWriteExt};
 
 use crate::accumulate::Buffer;
+use crate::io::{self, Checksum};
 use crate::schema::number;
-use crate::Serialize;
+use crate::{Sector, Serialize};
 
 /* ------------------------------------------------------------------------------ Public Exports */
 
@@ -254,47 +248,36 @@ mod variant {
 /// begins with a minimal **segment header** consisting of a [`Variant`] identifier and `u64` size.
 ///
 /// ```text
-/// [Variant] [Size] [Body] [Padding] [Checksum]
+/// [Variant] [Size] [Body] ... [Checksum]
 /// ```
 ///
-/// Up to seven bytes of padding are inserted after the segment body to maintain
-/// [64-bit alignment](Align), followed by a `u64` checksum calculated from the preceding bytes.
+/// Segments are **not aligned** by default. Specific [segment variants](Variant) can override the
+/// default implementation to achieve [64-bit alignment](Align) by inserting up to seven bytes of
+/// zero-filled padding between the segment body and [`Checksum`].
 ///
 /// Refer to the [module level documentation](self) for more details.
-pub(crate) trait Segment: Serialize + Sized {
+pub(crate) trait Segment: Checksum + Serialize + Sized {
     /// On-disk variant identifier for [`Self`]. Stored in the first byte of the segment header.
     const VARIANT: Variant;
 
-    /// Frame [`self`](Segment) into one complete on-disk segment.
-    ///
-    /// Serializes the [variant](Self::VARIANT) identifier, the payload [`size`](Header), and the
-    /// payload body in start-to-finish order; the buffer is [aligned](Align) so the trailing
-    /// checksum – and therefore the following segment – begins at a 64-bit boundary. Finally the
-    /// [checksum](Header::checksum) is computed over every preceding byte and appended, yielding
-    /// bytes ready to reach the disk in a single write.
-    ///
-    /// The `size` field records the exact payload byte count **including** the zero-filled
-    /// alignment padding.
+    /// Wrap the provided `self` body with the generated segment [`Header`] and [`Checksum`].
     ///
     /// ### Errors
     ///
-    /// Returns [`number::Error::Zero`] on `u64` overflow or an empty payload, or
-    /// [`number::Error::Convert`] if the framed footprint overflows `usize`.
-    fn frame(&self) -> Result<Vec<u8>, number::Error> {
-        let head = Header::SIZE as u64;
-        let size = self.size()?.checked_add(head).ok_or(number::Error::Zero)?.align()?;
-        let full = size
-            .checked_add(size_of::<NonZeroU64>() as u64)
-            .ok_or(number::Error::Zero)?
-            .try_into()?;
+    /// Returns [`Error::Zero`][1] on `u64` or `usize` overflow.
+    ///
+    /// [1]: number::Error::Zero
+    fn wrap(&self, offset: u64) -> Result<Vec<u8>, number::Error> {
+        let size = self.size()?.get();
+        let full = { size as usize }
+            .checked_add(Header::SIZE + size_of::<u64>())
+            .ok_or(number::Error::Zero)?;
         let mut buf = vec![u8::MIN; full];
         buf.as_mut_slice()
             .serialize_push(&{ Self::VARIANT as u8 })?
-            .serialize_push(&{ size - head })?
+            .serialize_push(&size)?
             .serialize_push(self)?;
-        buf.split_last_chunk_mut()
-            .map(|data| *data.1 = xxh3_64(data.0).to_le_bytes())
-            .ok_or(number::Error::Zero)?;
+        Self::checksum(&mut buf)?;
         Ok(buf)
     }
 
