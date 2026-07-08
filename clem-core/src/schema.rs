@@ -68,7 +68,7 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //! each `clem` file requires at least **one** schema segment. Multimodality and schema evolution
 //! are achieved by appending additional schema segments.
 
-use std::collections::btree_map::{BTreeMap, Entry};
+use std::collections::btree_map::{BTreeMap, Entry, OccupiedEntry};
 use std::fmt::{self, Display};
 use std::num::NonZeroU64;
 use std::{iter, num};
@@ -78,10 +78,12 @@ use minicbor::{CborLen, Decode, Encode};
 use static_assertions::{assert_eq_size, const_assert_ne};
 
 use self::number::Number;
-use crate::accumulate::{Accumulate, BoxAcc, Buffer, Flatten, OptBitVec, OptInSitu, OptSeq, Seq};
-use crate::io::{self, Write};
-use crate::segment::Variant;
-use crate::{manifest, segment, Align, Dataset, Sector, Serialize};
+use crate::accumulate::{self, Accumulate, BoxAcc, Buffer, Describe, OptBitVec, OptInSitu};
+use crate::io::{Checksum, Register};
+use crate::manifest::{self, Manifest};
+use crate::segment::{Segment, Variant};
+use crate::{io, Dataset, Sector, Serialize};
+
 /// Shorthand [`OccupiedEntry`] for a [`Schema`][1] that already exists in the [`Schema`].
 ///
 /// [1]: manifest::Schema
@@ -151,7 +153,7 @@ impl Schema {
             Entry::Occupied(entry) if entry.get() == &column => entry.into_mut(),
             Entry::Occupied(entry) => return Error::Collision { name: entry.key().clone() }.into(),
         };
-        let acc = Compact::<I>::default().boxed();
+        let acc = accumulate::Compact::<I>::default().boxed();
         Ok(acc)
     }
 
@@ -950,7 +952,7 @@ where
     I: Unfold + 'static,
 {
     type RawAcc = I::OptAcc;
-    type OptAcc = Flatten<I::OptAcc>;
+    type OptAcc = accumulate::Flatten<I::OptAcc>;
 
     fn same(&self, other: &Self) -> bool {
         match self {
@@ -964,8 +966,8 @@ impl<T> Unfold for Vec<T>
 where
     T: Unfold + Default + 'static,
 {
-    type RawAcc = Seq<T>;
-    type OptAcc = OptSeq<T>;
+    type RawAcc = accumulate::Seq<T>;
+    type OptAcc = accumulate::OptSeq<T>;
 
     fn same(&self, other: &Self) -> bool {
         self.len() == other.len() && self.iter().zip(other).all(|both| both.0.same(&both.1))
@@ -973,8 +975,8 @@ where
 }
 
 impl Unfold for String {
-    type RawAcc = Seq<u8>;
-    type OptAcc = OptSeq<u8>;
+    type RawAcc = accumulate::Seq<u8>;
+    type OptAcc = accumulate::OptSeq<u8>;
 
     fn same(&self, other: &Self) -> bool {
         self.as_bytes() == other.as_bytes()
