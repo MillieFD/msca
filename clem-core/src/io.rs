@@ -250,6 +250,12 @@ impl<I> SizedBuf<I> {
     }
 }
 
+impl<I> From<I> for SizedBuf<I> {
+    fn from(item: I) -> Self {
+        Self(item)
+    }
+}
+
 impl<I> AsRef<[u8]> for SizedBuf<I>
 where
     I: AsRef<[u8]>,
