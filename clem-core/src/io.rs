@@ -312,6 +312,32 @@ where
     }
 }
 
+impl<'de> Deserialize<'de> for SizedBuf<&'de [u8]> {
+    type Ok = Self;
+
+    /// Remove one **length-prefixed** [`SizedBuf`] from the front of the provided [source][1] and
+    /// borrow the exact body; advancing the source **in-situ** past the extracted body and the
+    /// zero-filled padding to the next 64-bit [alignment boundary](Align).
+    ///
+    /// ### Errors
+    ///
+    /// Returns [`Error::Truncated`] if `src` contains fewer than the required number of bytes, or
+    /// [`Error::Number`] if the on-disk `size` is not a valid [`NonZeroU64`].
+    ///
+    /// Refer to the [trait documentation](Deserialize::deserialize) for more information.
+    ///
+    /// [1]: https://doc.rust-lang.org/std/primitive.slice.html
+    fn deserialize(src: &mut &'de [u8]) -> Result<Self::Ok, Error> {
+        let size: usize = NonZeroU64::deserialize(src)?.get().try_into()?;
+        let data = src
+            .split_at_checked(size)
+            .ok_or_else(|| Error::Truncated { expected: size, actual: src.len() })?;
+        let pad = size.pad()?;
+        *src = data.1.get(pad..).ok_or(Error::Truncated { expected: pad, actual: data.1.len() })?;
+        Ok(Self(data.0))
+    }
+}
+
 /// Mutable region of the file header.
 ///
 /// Excludes immutable header elements such as the [magic bytes][1] and [version number][2]. See the
@@ -1199,32 +1225,6 @@ impl<'de> Deserialize<'de> for [u8] {
         // NOTE: consumes the entire source and replaces in situ with an empty byte slice
         let out = mem::take(src);
         Ok(out)
-    }
-}
-
-impl<'de> Deserialize<'de> for SizedBuf<&'de [u8]> {
-    type Ok = Self;
-
-    /// Remove one **length-prefixed** [`SizedBuf`] from the front of the provided [source][1] and
-    /// borrow the exact body; advancing the source **in-situ** past the extracted body and the
-    /// zero-filled padding to the next 64-bit [alignment boundary](Align).
-    ///
-    /// ### Errors
-    ///
-    /// Returns [`Error::Truncated`] if `src` contains fewer than the required number of bytes, or
-    /// [`Error::Number`] if the on-disk `size` is not a valid [`NonZeroU64`].
-    ///
-    /// Refer to the [trait documentation](Deserialize::deserialize) for more information.
-    ///
-    /// [1]: https://doc.rust-lang.org/std/primitive.slice.html
-    fn deserialize(src: &mut &'de [u8]) -> Result<Self::Ok, Error> {
-        let size: usize = NonZeroU64::deserialize(src)?.get().try_into()?;
-        let data = src
-            .split_at_checked(size)
-            .ok_or_else(|| Error::Truncated { expected: size, actual: src.len() })?;
-        let pad = size.pad()?;
-        *src = data.1.get(pad..).ok_or(Error::Truncated { expected: pad, actual: data.1.len() })?;
-        Ok(Self(data.0))
     }
 }
 
