@@ -2044,6 +2044,31 @@ impl<I> Serialize for Accumulator<I> {
     }
 }
 
+impl<I> Checksum for Accumulator<I> {}
+
+impl<I> Register for Accumulator<I> {
+    type Error = Error;
+
+    fn register<'a>(self, s: &'a Sector, m: &mut Manifest) -> Result<&'a Sector, Error> {
+        let mut columns = m
+            .schemas
+            .get_mut(&self.name)
+            // SAFETY: Dataset::schema registers the schema before producing an Accumulator
+            .expect("Schema missing from manifest")
+            .columns
+            .values_mut();
+        let offset = s
+            .offset
+            .checked_add(Self::HEADER as u64)
+            .ok_or(Error::Zero)?
+            .align()?
+            .checked_sub(HEADER as u64)
+            .ok_or(Error::Zero)?;
+        self.data.buffers(offset, &mut columns)?;
+        Ok(s)
+    }
+}
+
 /* --------------------------------------------------------------------------------------- Tests */
 
 #[cfg(test)]
