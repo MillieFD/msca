@@ -339,8 +339,4 @@ Refer to the [manifest documentation](./manifest.md) for more details.
 > therefore recorded relative to the start of the immutable segment region (excluding the file header) to enable direct
 > random access with no runtime offset arithmetic.
 
-### Targeted Alignment
 
-**64-bit alignment** is applied to critical data regions for SIMD vectorisation and cache-line efficiency. Non-critical
-fields are not aligned to improve on-disk storage efficiency. Refer to the [alignment reference](./simd-alignment.md)
-for more details.
