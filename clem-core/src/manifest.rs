@@ -170,6 +170,22 @@ pub struct Schema {
     pub columns: BTreeMap<String, Column>,
 }
 
+impl Schema {
+    /// Returns the total number of items across every [`Segment`] for this [`Schema`].
+    ///
+    /// Calculated from the [`Manifest`] via the summation (Σ) of [`Buffer::count`] for one
+    /// [`Column`] – since all columns in a single segment contain the same number of logical items.
+    pub(crate) fn count(&self) -> u64 {
+        self.columns
+            .values()
+            .next()
+            .into_iter()
+            .flat_map(|column| &column.buffers)
+            .map(Buffer::count)
+            .sum()
+    }
+}
+
 /// A minimal column **descriptor** wrapping a collection of [`Buffer`] descriptors.
 ///
 /// This type does **not** contain the actual buffer data; it is a lightweight descriptor for column
