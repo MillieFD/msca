@@ -397,4 +397,27 @@ mod tests {
         let disjoint = unsafe { lite.disjoint(&(10u32..20)) }.expect("Disjoint failed");
         assert!(!disjoint);
     }
+
+    /// [`Schema::count`] sums the item counts across every buffer of the first column, spanning both
+    /// [`Full`](Buffer::Full) and [`Lite`](Buffer::Lite) descriptors.
+    #[test]
+    fn schema_count_sums_buffers() {
+        let sector = Sector::new(8u64, 16u64).expect("Sector::new failed");
+        let full = Buffer::Full {
+            sector,
+            count: NonZeroU64::new(3).expect("Count is zero"),
+            min: [u8::MIN; B],
+            max: [u8::MAX; B],
+        };
+        let lite = Buffer::Lite {
+            sector,
+            count: NonZeroU64::new(2).expect("Count is zero"),
+        };
+        let column = Column { ty: Type::U32, buffers: vec![full, lite] };
+        let schema = Schema {
+            sector,
+            columns: BTreeMap::from([(String::from("v"), column)]),
+        };
+        assert_eq!(schema.count(), 5);
+    }
 }
