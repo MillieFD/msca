@@ -31,8 +31,6 @@ smol = "2.0"
 [features]
 default = ["derive"]
 derive = ["dep:clem-derive"]
-dictionary = ["clem-core/dictionary"]
-index = ["clem-core/index"]
 log = ["clem-core/log"] # TODO Implement logging.
 metadata = ["clem-core/metadata"]
 serde = ["clem-core/serde"]

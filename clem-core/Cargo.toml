@@ -44,8 +44,6 @@ optional = true
 
 [features]
 default = []
-dictionary = []
-index = ["dictionary"]
 log = ["dep:log"] # TODO Implement logging.
 metadata = ["dep:toml"] # TODO Remove TOML dependency
 serde = ["dep:serde"]
