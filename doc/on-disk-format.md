@@ -339,4 +339,11 @@ Refer to the [manifest documentation](./manifest.md) for more details.
 > therefore recorded relative to the start of the immutable segment region (excluding the file header) to enable direct
 > random access with no runtime offset arithmetic.
 
+### Index-Based Random Access
 
+Each on-disk item has a stable **positional index** within its respective schema; determined at write-time and never
+altered due to the immutable nature of the segment region. The on-disk location of a single item – or contiguous range
+of items – can therefore be resolved via the `count` statistic from each [manifest](#manifest) buffer descriptor.
+
+Refer to the dedicated [index random access](index-random-access.md) documentation for more details; specifically the
+distinction between pre-filter positional selection and post-filter result-set windows.
