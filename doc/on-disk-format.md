@@ -40,7 +40,7 @@ Data is recorded using self-describing segments which are immutable once written
 [segment header](#segment-header) consisting of a variant identifier and body size, followed by the variant-specific
 body and [checksum](#segment-checksum) suffix. Segments are **densely** packed: the next segment begins immediately
 after the preceding checksum with no inter-segment padding. The variant-specific body may include zero-filled padding
-to maintain [64-bit SIMD alignment](./simd-alignment.md) on critical data.
+to maintain [64-bit SIMD alignment](#segment-alignment) on critical data.
 
 ```text
 [Variant] [Size] [Body] [Checksum]
@@ -106,24 +106,38 @@ sequential readers to identify the segment type and skip if necessary without de
 ```text
 segment header
 ├─ variant: u8       // segment variant identifier
-└─ size: NonZeroU64  // length of the segment in bytes
+└─ size: NonZeroU64  // size of the segment body in bytes
 ```
 
-The `size` field encodes the number of bytes to the start of the next segment. Headers allow the entire segment region
-to **self-describe**: a sequential reader can walk the segment region end-to-end using information contained solely in
-the segment headers and dispatch relevant segment body deserialisation based on the `variant` identifier. This is the
-basis for [manifest recovery](#durability-and-recovery).
+The `size` field describes the exact number of bytes from the start of the segment body to the
+[checksum](#segment-checksum) suffix, including [64-bit alignment padding](#alignment-padding) if present. Headers allow
+the entire segment region to **self-describe**: a sequential reader can walk the segment region end-to-end using
+information contained solely in the segment headers and dispatch relevant segment body deserialisation based on the
+`variant` identifier. This is the basis for [manifest recovery](#durability-and-recovery).
 
-##### Alignment Padding
+##### Segment Checksum
 
-The header is excluded from the sector recorded in the [manifest](#manifest) and is read **exclusively** during
+Every segment ends with a fixed-length `u64` checksum computed over **every preceding byte** of the segment (including
+the [header](#segment-header)). The checksum is calculated exactly once – during segment serialisation – and is
+immutable once written. An invalid checksum is therefore the authorititive indicator of segment corruption and the
+automatic trigger for [manifest recovery](#durability-and-recovery).
+
+##### Segment Alignment
+
+The segment header is excluded from the sector recorded in the [manifest](#manifest) and is read **exclusively** during
 [manifest recovery](#durability-and-recovery); the optimised random-access read path routes fearlessly to the relevant
-segment body region without boundary checks or variant verification. [SIMD alignment](./simd-alignment.md) to the next
-64-bit boundary is therefore applied selectively based on the segment variant:
+segment body region without boundary checks or variant verification.
 
-- **Data segments** include a zero-filled padding region inserted after the [metadata](#data-segments) to ensure all
-  subsequent [columnar data buffers](#columnar-data-buffers) are begin at a 64-bit boundary.
+Segments are **densely** packed: the next segment begins immediately after the preceding checksum with no inter-segment
+padding. The variant-specific body may include zero-filled padding to maintain 64-bit alignment on critical data.
+
+- **Data segments** include up to seven (7) zero-filled padding bytes inserted after the [metadata](#data-segments) to
+  ensure the first [columnar data buffer](#columnar-data-buffers) begins at an **absolute** 64-bit boundary.
 - **Schema segments** are unaligned to improve on-disk storage efficiency.
+
+Since a segment header can begin at any byte offset, the alignment region is dynamically sized to an **absolute** 64-bit
+boundary measured relative to the page-aligned memory map; not relative to the segment start. Refer to the dedicated
+[alignment documentation](./simd-alignment.md) for more details.
 
 ### Schema Segments
 
@@ -137,7 +151,7 @@ schema segment
 │  ├─ variant: u8 = 0x01
 │  └─ size: NonZeroU64
 ├─ segment body: CBOR
-└─ alignment padding
+└─ checksum: u64
 ```
 
 Each schema segment encodes **one** schema and each clem file requires at least **one** schema segment. Multimodality
@@ -155,20 +169,21 @@ data segment
 │  ├─ variant: u8 = 0x02
 │  └─ size: NonZeroU64
 ├─ segment metadata
-│  ├─ schema: NonZeroU64  // offset of the associated schema segment
+│  ├─ schema: NonZeroU64  // offset to the associated schema segment
 │  ├─ count: NonZeroU64   // number of encoded items
 │  └─ alignment padding
-└─ segment body
-   ├─ 1st buffer
-   ⋮
-   └─ nth buffer
+├─ segment body
+│  ├─ 1st buffer
+│  ⋮
+│  └─ nth buffer
+└─ checksum: u64
 ```
 
 A metadata region is included directly after the segment header containing:
 
 1. A pointer to the associated schema segment which must be written to the file before this data segment.
 2. An item `count` indicating the total number of encoded rows; used for index-based random-access reads.
-3. A zero-filled padding region to maintain [64-bit SIMD alignment](./simd-alignment.md).
+3. Up to seven (7) zero-filled bytes to establish [absolute 64-bit alignment](#segment-alignment) for SIMD.
 
 All data buffers are guaranteed to begin at a 64-bit boundary. The number and order of buffers is determined by the
 associated schema segment.
@@ -179,7 +194,7 @@ Every buffer begins with a minimal header containing information shared by all v
 
 ```text
 buffer header
-└─ size: NonZeroU64  // length of the buffer in bytes
+└─ size: NonZeroU64  // size of the buffer body in bytes
 ```
 
 The `size` field encodes the number of bytes to the start of the next buffer. Headers allow the entire buffer region to
@@ -195,14 +210,8 @@ routes fearlessly to the relevant buffer without boundary checks or type verific
 ### Columnar Data Buffers
 
 Each schema column maps to one contiguous **buffer** within the data segment body. The buffer header is followed by a
-buffer body containing end-to-end serialised data. The final item may be followed by a variable-length zero-filled
-padding region to maintain [64-bit SIMD alignment](./simd-alignment.md).
-
-```text
-[Header] [Body] [Padding]
-```
-
-Item serialization is determined by the column `type` described in the associated schema segment.
+buffer body containing end-to-end serialised data. The final item may be followed by up to seven (7) zero-filled bytes
+to maintain [64-bit alignment](#buffer-alignment) for SIMD.
 
 | Size     | Optional  | Example              | Serialization Strategy                     |
 |----------|-----------|----------------------|:-------------------------------------------|
@@ -213,13 +222,25 @@ Item serialization is determined by the column `type` described in the associate
 | fixed    | niche     | `Option<NonZeroU64>` | concatenated data only; niche encodes none |
 | variable | yes       | `Option<String>`     | offset region + concatenated data region   |
 
-Each buffer body (the primary SIMD target) is aligned to a 64-bit boundary. The final serialized item may be followed by
-a variable-length zero-filled padding region to maintain this alignment.
+Item serialization is determined by the column `type` described in the associated schema segment.
+
+##### Buffer Alignment
+
+The buffer header is excluded from the sector recorded in the [manifest](#manifest) and is read **exclusively** during
+[manifest recovery](#durability-and-recovery); the optimised random-access read path routes fearlessly to the relevant
+buffer body region without boundary checks or variant verification.
+
+Each buffer body (the primary SIMD target) is aligned to an **absolute** 64-bit boundary measured relative to the
+page-aligned memory map; not relative to the segment start. The final serialized item may be followed by up to seven (7)
+zero-filled bytes to maintain this alignment for the next buffer. Compound buffer bodies (described below) may include
+additional internal padding after each sub-buffer to maintain absolute alignment for the next sub-buffer.
+
+Refer to the dedicated [alignment documentation](./simd-alignment.md) for more details.
 
 ##### Unsized Buffers
 
-It is not possible to predetermine the disk space required for each instance of an [unsized] type; there is no guarantee
-that two `Vec<I>` instances will contain the same number of elements. Clem therefore unfolds unsized types into:
+It is not possible to predetermine the disk space required for each instance of an [unsized][1] type; there is no
+guarantee that two collections will contain the same number of elements. Clem therefore unfolds unsized types into:
 
 1. Initial `ends` region describing boundaries.
 2. Contiguous `data` region encoding values.
@@ -274,17 +295,24 @@ repeated value across an entire data segment. Instead of repeatedly encoding ide
 > Implementers are encouraged to use a `bin` segment for genuinely constant values that never change across the entire
 > file lifetime. This improves storage efficiency by eliminating an unnecessary column from the schema.
 
-Compact buffers contain exactly **one** value – regardless of the segment header `count` – and are therefore detected
-automatically by the file reader when the buffer header `size` limit is reached after deserialising a single value. The
-reader returns a looped iterator yielding this value `count` times.
+Compact buffers contain exactly **one** value – regardless of the segment header `count` – and can therefore be detected
+automatically by a sequential file reader when the buffer header `size` limit is reached after deserialising a single
+value. The reader returns a looped iterator yielding this value `count` times. A compact buffer is byte-identical to an
+ordinary one-item buffer of the same column type; the segment layout is unchanged and remains fully self-describing.
 
 ### Manifest
 
-A self-describing **CBOR** file manifest is written after the immutable segment region. The manifest lists all file
-segments by type, acting like the index of a book to enhance segment discovery and enable **O(1) random access**.
+A self-describing **CBOR** file manifest is written immediately after the immutable segment region as an ordinary
+segment with a [segment header](#segment-header) and [checksum](#segment-checksum) suffix. The manifest lists all file
+segments by type, acting like the index of a book to enhance segment discovery and enable **O(1)** random access.
 
 ```text
-[header] [segment 1] ... [segment N] [manifest] ... [EOF]
+manifest segment
+├─ segment header
+│  ├─ variant: u8 = 0x00
+│  └─ size: NonZeroU64
+├─ segment body: CBOR
+└─ checksum: u64
 ```
 
 The manifest stores a lightweight **descriptor** for each on-disk [buffer](#columnar-data-buffers). These descriptors
@@ -294,10 +322,14 @@ bounds unset.
 
 ```text
 buffer descriptor
-├─ sector: Sector     // buffer location in the immutable region
-├─ count: NonZeroU64  // logical number of items in this buffer
-├─ min: LE bytes
-└─ max: LE bytes
+├─ full                  // standard buffer carrying `count` serialized rows
+│  ├─ sector: Sector     // buffer location in the immutable region
+│  ├─ count: NonZeroU64  // logical number of items in this buffer
+│  ├─ min: LE bytes
+│  └─ max: LE bytes
+└─ lite                  // compact buffer; sector spans ONE serialized row
+   ├─ sector: Sector
+   └─ count: NonZeroU64
 ```
 
 Refer to the [manifest documentation](./manifest.md) for more details.
