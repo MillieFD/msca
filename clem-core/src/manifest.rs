@@ -41,22 +41,6 @@ pub(crate) struct Manifest {
         serde(default, skip_serializing_if = "BTreeMap::is_empty")
     )]
     pub schemas: BTreeMap<String, Schema>,
-    /// [`Dictionary`] segments keyed by [`name`](String).
-    #[cfg(feature = "dictionary")]
-    #[cbor(n(1), skip_if = "BTreeMap::is_empty")]
-    #[cfg_attr(
-        feature = "serde",
-        serde(default, skip_serializing_if = "BTreeMap::is_empty")
-    )]
-    pub dictionaries: BTreeMap<String, Dictionary>,
-    /// [`Index`] segments keyed by [`name`](String).
-    #[cfg(feature = "index")]
-    #[cbor(n(2), skip_if = "BTreeMap::is_empty")]
-    #[cfg_attr(
-        feature = "serde",
-        serde(default, skip_serializing_if = "BTreeMap::is_empty")
-    )]
-    pub indexes: BTreeMap<String, Index>,
     /// Implementers can use the optional free-form `metadata.toml` to attach file-level
     /// domain-specific information such as:
     ///
@@ -68,7 +52,7 @@ pub(crate) struct Manifest {
     /// described in the `manifest`. The core library includes a read and write surface, but
     /// implementers must include their own metadata parsing and validation logic.
     #[cfg(feature = "metadata")]
-    #[cbor(n(3), skip_if = "Option::is_none")]
+    #[cbor(n(1), skip_if = "Option::is_none")]
     #[cfg_attr(
         feature = "serde",
         serde(default, skip_serializing_if = "Option::is_none")
