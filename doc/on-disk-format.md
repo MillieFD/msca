@@ -2,17 +2,16 @@
 
 This document describes the on-disk layout of a clem file. It is intended as a reference for end-users and implementers.
 
-The self-describing clem format has been carefully designed to maximise query performance and space efficiency while
-remaining deterministic and portable across all platforms and architectures. This file does not describe the in-memory
-layout which may vary between platforms and releases.
+The self-describing clem format is designed to maximise query performance and space efficiency while remaining
+deterministic and portable across supported architectures. This file does not describe the in-memory layout which may
+vary between platforms and releases.
 
 > **LE Byte Order Throughout:**
 > All sizes and offsets are encoded using `u64`. Platform-dependent types such as `usize` are deliberately omitted to
 > ensure file portability.
 
-This file describes how a single
-self-describing file is partitioned into segments, how those segments encode columnar data, and how a reader navigates
-the file with minimal IO.
+This file describes how a single self-describing file is partitioned into segments, how those segments encode columnar
+data, and how a reader navigates the file with minimal IO.
 
 ### File Anatomy
 
@@ -20,12 +19,9 @@ Every clem file begins with a fixed-size [file header](#file-header), followed b
 [segments](#sectors-and-segments). The file ends with a CBOR [manifest](#manifest) and optional [metadata](#metadata).
 
 ```text
-[Header] [Segment 0] ... [Segment N] ... [Manifest] [Metadata]
-                               tail ↑   ↑ manifest.offset
+[Header] [Segment 0] ... [Segment N] [Manifest] [Metadata]
+                                    ↑ manifest.offset
 ```
-
-A transient empty region may exist between the final segment and the manifest after the [write-cycle](./write-cycle.md).
-This region is unreferenced and invisible to readers; it is reclaimed during the next write-cycle.
 
 ### Sectors and Segments
 
@@ -41,20 +37,23 @@ sector
 ```
 
 Data is recorded using self-describing segments which are immutable once written. Each segment begins with a minimal
-[segment header](#segment-header) consisting of a variant identifier and length. The variant-specific payload may be
-followed by a zero-filled padding region to maintain [64-bit SIMD alignment](./simd-alignment.md).
+[segment header](#segment-header) consisting of a variant identifier and body size, followed by the variant-specific
+body and [checksum](#segment-checksum) suffix. Segments are **densely** packed: the next segment begins immediately
+after the preceding checksum with no inter-segment padding. The variant-specific body may include zero-filled padding
+to maintain [64-bit SIMD alignment](./simd-alignment.md) on critical data.
 
 ```text
-[Variant] [Length] [Payload] [Padding]
+[Variant] [Size] [Body] [Checksum]
 ```
 
-Two segment variants are currently defined.
+Four segment variants are currently defined.
 
-| Variant |  Byte  | Payload                                                        |
-|--------:|:------:|:---------------------------------------------------------------|
-|  Schema | `0x01` | The [structure](#schema-segments) of an encoded type.          |
-|    Data | `0x02` | The [columnar buffers](#data-segment) for one schema instance. |
-|  Binary | `0x03` | Free-form immutable binary data                                |
+|  Variant |  Byte  | Payload                                                         |
+|---------:|:------:|:----------------------------------------------------------------|
+| Manifest | `0x00` | The CBOR [manifest](#manifest) listing all file segments.       |
+|   Schema | `0x01` | The [structure](#schema-segments) of an encoded type.           |
+|     Data | `0x02` | The [columnar buffers](#data-segments) for one schema instance. |
+|   Binary | `0x03` | Free-form immutable binary data (planned)                       |
 
 Multimodality and schema evolution are realised by appending additional schema segments. Data storage and file
 extensibility are realised by appending additional data segments. Format extensibility may be achieved via the
@@ -70,8 +69,7 @@ followed by the mutable pointers required to bootstrap navigation.
 file header
 ├─ magic: [u8; 4]      // b"clem"
 ├─ version: u8
-├─ tail: NonZeroU64    // offset immediately after the final segment
-├─ manifest: Sector    // offset + length of the encoded manifest
+├─ manifest: Sector    // offset + length of the manifest segment
 └─ alignment padding   // zero-filled to the next 64-bit boundary
 ```
 
@@ -87,16 +85,13 @@ A major version number is embedded in the file header to indicate breaking chang
 and backwards compatibility across version numbers is not guaranteed. Readers must reject any file with an unrecognised
 version number.
 
-##### Tail Pointer
-
-Mutable pointer recording the byte offset immediately following the final committed segment. New segments are always
-appended from `tail`, not from EOF. An empty region may exist between `tail` and the start of the manifest when
-appending segments that are shorter than the combined manifest and metadata. This empty region is reclaimed during the
-next write-cycle.
-
 ##### Manifest Sector
 
-A [sector](#sectors-and-segments) to locate the CBOR manifest written after the immutable segment region.
+A mutable [sector](#sectors-and-segments) to locate the [manifest](#manifest). The manifest sector offset doubles as the
+[write-cycle](./write-cycle.md) start point for new [segments](#sectors-and-segments).
+
+The [file header](#file-header) carries no checksum. Readers should trust the indicated manifest sector **only if** the
+[checksum](#segment-checksum) suffix passes and the CBOR body decodes.
 
 ##### Alignment Padding
 
