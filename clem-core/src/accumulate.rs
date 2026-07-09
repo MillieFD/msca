@@ -2007,23 +2007,19 @@ where
     type Buffer = Vec<u8>;
 
     fn size(&self) -> Result<NonZeroU64, Error> {
-        let data = self.data.size()?.align()?;
-        let prefix = size_of::<NonZeroU64>().try_into()?; // Length prefix
-        self.offsets
-            .size()?
-            .align()?
-            .checked_add(data)
-            .ok_or(Error::Zero)?
-            .checked_add(prefix)
-            .and_then(NonZeroU64::new)
-            .ok_or(Error::Zero)
+        let ends = SizedBuf::new(&self.offsets).size()?;
+        match self.data.is_empty() {
+            true => Ok(ends),
+            false => SizedBuf::new(&self.data).size()?.checked_add(ends.get()).ok_or(Error::Zero),
+        }
     }
 
     fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
-        let prefix: u64 = size_of::<NonZeroU64>().try_into()?;
-        // NOTE: Self::size returns Error if Σ overflows u64 (not expected in production)
-        let buf = self.size()?.get().sub(prefix).to_le_bytes().serialize_into(buf)?;
-        buf.serialize_push_aligned(&self.offsets)?.serialize_push_aligned(&self.data)
+        let buf = SizedBuf::new(&self.offsets).serialize_into(buf)?;
+        match self.data.is_empty() {
+            true => Ok(buf),
+            false => SizedBuf::new(&self.data).serialize_into(buf),
+        }
     }
 
     fn serialize(&self) -> Result<Self::Buffer, Error> {
