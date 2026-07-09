@@ -267,6 +267,13 @@ pub enum Buffer {
 }
 
 impl Buffer {
+    /// Returns the logical number of items recorded in [`self`](Buffer).
+    pub(crate) const fn count(&self) -> u64 {
+        match self {
+            Buffer::Full { count, .. } | Buffer::Lite { count, .. } => count.get(),
+        }
+    }
+
     /// Returns `true` if [`self`](Buffer) is provably disjoint from the specified [`Range`].
     ///
     /// - [`Buffer::Full`] are evaluated using `min` and `max` statistics.
