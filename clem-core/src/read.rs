@@ -166,13 +166,16 @@ where
 impl<'de, I> Deserialize<'de> for OptBitVec<'de, I>
 where
     I: Read,
-    I::Src<'de>: Deserialize<'de, Ok = I::Src<'de>>,
+    I::Src<'de>: Deserialize<'de, Ok = I::Src<'de>> + Default,
 {
     type Ok = Self;
 
     fn deserialize(src: &mut &'de [u8]) -> Result<Self, Error> {
-        let mask = src.deserialize_into::<SizedBuf>()?.deserialize_into()?;
-        let data = src.deserialize_into::<SizedBuf>()?.deserialize_into()?;
+        let mask = SizedBuf::deserialize(src)?.deserialize_into()?;
+        let data = match src.is_empty() {
+            true => I::Src::default(),
+            false => SizedBuf::deserialize(src)?.deserialize_into()?,
+        };
         Ok(Self { mask, data })
     }
 }
