@@ -509,10 +509,6 @@ where
 ///
 /// [1]: crate::schema::Type
 pub trait Accumulate<I>: Serialize {
-    /// Returns a new empty instance of [`Self`] boxed as a [`BoxAcc`] trait object.
-    // NOTE: Buffer must be a growable Vec; compiler cannot predict the number of accumulated items
-    fn boxed(&self) -> BoxAcc<I>;
-
     /// Append one [`Item`](I) to the [accumulator](Self)
     fn push(&mut self, item: I);
 
@@ -524,8 +520,11 @@ pub trait Accumulate<I>: Serialize {
     /// Returns `true` if the [accumulator](Self) contains no data.
     fn is_empty(&self) -> bool;
 
-    /// Returns the number of accumulated rows.
+    /// Returns the number of accumulated [`items`](I).
     fn count(&self) -> u64;
+
+    /// Returns `true` if **any** accumulated [`item`](I) is **bit-identical** to the provided item.
+    fn contains(&self, item: &I) -> bool;
 
     /// Returns the minimum accumulated value, or [`None`] if the [`Item`](I) is not meaningfully
     /// [orderable](PartialOrd).
@@ -538,23 +537,11 @@ pub trait Accumulate<I>: Serialize {
     fn max(&self) -> Option<I> {
         None
     }
-
-    /// Generates one or more [`Buffer`] instances describing the accumulated data and appends to
-    /// the [`Manifest`][1].
-    ///
-    /// Returns the next available offset for subsequent buffers, or [`Error`] on overflow.
-    ///
-    /// [1]: manifest::Manifest
-    fn buffers(&self, offset: u64, columns: &mut Columns) -> Result<u64, Error>;
 }
 
 /* ------------------------------------------------------------- Accumulate Trait Implementation */
 
 impl<I> Accumulate<I> for Accumulator<I> {
-    fn boxed(&self) -> BoxAcc<I> {
-        self.data.boxed()
-    }
-
     fn push(&mut self, item: I) {
         self.data.push(item);
     }
@@ -571,6 +558,10 @@ impl<I> Accumulate<I> for Accumulator<I> {
         self.data.count()
     }
 
+    fn contains(&self, item: &I) -> bool {
+        self.data.contains(item)
+    }
+
     fn min(&self) -> Option<I> {
         self.data.min()
     }
@@ -578,17 +569,9 @@ impl<I> Accumulate<I> for Accumulator<I> {
     fn max(&self) -> Option<I> {
         self.data.max()
     }
-
-    fn buffers(&self, offset: u64, columns: &mut Columns) -> Result<u64, Error> {
-        self.data.buffers(offset, columns)
-    }
 }
 
 impl Accumulate<bool> for BitVec {
-    fn boxed(&self) -> BoxAcc<bool> {
-        Box::new(Self::default())
-    }
-
     fn push(&mut self, item: bool) {
         BitVec::push(self, item);
     }
@@ -605,6 +588,10 @@ impl Accumulate<bool> for BitVec {
         BitVec::len(self) as u64
     }
 
+    fn contains(&self, item: &bool) -> bool {
+        if *item { self.any() } else { self.not_all() }
+    }
+
     fn min(&self) -> Option<bool> {
         const_assert!(false < true);
         self.iter().min().as_deref().copied()
@@ -614,33 +601,12 @@ impl Accumulate<bool> for BitVec {
         const_assert!(false < true);
         self.iter().max().as_deref().copied()
     }
-
-    fn buffers(&self, offset: u64, columns: &mut Columns) -> Result<u64, Error> {
-        // TODO → move manifest::Buffer construction to accumulate::Compact & match variants?
-        let sector = Sector {
-            offset: offset.checked_add(PREFIX).ok_or(Error::Zero)?,
-            length: self.size()?,
-        };
-        let next = sector.next().ok_or(Error::Zero)?.align()?;
-        let buf = manifest::Buffer::Full {
-            sector,
-            count: self.count().try_into()?,
-            min: Accumulate::min(self).map(u128::from).unwrap_or(u128::MIN).serialize()?,
-            max: Accumulate::max(self).map(u128::from).unwrap_or(u128::MAX).serialize()?,
-        };
-        columns.next().map(|column| column.buffers.push(buf));
-        Ok(next)
-    }
 }
 
 impl<I> Accumulate<I> for Vec<I>
 where
-    I: Serialize + Copy + PartialOrd + 'static,
+    I: Copy + PartialOrd + Serialize + Unfold + 'static,
 {
-    fn boxed(&self) -> BoxAcc<I> {
-        Box::new(Self::default())
-    }
-
     fn push(&mut self, item: I) {
         Vec::push(self, item);
     }
@@ -655,6 +621,10 @@ where
 
     fn count(&self) -> u64 {
         Vec::len(self) as u64
+    }
+
+    fn contains(&self, item: &I) -> bool {
+        self.iter().any(|i| !i.unique(item))
     }
 
     fn min(&self) -> Option<I> {
@@ -672,42 +642,13 @@ where
             false => b,
         })
     }
-
-    fn buffers(&self, offset: u64, columns: &mut Columns) -> Result<u64, Error> {
-        // TODO → move manifest::Buffer construction to accumulate::Compact & match variants?
-        let min = [u8::MIN; B];
-        let max = [u8::MAX; B];
-        let sector = Sector {
-            offset: offset.checked_add(PREFIX).ok_or(Error::Zero)?,
-            length: self.size()?,
-        };
-        let next = sector.next().ok_or(Error::Zero)?.align()?;
-        let buf = manifest::Buffer::Full {
-            sector,
-            count: self.count().try_into()?,
-            min: match Accumulate::min(self) {
-                Some(v) => min.serialize_push(&v)?,
-                None => min,
-            },
-            max: match Accumulate::max(self) {
-                Some(v) => max.serialize_push(&v)?,
-                None => max,
-            },
-        };
-        columns.next().map(|column| column.buffers.push(buf));
-        Ok(next)
-    }
 }
 
 impl<I> Accumulate<Option<I>> for OptInSitu<I>
 where
     Option<I>: Serialize,
-    I: Copy + PartialOrd + 'static,
+    I: Copy + PartialOrd + Unfold + 'static,
 {
-    fn boxed(&self) -> BoxAcc<Option<I>> {
-        Box::new(Self::default())
-    }
-
     fn push(&mut self, item: Option<I>) {
         self.data.push(item);
     }
@@ -724,6 +665,10 @@ where
         self.data.count()
     }
 
+    fn contains(&self, item: &Option<I>) -> bool {
+        self.data.contains(item)
+    }
+
     fn min(&self) -> Option<Option<I>> {
         self.data.min()
     }
@@ -731,20 +676,12 @@ where
     fn max(&self) -> Option<Option<I>> {
         self.data.max()
     }
-
-    fn buffers(&self, offset: u64, columns: &mut Columns) -> Result<u64, Error> {
-        self.data.buffers(offset, columns)
-    }
 }
 
 impl<I> Accumulate<Option<I>> for OptBitVec<I>
 where
     I: Unfold + 'static,
 {
-    fn boxed(&self) -> BoxAcc<Option<I>> {
-        Box::new(Self::default())
-    }
-
     fn push(&mut self, item: Option<I>) {
         if let Some(value) = item {
             self.mask.push(true);
@@ -768,32 +705,18 @@ where
         self.mask.len() as u64
     }
 
-    fn buffers(&self, offset: u64, columns: &mut Columns) -> Result<u64, Error> {
-        // TODO → move manifest::Buffer construction to accumulate::Compact & match variants?
-        let sector = Sector {
-            offset: offset.checked_add(PREFIX).ok_or(Error::Zero)?,
-            length: self.size()?,
-        };
-        let next = sector.next().ok_or(Error::Zero)?.align()?;
-        let buf = manifest::Buffer::Full {
-            sector,
-            count: self.count().try_into()?,
-            min: [u8::MIN; B],
-            max: [u8::MAX; B],
-        };
-        columns.next().map(|column| column.buffers.push(buf));
-        Ok(next)
+    fn contains(&self, item: &Option<I>) -> bool {
+        match item {
+            None => self.mask.not_all(),
+            Some(i) => self.data.contains(i),
+        }
     }
 }
 
 impl<I> Accumulate<Vec<I>> for Seq<I>
 where
-    I: Unfold + 'static,
+    I: Clone + Unfold + 'static,
 {
-    fn boxed(&self) -> BoxAcc<Vec<I>> {
-        Box::new(Self::default())
-    }
-
     fn push(&mut self, item: Vec<I>) {
         let size = item.len() as u64;
         let next = self.offsets.last().copied().unwrap_or(u64::MIN).saturating_add(size);
@@ -948,10 +871,6 @@ impl<A, B> Accumulate<Option<Option<B>>> for Flatten<A>
 where
     A: Accumulate<Option<B>> + Default + Serialize<Buffer = Vec<u8>> + 'static,
 {
-    fn boxed(&self) -> BoxAcc<Option<Option<B>>> {
-        Box::new(Self::default())
-    }
-
     fn push(&mut self, item: Option<Option<B>>) {
         self.0.push(item.flatten());
     }
@@ -968,8 +887,11 @@ where
         self.0.count()
     }
 
-    fn buffers(&self, offset: u64, columns: &mut Columns) -> Result<u64, Error> {
-        self.0.buffers(offset, columns)
+    fn contains(&self, item: &Option<Option<B>>) -> bool {
+        match item {
+            Some(i) => self.0.contains(i),
+            None => self.0.contains(&None),
+        }
     }
 }
 
@@ -1008,6 +930,14 @@ where
             Self::Empty => u64::MIN,
             Self::Lite { count, .. } => *count,
             Self::Full(acc) => acc.count(),
+        }
+    }
+
+    fn contains(&self, other: &I) -> bool {
+        match self {
+            Self::Empty => false,
+            Self::Lite { item, .. } => !item.unique(other),
+            Self::Full(acc) => acc.contains(other),
         }
     }
 
