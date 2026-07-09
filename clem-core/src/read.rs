@@ -199,8 +199,8 @@ impl<'de> Deserialize<'de> for Seq<'de> {
     type Ok = Self;
 
     fn deserialize(src: &mut &'de [u8]) -> Result<Self, Error> {
-        let ends = src.deserialize_into::<SizedBuf>()?.deserialize_into()?;
-        let data = src.deserialize_into::<SizedBuf>()?.deserialize_into()?;
+        let ends = SizedBuf::deserialize(src)?.deserialize_into()?;
+        let data = SizedBuf::deserialize(src)?.deserialize_into::<&[u8]>().unwrap_or_default();
         Ok(Self { ends, data })
     }
 }
