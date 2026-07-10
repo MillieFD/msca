@@ -634,6 +634,206 @@ where
     }
 }
 
+/* ------------------------------------------------------------------- BitMatch Trait Definition */
+
+/// Compares two items by their exact **bit pattern**.
+///
+/// ### [BitMatch](Self) vs [PartialEq](PartialEq)
+///
+/// Each equality-testing trait uses a different underlying mechanism:
+///
+/// - `BitMatch` compares the serialized on-disk bytes.
+/// - [`PartialEq`] compares the logical value.
+///
+/// For example, two [`f64::NAN`] are bit-identical – meaning [`BitMatch::eq`] returns `true` – but
+/// logically non-equivalent – meaning [`PartialEq::eq`] returns `false`.
+// NOTE: used by accumulate::Compact to identify when Buffer::Lite must transform into Buffer::Full
+#[doc(hidden)]
+pub trait BitMatch {
+    /// Returns `true` if [`self`](Self) and `other` are **bit-identical**.
+    fn eq(&self, other: &Self) -> bool;
+
+    /// Returns `true` if [`self`](Self) and `other` are **not** [bit-identical](Self::eq).
+    fn ne(&self, other: &Self) -> bool {
+        !self.eq(other)
+    }
+}
+
+/* --------------------------------------------------------------- BitMatch Trait Implementation */
+
+impl BitMatch for bool {
+    fn eq(&self, other: &Self) -> bool {
+        self == other
+    }
+}
+
+impl BitMatch for char {
+    fn eq(&self, other: &Self) -> bool {
+        self == other
+    }
+}
+
+impl BitMatch for u8 {
+    fn eq(&self, other: &Self) -> bool {
+        self == other
+    }
+}
+
+impl BitMatch for u16 {
+    fn eq(&self, other: &Self) -> bool {
+        self == other
+    }
+}
+
+impl BitMatch for u32 {
+    fn eq(&self, other: &Self) -> bool {
+        self == other
+    }
+}
+
+impl BitMatch for u64 {
+    fn eq(&self, other: &Self) -> bool {
+        self == other
+    }
+}
+
+impl BitMatch for u128 {
+    fn eq(&self, other: &Self) -> bool {
+        self == other
+    }
+}
+
+impl BitMatch for num::NonZeroU8 {
+    fn eq(&self, other: &Self) -> bool {
+        self == other
+    }
+}
+
+impl BitMatch for num::NonZeroU16 {
+    fn eq(&self, other: &Self) -> bool {
+        self == other
+    }
+}
+
+impl BitMatch for num::NonZeroU32 {
+    fn eq(&self, other: &Self) -> bool {
+        self == other
+    }
+}
+
+impl BitMatch for num::NonZeroU64 {
+    fn eq(&self, other: &Self) -> bool {
+        self == other
+    }
+}
+
+impl BitMatch for num::NonZeroU128 {
+    fn eq(&self, other: &Self) -> bool {
+        self == other
+    }
+}
+
+impl BitMatch for i8 {
+    fn eq(&self, other: &Self) -> bool {
+        self == other
+    }
+}
+
+impl BitMatch for i16 {
+    fn eq(&self, other: &Self) -> bool {
+        self == other
+    }
+}
+
+impl BitMatch for i32 {
+    fn eq(&self, other: &Self) -> bool {
+        self == other
+    }
+}
+
+impl BitMatch for i64 {
+    fn eq(&self, other: &Self) -> bool {
+        self == other
+    }
+}
+
+impl BitMatch for i128 {
+    fn eq(&self, other: &Self) -> bool {
+        self == other
+    }
+}
+
+impl BitMatch for num::NonZeroI8 {
+    fn eq(&self, other: &Self) -> bool {
+        self == other
+    }
+}
+
+impl BitMatch for num::NonZeroI16 {
+    fn eq(&self, other: &Self) -> bool {
+        self == other
+    }
+}
+
+impl BitMatch for num::NonZeroI32 {
+    fn eq(&self, other: &Self) -> bool {
+        self == other
+    }
+}
+
+impl BitMatch for num::NonZeroI64 {
+    fn eq(&self, other: &Self) -> bool {
+        self == other
+    }
+}
+
+impl BitMatch for num::NonZeroI128 {
+    fn eq(&self, other: &Self) -> bool {
+        self == other
+    }
+}
+
+impl BitMatch for f32 {
+    fn eq(&self, other: &Self) -> bool {
+        // NOTE: compare by exact bit pattern unlike PartialEq
+        self.to_le_bytes() == other.to_le_bytes()
+    }
+}
+
+impl BitMatch for f64 {
+    fn eq(&self, other: &Self) -> bool {
+        // NOTE: compare by exact bit pattern unlike PartialEq
+        self.to_le_bytes() == other.to_le_bytes()
+    }
+}
+
+impl<I> BitMatch for Option<I>
+where
+    I: BitMatch,
+{
+    fn eq(&self, other: &Self) -> bool {
+        match self {
+            None => other.is_none(),
+            Some(a) => other.as_ref().is_some_and(|b| a.eq(b)),
+        }
+    }
+}
+
+impl<I> BitMatch for Vec<I>
+where
+    I: BitMatch,
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.len() == other.len() && self.iter().zip(other).all(|both| both.0.eq(both.1))
+    }
+}
+
+impl BitMatch for String {
+    fn eq(&self, other: &Self) -> bool {
+        self.as_bytes() == other.as_bytes()
+    }
+}
+
 /* --------------------------------------------------------------------- Unfold Trait Definition */
 
 /// A platform-agnostic **type** that can be unfolded into its primitive [components](Type) using
