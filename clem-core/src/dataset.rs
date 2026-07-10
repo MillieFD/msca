@@ -140,6 +140,33 @@ impl Dataset {
         Ok(count)
     }
 
+    /// [`Write`][1] the accumulated data and return the **insertion indices** of the written items.
+    ///
+    /// Exclusive `&mut` access ensures indices are assigned atomically at write-time. The starting
+    /// index is resolved from the number of existing items for this [`Schema`]. The returned
+    /// [`Range`] therefore contains one index per item in [`Accumulator`] insertion order.
+    ///
+    /// An empty accumulator yields an empty range without file [`IO`](io).
+    ///
+    /// ### Errors
+    ///
+    /// - [`Error::Io`][2] from the underlying [write-cycle](io)
+    /// - [`Error::Number`][3] if the segment `size` or `offset` overflow `u64`.
+    ///
+    /// [1]: crate::segment::Segment::write
+    /// [2]: io::Error::Io
+    /// [3]: io::Error::Number
+    pub async fn index<I>(&mut self, accumulator: Accumulator<I>) -> Result<Range<u64>, io::Error> {
+        let start = self
+            .file
+            .manifest
+            .schemas
+            .get(&accumulator.name)
+            .map_or(u64::MIN, manifest::Schema::count);
+        let end = start + self.write(accumulator).await?;
+        Ok(start..end)
+    }
+
     /// Initialise a new [`Query`] over the named [`Schema`][1].
     ///
     /// The query begins with **every** column and **every** buffer from the specified schema.
