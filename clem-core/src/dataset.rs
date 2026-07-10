@@ -119,7 +119,7 @@ impl Dataset {
         })
     }
 
-    /// [`Write`][1] the accumulated data to the [clem](crate) file and return the number of rows.
+    /// [`Write`][1] the accumulated data and return the number of written items.
     ///
     /// Empty accumulators are ignored.
     ///
