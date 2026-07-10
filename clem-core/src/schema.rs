@@ -143,7 +143,7 @@ impl Schema {
     #[doc(hidden)]
     pub fn column<I>(&mut self, name: impl Into<String>) -> Result<BoxAcc<I>, Error>
     where
-        I: Unfold + Clone + 'static,
+        I: BitMatch + Clone + Unfold + 'static,
         Schema: Unfolder<I>,
     {
         let name = name.into();
