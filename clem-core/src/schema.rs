@@ -876,9 +876,6 @@ pub trait Unfold: Sized {
         U::unfold()
     }
 
-    /// Returns `true` if [`self`](Self) and `other` are **not** bit-identical.
-    fn unique(&self, other: &Self) -> bool;
-
     /// Construct an [accumulator](Self::RawAcc) containing exactly **one** [`item`](Self); used to
     /// serialize single-value [`Compact::Lite`] without repeated [`Accumulate::push`] calls.
     fn once(item: &Self) -> Self::RawAcc
