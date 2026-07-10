@@ -922,229 +922,121 @@ const_assert_ne!(size_of::<f64>(), size_of_opt::<f64>());
 impl Unfold for bool {
     type RawAcc = BitVec;
     type OptAcc = OptBitVec<Self>;
-
-    fn unique(&self, other: &Self) -> bool {
-        self != other
-    }
 }
 
 impl Unfold for char {
     type RawAcc = Vec<Self>;
     type OptAcc = OptInSitu<Self>;
-
-    fn unique(&self, other: &Self) -> bool {
-        self != other
-    }
 }
 
 impl Unfold for u8 {
     type RawAcc = Vec<Self>;
     type OptAcc = OptBitVec<Self>;
-
-    fn unique(&self, other: &Self) -> bool {
-        self != other
-    }
 }
 
 impl Unfold for u16 {
     type RawAcc = Vec<Self>;
     type OptAcc = OptBitVec<Self>;
-
-    fn unique(&self, other: &Self) -> bool {
-        self != other
-    }
 }
 
 impl Unfold for u32 {
     type RawAcc = Vec<Self>;
     type OptAcc = OptBitVec<Self>;
-
-    fn unique(&self, other: &Self) -> bool {
-        self != other
-    }
 }
 
 impl Unfold for u64 {
     type RawAcc = Vec<Self>;
     type OptAcc = OptBitVec<Self>;
-
-    fn unique(&self, other: &Self) -> bool {
-        self != other
-    }
 }
 
 impl Unfold for u128 {
     type RawAcc = Vec<Self>;
     type OptAcc = OptBitVec<Self>;
-
-    fn unique(&self, other: &Self) -> bool {
-        self != other
-    }
 }
 
 impl Unfold for num::NonZeroU8 {
     type RawAcc = Vec<Self>;
     type OptAcc = OptInSitu<Self>;
-
-    fn unique(&self, other: &Self) -> bool {
-        let other = other.get();
-        self.get().unique(&other)
-    }
 }
 
 impl Unfold for num::NonZeroU16 {
     type RawAcc = Vec<Self>;
     type OptAcc = OptInSitu<Self>;
-
-    fn unique(&self, other: &Self) -> bool {
-        let other = other.get();
-        self.get().unique(&other)
-    }
 }
 
 impl Unfold for num::NonZeroU32 {
     type RawAcc = Vec<Self>;
     type OptAcc = OptInSitu<Self>;
-
-    fn unique(&self, other: &Self) -> bool {
-        let other = other.get();
-        self.get().unique(&other)
-    }
 }
 
 impl Unfold for num::NonZeroU64 {
     type RawAcc = Vec<Self>;
     type OptAcc = OptInSitu<Self>;
-
-    fn unique(&self, other: &Self) -> bool {
-        let other = other.get();
-        self.get().unique(&other)
-    }
 }
 
 impl Unfold for num::NonZeroU128 {
     type RawAcc = Vec<Self>;
     type OptAcc = OptInSitu<Self>;
-
-    fn unique(&self, other: &Self) -> bool {
-        let other = other.get();
-        self.get().unique(&other)
-    }
 }
 
 impl Unfold for i8 {
     type RawAcc = Vec<Self>;
     type OptAcc = OptBitVec<Self>;
-
-    fn unique(&self, other: &Self) -> bool {
-        self != other
-    }
 }
 
 impl Unfold for i16 {
     type RawAcc = Vec<Self>;
     type OptAcc = OptBitVec<Self>;
-
-    fn unique(&self, other: &Self) -> bool {
-        self != other
-    }
 }
 
 impl Unfold for i32 {
     type RawAcc = Vec<Self>;
     type OptAcc = OptBitVec<Self>;
-
-    fn unique(&self, other: &Self) -> bool {
-        self != other
-    }
 }
 
 impl Unfold for i64 {
     type RawAcc = Vec<Self>;
     type OptAcc = OptBitVec<Self>;
-
-    fn unique(&self, other: &Self) -> bool {
-        self != other
-    }
 }
 
 impl Unfold for i128 {
     type RawAcc = Vec<Self>;
     type OptAcc = OptBitVec<Self>;
-
-    fn unique(&self, other: &Self) -> bool {
-        self != other
-    }
 }
 
 impl Unfold for num::NonZeroI8 {
     type RawAcc = Vec<Self>;
     type OptAcc = OptInSitu<Self>;
-
-    fn unique(&self, other: &Self) -> bool {
-        let other = other.get();
-        self.get().unique(&other)
-    }
 }
 
 impl Unfold for num::NonZeroI16 {
     type RawAcc = Vec<Self>;
     type OptAcc = OptInSitu<Self>;
-
-    fn unique(&self, other: &Self) -> bool {
-        let other = other.get();
-        self.get().unique(&other)
-    }
 }
 
 impl Unfold for num::NonZeroI32 {
     type RawAcc = Vec<Self>;
     type OptAcc = OptInSitu<Self>;
-
-    fn unique(&self, other: &Self) -> bool {
-        let other = other.get();
-        self.get().unique(&other)
-    }
 }
 
 impl Unfold for num::NonZeroI64 {
     type RawAcc = Vec<Self>;
     type OptAcc = OptInSitu<Self>;
-
-    fn unique(&self, other: &Self) -> bool {
-        let other = other.get();
-        self.get().unique(&other)
-    }
 }
 
 impl Unfold for num::NonZeroI128 {
     type RawAcc = Vec<Self>;
     type OptAcc = OptInSitu<Self>;
-
-    fn unique(&self, other: &Self) -> bool {
-        let other = other.get();
-        self.get().unique(&other)
-    }
 }
 
 impl Unfold for f32 {
     type RawAcc = Vec<Self>;
     type OptAcc = OptBitVec<Self>;
-
-    fn unique(&self, other: &Self) -> bool {
-        // NOTE: compare by exact bit pattern unlike PartialEq
-        self.to_le_bytes() != other.to_le_bytes()
-    }
 }
 
 impl Unfold for f64 {
     type RawAcc = Vec<Self>;
     type OptAcc = OptBitVec<Self>;
-
-    fn unique(&self, other: &Self) -> bool {
-        // NOTE: compare by exact bit pattern unlike PartialEq
-        self.to_le_bytes() != other.to_le_bytes()
-    }
 }
 
 impl<I> Unfold for Option<I>
@@ -1153,13 +1045,6 @@ where
 {
     type RawAcc = I::OptAcc;
     type OptAcc = accumulate::Flatten<I::OptAcc>;
-
-    fn unique(&self, other: &Self) -> bool {
-        match self {
-            None => other.is_some(),
-            Some(a) => other.as_ref().map_or(true, |b| a.unique(&b)),
-        }
-    }
 }
 
 impl<I> Unfold for Vec<I>
@@ -1168,19 +1053,11 @@ where
 {
     type RawAcc = accumulate::Seq<I>;
     type OptAcc = accumulate::OptSeq<I>;
-
-    fn unique(&self, other: &Self) -> bool {
-        self.len() != other.len() || self.iter().zip(other).any(|both| both.0.unique(&both.1))
-    }
 }
 
 impl Unfold for String {
     type RawAcc = accumulate::Seq<u8>;
     type OptAcc = accumulate::OptSeq<u8>;
-
-    fn unique(&self, other: &Self) -> bool {
-        self.as_bytes() != other.as_bytes()
-    }
 }
 
 /* ------------------------------------------------------------------- Unfolder Trait Definition */
@@ -1416,26 +1293,30 @@ mod tests {
         );
     }
 
-    /// [`Unfold::unique`] compares floating point values by exact bit pattern: a repeated
-    /// [`NaN`](f64::NAN) payload is not unique while distinct payloads are, unlike [`PartialEq`].
+    /// [`BitMatch::eq`] compares floating point values by exact bit pattern: a repeated
+    /// [`NaN`](f64::NAN) payload is bit-identical while distinct payloads are not, unlike
+    /// [`PartialEq`].
     #[test]
-    fn unique_compares_float_bits() {
-        assert!(!f64::NAN.unique(&f64::NAN));
-        assert!(!f64::INFINITY.unique(&f64::INFINITY));
-        assert!(f64::INFINITY.unique(&f64::NEG_INFINITY));
-        assert!(1.0f64.unique(&2.0));
-        assert!(f32::NAN.unique(&f32::from_bits(f32::NAN.to_bits() | 1)));
+    fn bit_match_compares_float_bits() {
+        assert!(BitMatch::eq(&f64::NAN, &f64::NAN));
+        assert!(BitMatch::eq(&f64::INFINITY, &f64::INFINITY));
+        assert!(BitMatch::ne(&f64::INFINITY, &f64::NEG_INFINITY));
+        assert!(BitMatch::ne(&1.0f64, &2.0));
+        assert!(BitMatch::ne(
+            &f32::NAN,
+            &f32::from_bits(f32::NAN.to_bits() | 1)
+        ));
     }
 
-    /// [`Unfold::unique`] recurses through [`Option`] and [`Vec`] layers so bit-pattern semantics
+    /// [`BitMatch::eq`] recurses through [`Option`] and [`Vec`] layers so bit-pattern semantics
     /// propagate into optional and unsized columns.
     #[test]
-    fn unique_recurses_layers() {
-        assert!(!Some(f64::NAN).unique(&Some(f64::NAN)));
-        assert!(!None::<f64>.unique(&None));
-        assert!(Some(f64::NAN).unique(&None));
-        assert!(!vec![f32::NAN, 1.0].unique(&vec![f32::NAN, 1.0]));
-        assert!(vec![1.0f32].unique(&vec![1.0, 1.0]));
-        assert!(!String::from("a").unique(&String::from("a")));
+    fn bit_match_recurses_layers() {
+        assert!(BitMatch::eq(&Some(f64::NAN), &Some(f64::NAN)));
+        assert!(BitMatch::eq(&None::<f64>, &None));
+        assert!(BitMatch::ne(&Some(f64::NAN), &None));
+        assert!(BitMatch::eq(&vec![f32::NAN, 1.0], &vec![f32::NAN, 1.0]));
+        assert!(BitMatch::ne(&vec![1.0f32], &vec![1.0, 1.0]));
+        assert!(BitMatch::eq(&String::from("a"), &String::from("a")));
     }
 }
