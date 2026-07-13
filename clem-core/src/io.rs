@@ -102,7 +102,7 @@ const MAGIC: [u8; 4] = *b"msca";
 /// Current [clem](crate) major version number which is embedded in the file header to indicate
 /// breaking changes in the format specification. Forwards and backwards compatibility across
 /// version numbers is not guaranteed. Implementers must reject any unrecognised version number.
-const VERSION: u8 = 1;
+const VERSION: u8 = 0;
 
 /// Total length of the file header in bytes. Includes the [magic][1] bytes, [version][2] number,
 /// and [SIMD alignment][3] bytes.
