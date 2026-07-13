@@ -1083,15 +1083,6 @@ impl<'de> Deserialize<'de> for f64 {
     }
 }
 
-impl<'de> Deserialize<'de> for bool {
-    type Ok = Self;
-
-    fn deserialize(src: &mut &'de [u8]) -> Result<Self, Error> {
-        // NOTE: a widened bit-packed byte decodes to `false` only at the zero niche.
-        u8::deserialize(src).map(|byte| byte != u8::MIN)
-    }
-}
-
 impl<'de> Deserialize<'de> for char {
     type Ok = Self;
 
