@@ -70,8 +70,7 @@ use bitvec::order::Lsb0;
 use bitvec::slice::BitSlice;
 
 use crate::io::{Deserialize, Deserializer, Error, SizedBuf};
-use crate::query;
-use crate::schema::Unfold;
+use crate::{query, Accumulate};
 
 /* ------------------------------------------------------------------------------ Public Exports */
 
@@ -669,42 +668,38 @@ impl Read for &str {
 
 /* ------------------------------------------------------------------- Evaluate Trait Definition */
 
-/// A **deserialized item** that can be tested against the provided filter.
+/// A **deserialized item** that can be mapped to an [`Outcome`] using the provided [closure][1].
 ///
-/// This trait is used to subtractively reduce the [`query`] results set.
+/// [1]: https://doc.rust-lang.org/book/ch13-01-closures.html
 #[doc(hidden)] // pub required for filter trait bounds; not intended as a stable API
-pub trait Evaluate<I = Self> {
-    /// Apply the specified [`filter`](F) to the item operand and wrap in [`Outcome`].
+pub trait Evaluate<I = Self>: Sized {
+    /// Assess `self` using the provided [`filter`](F) and maps:
+    ///
+    /// - `true` → [`Outcome::Include`]
+    /// - `false` → [`Outcome::Exclude`]
+    ///
+    /// Used to subtractively reduce a [query] result set.
+    ///
+    /// # Performance
+    ///
+    /// This function takes an [`Fn`] with a generic input type [`I`] determined at compile time.
+    /// The compiler [monomorphises][2] each `evaluate` function call to minimise runtime overhead
+    /// and eliminate [`fn`] pointer chasing.
+    ///
+    /// Refer to the [trait documentation](Self) for more details.
+    ///
+    /// [1]: https://doc.rust-lang.org/book/ch13-01-closures.html
+    /// [2]: https://rustc-dev-guide.rust-lang.org/backend/monomorph.html
     #[rustfmt::skip] // Single line where clause improves readability
-    fn evaluate<F>(self, filter: F) -> Outcome<Self> where F: Fn(&I) -> bool, Self: Sized;
-
-    /// Returns `true` if `self` is [`Some`].
-    fn some(&self) -> bool;
+    fn evaluate<F>(self, filter: F) -> Outcome<Self> where F: Fn(&I) -> bool;
 }
 
 /* --------------------------------------------------------------- Evaluate Trait Implementation */
 
 impl<I> Evaluate for I
 where
-    I: Unfold<RawAcc = Vec<Self>>,
+    Vec<I>: Accumulate<I>,
 {
-    fn evaluate<F>(self, filter: F) -> Outcome<Self>
-    where
-        F: Fn(&Self) -> bool,
-        Self: Sized,
-    {
-        match filter(&self) {
-            true => Outcome::Include(self),
-            false => Outcome::Exclude(self),
-        }
-    }
-
-    fn some(&self) -> bool {
-        true
-    }
-}
-
-impl Evaluate for bool {
     fn evaluate<F>(self, filter: F) -> Outcome<Self>
     where
         F: Fn(&Self) -> bool,
@@ -713,29 +708,6 @@ impl Evaluate for bool {
             true => Outcome::Include(self),
             false => Outcome::Exclude(self),
         }
-    }
-
-    fn some(&self) -> bool {
-        true
-    }
-}
-
-impl<I> Evaluate<I> for Option<I>
-where
-    I: Unfold + Evaluate,
-{
-    fn evaluate<F>(self, filter: F) -> Outcome<Self>
-    where
-        F: Fn(&I) -> bool,
-    {
-        match self {
-            None => Outcome::Include(None),
-            Some(item) => item.evaluate(filter).map(Some),
-        }
-    }
-
-    fn some(&self) -> bool {
-        self.is_some()
     }
 }
 
@@ -749,10 +721,6 @@ impl Evaluate for String {
             false => Outcome::Exclude(self),
         }
     }
-
-    fn some(&self) -> bool {
-        true
-    }
 }
 
 impl Evaluate for &str {
@@ -765,22 +733,33 @@ impl Evaluate for &str {
             false => Outcome::Exclude(self),
         }
     }
-
-    fn some(&self) -> bool {
-        true
-    }
 }
 
-impl<I> Evaluate for Vec<I> {
+impl<I> Evaluate<I> for Option<I>
+where
+    I: Evaluate,
+{
+    /// Assess the wrapped [`item`](I) using the provided [`filter`](F) if the option is [`Some`].
+    ///
+    /// ### Retains None
+    ///
+    /// The filter has no input – and therefore cannot be executed – if the option is [`None`].
+    /// Untested items are **retained** by default; chain with [`Column::is_some`][1] to exclude
+    /// these results.
+    ///
+    /// Refer to the [trait documentation](Evaluate) for more details.
+    ///
+    /// [1]: query::column::Column::is_some
     fn evaluate<F>(self, filter: F) -> Outcome<Self>
     where
-        F: Fn(&Self) -> bool,
+        F: Fn(&I) -> bool,
     {
-        match filter(&self) {
-            true => Outcome::Include(self),
-            false => Outcome::Exclude(self),
+        match self {
+            None => Outcome::Include(None),
+            Some(item) => item.evaluate(filter).map(Some),
         }
     }
+}
 
     fn some(&self) -> bool {
         true
