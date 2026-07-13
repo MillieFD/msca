@@ -585,47 +585,47 @@ impl Read for Option<bool> {
 }
 
 impl Read for Option<char> {
-    type Src<'a> = &'a [u8];
+    type Src<'a> = OptInSitu<'a>;
 }
 
 impl Read for Option<num::NonZeroU8> {
-    type Src<'a> = &'a [u8];
+    type Src<'a> = OptInSitu<'a>;
 }
 
 impl Read for Option<num::NonZeroU16> {
-    type Src<'a> = &'a [u8];
+    type Src<'a> = OptInSitu<'a>;
 }
 
 impl Read for Option<num::NonZeroU32> {
-    type Src<'a> = &'a [u8];
+    type Src<'a> = OptInSitu<'a>;
 }
 
 impl Read for Option<num::NonZeroU64> {
-    type Src<'a> = &'a [u8];
+    type Src<'a> = OptInSitu<'a>;
 }
 
 impl Read for Option<num::NonZeroU128> {
-    type Src<'a> = &'a [u8];
+    type Src<'a> = OptInSitu<'a>;
 }
 
 impl Read for Option<num::NonZeroI8> {
-    type Src<'a> = &'a [u8];
+    type Src<'a> = OptInSitu<'a>;
 }
 
 impl Read for Option<num::NonZeroI16> {
-    type Src<'a> = &'a [u8];
+    type Src<'a> = OptInSitu<'a>;
 }
 
 impl Read for Option<num::NonZeroI32> {
-    type Src<'a> = &'a [u8];
+    type Src<'a> = OptInSitu<'a>;
 }
 
 impl Read for Option<num::NonZeroI64> {
-    type Src<'a> = &'a [u8];
+    type Src<'a> = OptInSitu<'a>;
 }
 
 impl Read for Option<num::NonZeroI128> {
-    type Src<'a> = &'a [u8];
+    type Src<'a> = OptInSitu<'a>;
 }
 
 impl<I> Read for Vec<I>
