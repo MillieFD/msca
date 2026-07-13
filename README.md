@@ -1,10 +1,10 @@
-# clem
+# Multimodal Segmented Compact Archive (MSCA)
 
 **A high-throughput storage engine for multidimensional analytical data, written in Rust.**
 
 [![License: BSD-3-Clause](https://img.shields.io/badge/License-BSD--3--Clause-blue.svg)](LICENSE)
 
-`clem` optimises read and write performance independently by separating the data lifecycle into two phases:
+`MSCA` optimises read and write performance independently by separating the data lifecycle into two phases:
 
 1. **In-memory** accumulator for high-throughput ingestion.
 2. **On-disk** columnar buffers for analytical queries across an arbitrary number of dimensions.
@@ -16,11 +16,11 @@ optimisations.
 
 ### Citation
 
-Please cite `clem` in your academic work using the provided [citation](CITATION.cff) metadata.
+Please cite `msca` in your academic work using the provided [citation](CITATION.cff) metadata.
 
 ### Motivation and Design Goals
 
-`clem` is designed to address the shortcomings of existing storage engines for edge deployment in scientific and
+`MSCA` is designed to address the shortcomings of existing storage engines for edge deployment in scientific and
 research applications where data integrity and high throughput are critical. Development is guided by a focused set of
 design goals:
 
@@ -34,18 +34,18 @@ The self-describing deterministic on-disk layout ensures portability across plat
 schemas can coexist in a single multimodal file, enabling simple collaboration and sharing of heterogeneous data.
 No background server is required.
 
-To achieve these goals, clem decouples **logical structure** (types and schemas) from **physical storage** (segments).
+To achieve these goals, `msca` decouples **logical structure** (types and schemas) from **physical storage** (segments).
 The [on-disk-format.md](./doc/on-disk-format.md) document shows how each goal is met.
 
-### When to use clem
+### When to use MSCA
 
-`clem` is a strong fit for any workload that writes once and queries many times. The rapid ingestion append-only design
+`MSCA` is a strong fit for any workload that writes once and queries many times. The rapid ingestion append-only design
 is ideally suited to high-throughput sensor streams, experimental runs, telemetry, and time-series data. Clem is **not**
 a transactional database and deliberately omits support for in-situ mutation, deletions, or ad-hoc SQL queries.
 
-The table below compares clem against several widely used alternatives:
+The table below compares `msca` against several widely used alternatives:
 
-| Capability                            | Clem | Parquet | Arrow IPC | HDF5 | SQLite |
+| Capability                            | MSCA | Parquet | Arrow IPC | HDF5 | SQLite |
 |---------------------------------------|:----:|:-------:|:---------:|:----:|:------:|
 | Columnar storage                      |  ✓   |    ✓    |     ✓     |  ~   |   ✗    |
 | Zero-copy memory-mapped reads         |  ✓   |    ✗    |     ✓     |  ~   |   ✗    |
@@ -59,23 +59,23 @@ The table below compares clem against several widely used alternatives:
 
 <sub>✓ native · ~ partial or via tooling · ✗ not supported</sub>
 
-`clem` understands **platform-agnostic** primitive types such as `u32` or `f64`. Platform-dependent types such as
+`MSCA` understands **platform-agnostic** primitive types such as `u32` or `f64`. Platform-dependent types such as
 `usize` are deliberately omitted to ensure file portability. External user-defined types are mapped directly to a
 generated schema using the provided `#[derive(Data)]` macro.
 
-### How to use clem
+### How to use MSCA
 
-Add `clem` to your `Cargo.toml`:
+Add `msca` to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-clem = "0.1"
+msca = "1.0"
 ```
 
 A minimal end-to-end example — derive the traits, accumulate rows, commit a segment, then query it:
 
 ```rust
-use clem::{Accumulate, Data, Dataset, Read};
+use msca::{Accumulate, Data, Dataset, Read};
 
 #[derive(Data, Read)]
 struct Reading {
@@ -83,7 +83,7 @@ struct Reading {
     temperature: f64,
 }
 
-let mut dataset = Dataset::new("readings.clem").await?;
+let mut dataset = Dataset::new("readings.msca").await?;
 
 // Register the schema once and accumulate rows in memory.
 let mut readings = dataset.schema::<Reading>("readings").await?;
@@ -105,7 +105,7 @@ accumulation, and the complete query and filter vocabulary.
 
 ### Crate Features
 
-`clem` ships a minimal default surface; additional capabilities are opt-in via Cargo features.
+`MSCA` ships a minimal default surface; additional capabilities are opt-in via Cargo features.
 
 | Feature    | Default | Description                                                            |
 |------------|:-------:|------------------------------------------------------------------------|
