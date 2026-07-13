@@ -245,6 +245,18 @@ impl<I> From<Error> for Outcome<I> {
     }
 }
 
+impl<I, E> From<Result<I, E>> for Outcome<I>
+where
+    E: Into<Error>,
+{
+    fn from(result: Result<I, E>) -> Self {
+        match result {
+            Ok(item) => Outcome::Include(item),
+            Err(error) => error.into().into(),
+        }
+    }
+}
+
 /* --------------------------------------------------------------------- Reader Trait Definition */
 
 /// A **stateful data source** used to construct a lazy [`Stream`].
