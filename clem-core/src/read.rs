@@ -622,7 +622,7 @@ pub trait Evaluate<I = Self>: Sized {
     ///
     /// [1]: https://doc.rust-lang.org/book/ch13-01-closures.html
     /// [2]: https://rustc-dev-guide.rust-lang.org/backend/monomorph.html
-    #[rustfmt::skip] // Single line where clause improves readability
+    #[rustfmt::skip] // single line where clause improves readability
     fn evaluate<F>(self, filter: F) -> Outcome<Self> where F: Fn(&I) -> bool;
 }
 

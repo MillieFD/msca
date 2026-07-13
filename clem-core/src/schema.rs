@@ -408,7 +408,7 @@ impl Type {
             // 1. Flatten nested options. Single null bitmap improves on-disk efficiency.
             Self::Option { subtype } => Self::Option { subtype },
             // 2. Box non-option subtypes to prevent unbounded enum size from infinite recursion.
-            #[rustfmt::skip] // Single line match arm improves readability
+            #[rustfmt::skip] // single line match arm improves readability
             subtype => Self::Option { subtype: Box::new(subtype) },
         }
     }
@@ -890,7 +890,7 @@ pub trait Unfold: Sized {
 /* ---------------------------------------------------------------- Unfold Trait Size Assertions */
 
 /// Returns the size of `Option<T>` in bytes.
-#[rustfmt::skip] // Single line function improves readability
+#[rustfmt::skip] // single line function improves readability
 pub(crate) const fn size_of_opt<T>() -> usize { size_of::<Option<T>>() }
 
 assert_eq_size!(char, Option<char>);

@@ -1230,7 +1230,7 @@ pub trait Deserializer<'de> {
     /// without an intermediate copy.
     ///
     /// [1]: https://doc.rust-lang.org/std/primitive.slice.html
-    #[rustfmt::skip] // Single line where clause improves readability
+    #[rustfmt::skip] // single line where clause improves readability
     fn deserialize_into<I>(&mut self) -> Result<I, Error> where I: Deserialize<'de, Ok = I>;
 }
 
