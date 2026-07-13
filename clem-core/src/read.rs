@@ -71,6 +71,7 @@ use bitvec::slice::BitSlice;
 
 use crate::io::{Deserialize, Deserializer, Error, SizedBuf};
 use crate::query;
+use crate::schema::Unfold;
 
 /* ------------------------------------------------------------------------------ Public Exports */
 
