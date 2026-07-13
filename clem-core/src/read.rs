@@ -64,7 +64,7 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //! [5]: crate::schema::Schema
 //! [6]: crate::Data
 
-use std::{iter, mem, num};
+use std::{iter, num};
 
 use bitvec::order::Lsb0;
 use bitvec::slice::BitSlice;
@@ -161,6 +161,15 @@ impl<'de> Deserialize<'de> for Seq<'de> {
 /// [3]: crate::accumulate::OptBitVec
 #[doc(hidden)] // Reachable via Read::Src for optional niche readers
 pub struct OptInSitu<'a>(&'a [u8]);
+
+impl<'de> Deserialize<'de> for OptInSitu<'de> {
+    type Ok = Self;
+
+    fn deserialize(src: &mut &'de [u8]) -> Result<Self, Error> {
+        // NOTE: consumes the whole source; a buffer sector must frame the slice externally
+        <&[u8]>::deserialize(src).map(OptInSitu)
+    }
+}
 
 /* ------------------------------------------------------------------------- Read Stream Outcome */
 
