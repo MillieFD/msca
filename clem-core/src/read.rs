@@ -315,8 +315,27 @@ where
     }
 }
 
-impl<'a> Reader<bool> for &'a BitSlice<u8, Lsb0> {
-    type Ctx = &'a HashSet<Filter>;
+impl<'a> Reader<'a, &'a str> for Seq<'a> {
+    fn iter(self) -> impl Iterator<Item = Result<&'a str, Error>> + 'a {
+        let (mut ends, mut data) = (self.ends, self.data);
+        let mut start = usize::MIN;
+        iter::from_fn(move || {
+            ends.is_empty().not().then(|| {
+                let end: usize = u64::deserialize(&mut ends)?.try_into()?;
+                let len = end.checked_sub(start).ok_or(number::Error::Zero)?;
+                let utf = data
+                    .split_at_checked(len)
+                    .ok_or_else(|| Error::Truncated { expected: len, actual: data.len() })
+                    .and_then(|src| {
+                        data = src.1;
+                        start = end;
+                        Ok(src.0)
+                    })?;
+                str::from_utf8(utf).map_err(|e| Error::Utf8(utf[e.valid_up_to().add(1)].into()))
+            })
+        })
+    }
+}
 
     fn boxed(&self, ctx: Self::Ctx) -> Stream<bool> {
         let iter = iter::from_fn(move || {
