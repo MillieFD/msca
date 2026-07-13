@@ -16,7 +16,7 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //! high-level surface for registering [`Data`] types and [querying](query) stored data while
 //! delegating low-level IO to an internal [`File`] handle.
 
-use std::num::NonZeroU32;
+use std::ops::Range;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -24,7 +24,7 @@ use memmap2::Mmap;
 
 use crate::io::File;
 use crate::query::{self, Query};
-use crate::{io, Accumulate, Accumulator, Data, Schema};
+use crate::{io, manifest, Accumulate, Accumulator, Data, Schema};
 
 /* ------------------------------------------------------------------------------ Public Exports */
 
@@ -167,26 +167,27 @@ impl Dataset {
         Ok(start..end)
     }
 
-    /// Initialise a new [`Query`] over the named [`Schema`][1].
+    /// Initialise a new [`Query`] over the named [`Schema`](manifest::Schema).
     ///
     /// The query begins with **every** column and **every** buffer from the specified schema.
-    /// [`Filter`] functions are applied subtractively to reduce the result set. No file
-    /// [`IO`](io) occurs until the query is executed via [`Query::read`] or [`Query::column`].
+    /// Each [`Column`](query::Column) is filtered subtractively to reduce the result set. No file
+    /// [`IO`](io) occurs until the query is executed via a terminal method such as [`Query::read`]
+    /// or [`Query::item`].
     ///
     /// ### Errors
     ///
-    /// Returns [`Error::Query`] wrapping [`query::Error::Column`] if the requested `name` is not
-    /// found in the [`Manifest`][2].
+    /// Returns [`Error::Column`][2] if the requested `name` is not found in the [`Manifest`][3].
     ///
-    /// [1]: crate::manifest::Schema
-    /// [2]: crate::manifest::Manifest
+    /// [1]: manifest::Schema
+    /// [2]: query::Error::Column
+    /// [3]: manifest::Manifest
     pub fn query(&self, name: &str) -> Result<Query, query::Error> {
         let columns = self
             .file
             .manifest
             .schemas
             .get(name)
-            .ok_or_else(|| query::Error::column(name))?
+            .ok_or_else(|| query::Error::Column { name: name.into() })?
             .columns
             .iter()
             .map(query::Column::map) // Clone each entry
@@ -194,7 +195,6 @@ impl Dataset {
         Ok(Query {
             mmap: self.mmap.clone(), // Inexpensive Arc Clone
             columns,
-            stride: NonZeroU32::MIN,
         })
     }
 }
@@ -242,6 +242,10 @@ mod tests {
 
         fn count(&self) -> u64 {
             self.v.count()
+        }
+
+        fn contains(&self, item: &Row) -> bool {
+            self.v.contains(&item.v)
         }
     }
 
