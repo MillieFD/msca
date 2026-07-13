@@ -133,7 +133,10 @@ impl<'de> Deserialize<'de> for Seq<'de> {
 
     fn deserialize(src: &mut &'de [u8]) -> Result<Self, Error> {
         let ends = SizedBuf::deserialize(src)?.deserialize_into()?;
-        let data = SizedBuf::deserialize(src)?.deserialize_into::<&[u8]>().unwrap_or_default();
+        let data = match src.is_empty() {
+            true => <&[u8]>::default(),
+            false => SizedBuf::deserialize(src)?.deserialize_into()?,
+        };
         Ok(Self { ends, data })
     }
 }
