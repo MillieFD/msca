@@ -168,11 +168,11 @@ pub struct OptInSitu<'a>(&'a [u8]);
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug)]
 pub enum Outcome<I> {
-    /// A [deserialized](Deserialize::deserialize) [`Item`](I) which satisfies every [`Filter`].
+    /// A [deserialized](Deserialize::deserialize) item that satisfies every column filter.
     Include(I),
-    /// The [`Item`](I) was rejected by one or more [filters](Filter).
+    /// A [deserialized](Deserialize::deserialize) item that was rejected by one or more filter.
     Exclude(I),
-    /// An [`Error`] occurred during [deserialization](Deserialize) or [filtering](Filter).
+    /// An [`Error`] occurred during [deserialization](Deserialize).
     Error(Error),
 }
 
