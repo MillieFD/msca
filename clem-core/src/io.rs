@@ -97,7 +97,7 @@ use crate::{number, schema, Serialize};
 /* ------------------------------------------------------------------------------ Public Exports */
 
 /// Magic byte sequence used to identify a valid [clem](crate) file.
-const MAGIC: [u8; 4] = *b"clem";
+const MAGIC: [u8; 4] = *b"msca";
 
 /// Current [clem](crate) major version number which is embedded in the file header to indicate
 /// breaking changes in the format specification. Forwards and backwards compatibility across
