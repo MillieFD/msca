@@ -8,25 +8,25 @@ Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the conditions of the LICENSE are met.
 */
 
-//! Data **streaming** interface for [query](crate::query) execution.
+//! Data **streaming** interface for [query] execution.
 //!
 //! ---
 //!
-//! [clem](crate) maximises IO performance by storing on-disk data as columnar [buffers](Buffer)
+//! [clem](crate) maximises IO performance by storing on-disk data as columnar [buffers][1]
 //! optimised for range-based queries across an arbitrary number of dimensions; however, this
 //! underlying format is generally unsuitable for direct manipulation by end-users.
 //!
 //! This module provides an [iterator-based](Iterator) interface to coordinate the transition from
-//! raw binary data into supported rust types; corresponding to **phase 3** of the [read-cycle](io).
+//! raw binary data into supported rust types; corresponding to **phase 3** of the [read-cycle][2].
 //!
 //! ### Segment Composition
 //!
-//! Each [`Dataset`][1] is partitioned into self-describing segments which are immutable once
-//! written. Each segment begins with a minimal header consisting of a [`variant`][2] identifier and
+//! Each [`Dataset`][3] is partitioned into self-describing segments which are immutable once
+//! written. Each segment begins with a minimal header consisting of a [`variant`][4] identifier and
 //! [`next`](num::NonZeroU64) offset.
 //!
-//! - [`Schema`][3] segments describe the structure of encoded data.
-//! - [`Data`][4] segments carry columnar [buffers](Buffer) for a specified schema.
+//! - [`Schema`][5] segments describe the structure of encoded data.
+//! - [`Data`][6] segments carry columnar [buffers][1] for a specified schema.
 //!
 //! Multimodality and schema evolution are realised by appending additional schema segments. Data
 //! storage and file extensibility are realised by appending additional data segments. Format
@@ -34,11 +34,10 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //!
 //! ### Lazy Zero-Copy Reads
 //!
-//! Each [`Query`][5] column is packaged into a lazy zero-copy [`Stream`] that:
+//! Each column is packaged into a lazy zero-copy stream that:
 //!
-//! 1. Pulls bytes from the retained on-disk [buffers](Buffer).
-//! 2. [Deserializes](Deserialize) bytes into the requested Rust type.
-//! 3. Evaluates query [filters](Filter) on the deserialized item.
+//! 1. Pulls bytes from the retained on-disk buffers.
+//! 2. [Deserializes](Deserialize) bytes into the requested type **exactly once**.
 //!
 //! Streams chain transparently across segments, abstracting away the underlying file structure to
 //! provide a seamless interface for end-users.
@@ -58,29 +57,27 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //!
 //! This module addresses **phase three** of the [read-cycle](io).
 //!
-//! [1]: crate::dataset::Dataset
-//! [2]: crate::segment::Variant
-//! [3]: crate::schema::Schema
-//! [4]: crate::Data
-//! [5]: crate::query::Query
+//! [1]: crate::manifest::Buffer
+//! [2]: crate::io
+//! [3]: crate::dataset::Dataset
+//! [4]: crate::segment::Variant
+//! [5]: crate::schema::Schema
+//! [6]: crate::Data
 
-use std::collections::HashSet;
-use std::slice::Iter;
-use std::{iter, num};
+use std::{iter, mem, num};
 
 use bitvec::order::Lsb0;
 use bitvec::slice::BitSlice;
-use memmap2::Mmap;
 
 use crate::io::{Deserialize, Deserializer, Error, SizedBuf};
-use crate::manifest::Buffer;
-use crate::query::{Evaluate, Filter};
-use crate::Boxed;
+use crate::query;
 
 /* ------------------------------------------------------------------------------ Public Exports */
 
 /// Shorthand type-erased stack-allocated [pointer](Box) to a lazy [`Iterator`] yielding one
-/// [`Outcome`] per candidate [`Item`](I), or [`None`] once every candidate [`Buffer`] is consumed.
+/// [`Outcome`] per [`Item`](I), or [`None`] once every candidate [`Buffer`][1] is consumed.
+///
+/// [1]: crate::manifest::Buffer
 pub type Stream<'a, I> = Box<dyn Iterator<Item = Outcome<I>> + 'a>;
 
 /// A minimal columnar **data source** with [deserialization](Deserialize) context; used during
