@@ -9,8 +9,7 @@ underlying reader.
 Header
 ├─ magic: [u8; 4]      // b"clem"
 ├─ version: u8
-├─ tail: NonZeroU64    // offset immediately after the final segment
-├─ manifest: Sector    // offset + length of the encoded manifest
+├─ manifest: Sector    // size & offset of the manifest segment
 └─ alignment padding   // zero-filled to the next 64-bit boundary
 ```
 
@@ -19,15 +18,15 @@ and backwards compatibility across version numbers is not guaranteed. Implemente
 unrecognised version number.
 
 ```text
-[Header] [Segment 0] ... [Segment N] ... [Manifest] [Metadata]
-                               tail ↑   ↑ manifest.offset
+[Header] [Segment 0] ... [Segment N] [Manifest] [Metadata]
+                                    ↑ manifest.offset
 ```
 
-The [`tail`][1] field records the byte offset immediately following the final committed segment. New segments are always
-appended from `tail`, not from EOF. An empty region may exist between `tail` and the start of the manifest when
-appending segments that are shorter than the combined manifest and metadata. This empty region is filled during the next
-write-cycle.
+A mutable [sector](on-disk-format#sectors-and-segments) locates the [manifest](manifest). The file header carries no
+checksum; readers should trust the indicated manifest sector **only if** the [checksum](on-disk-format#segment-checksum)
+suffix passes and the CBOR body decodes.
 
-The file header is zero-padded to the next [SIMD alignment boundary](./simd-alignment.md).
+The manifest sector is written immediately after the immutable segment region. The manifest sector offset therefore
+doubles as the [write-cycle](write-cycle.md) entry point for new [segments](on-disk-format#sectors-and-segments).
 
-[1]: https://doc.rust-lang.org/std/num/type.NonZeroU64.html
+The file header is zero-padded to the next [SIMD alignment boundary](simd-alignment.md).
