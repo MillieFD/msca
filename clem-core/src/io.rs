@@ -27,7 +27,7 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //! written. Each segment begins with a minimal header consisting of a [`variant`][1] identifier
 //! and [`length`](NonZeroU64).
 //!
-//! - [`Schema`] segments describe the structure of encoded data.
+//! - [`Schema`](crate::Schema) segments describe the structure of encoded data.
 //! - `Data` segments carry columnar buffers for a specified schema instance.
 //!
 //! Multimodality and schema evolution are realised by appending additional schema segments. Data
@@ -91,10 +91,8 @@ use xxhash_rust::xxh3::xxh3_64;
 
 use crate::accumulate::Buffer;
 use crate::manifest::Manifest;
-use crate::query::Filter;
-use crate::schema::{Type, Unfold, Unfolder};
 use crate::segment::{self, Align, Segment};
-use crate::{number, schema, Schema, Serialize};
+use crate::{number, schema, Serialize};
 
 /* ------------------------------------------------------------------------------ Public Exports */
 
@@ -640,15 +638,6 @@ pub enum Error {
     ///
     /// [1]: minicbor::decode::Error
     Decode(minicbor::decode::Error),
-    /// The requested [`Filter`] is not compatible with the actual on-disk [`Column`][1] type.
-    ///
-    /// [1]: crate::read::Column
-    Filter {
-        /// The [`Filter`] applied by the caller.
-        filter: Filter,
-        /// The actual on-disk column [`Type`].
-        actual: Type,
-    },
     /// Underlying [`std::io::Error`] from the file backing the [`Dataset`](crate::Dataset).
     Io(std::io::Error),
     /// File magic bytes did not match the expected `clem` signature.
@@ -694,18 +683,6 @@ impl Error {
         };
         Self::Truncated { expected, actual }
     }
-
-    /// Constructor for [`Error::Filter`] wrapping the incompatible [`Filter`] and actual [`Type`].
-    pub(crate) fn filter<I>(filter: &Filter) -> Self
-    where
-        I: Unfold,
-        Schema: Unfolder<I>,
-    {
-        Error::Filter {
-            filter: filter.clone(),
-            actual: Schema::unfold(),
-        }
-    }
 }
 
 impl fmt::Display for Error {
@@ -713,7 +690,6 @@ impl fmt::Display for Error {
         match self {
             Self::Checksum => write!(f, "Checksum error"),
             Self::Decode(e) => write!(f, "CBOR decode error → {e}"),
-            Self::Filter { filter, actual } => write!(f, "{filter} cannot evaluate {actual}"),
             Self::Io(e) => write!(f, "File IO error → {e}"),
             Self::Magic => f.write_str("File is not a valid clem dataset"),
             Self::Number(e) => write!(f, "Number error → {e}"),
@@ -1104,6 +1080,15 @@ impl<'de> Deserialize<'de> for f64 {
                 *src = data.1;
                 Self::from_le_bytes(*data.0)
             })
+    }
+}
+
+impl<'de> Deserialize<'de> for bool {
+    type Ok = Self;
+
+    fn deserialize(src: &mut &'de [u8]) -> Result<Self, Error> {
+        // NOTE: a widened bit-packed byte decodes to `false` only at the zero niche.
+        u8::deserialize(src).map(|byte| byte != u8::MIN)
     }
 }
 
