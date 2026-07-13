@@ -1,8 +1,8 @@
-# Clem Format Specification
+# MSCA Format Specification
 
-This document describes the on-disk layout of a clem file. It is intended as a reference for end-users and implementers.
+This document describes the on-disk layout of an MSCA file. It is intended as a reference for end-users and implementers.
 
-The self-describing clem format is designed to maximise query performance and space efficiency while remaining
+The self-describing MSCA format is designed to maximise query performance and space efficiency while remaining
 deterministic and portable across supported architectures. This file does not describe the in-memory layout which may
 vary between platforms and releases.
 
@@ -15,7 +15,7 @@ data, and how a reader navigates the file with minimal IO.
 
 ### File Anatomy
 
-Every clem file begins with a fixed-size [file header](#file-header), followed by a variable-length region of immutable
+Every MSCA file begins with a fixed-size [file header](#file-header), followed by a variable-length region of immutable
 [segments](#sectors-and-segments). The file ends with a CBOR [manifest](#manifest) and optional [metadata](#metadata).
 
 ```text
@@ -62,12 +62,12 @@ introduction of new segment variants in future releases.
 ### File Header
 
 The header is the only file region with a fixed size and offset; essential for providing an entry point for
-uninitialised readers. The header begins with a magic byte sequence and version number used to identify the clem format,
+uninitialised readers. The header begins with a magic byte sequence and version number used to identify the MSCA format,
 followed by the mutable pointers required to bootstrap navigation.
 
 ```text
 file header
-├─ magic: [u8; 4]      // b"clem"
+├─ magic: [u8; 4]      // b"msca"
 ├─ version: u8
 ├─ manifest: Sector    // size & offset of the manifest segment
 └─ alignment padding   // zero-filled to the next 64-bit boundary
@@ -76,7 +76,7 @@ file header
 ##### Magic Bytes
 
 Used to identify the file type. Implementers may prepend their own file header – e.g. to indicate a specific file type
-built atop `clem` with a canonical schema – but must remove the prepended data before passing to the underlying reader.
+built atop `msca` with a canonical schema – but must remove the prepended data before passing to the underlying reader.
 Readers must reject any file that does not begin with the expected magic byte sequence.
 
 ##### Version Number
@@ -154,7 +154,7 @@ schema segment
 └─ checksum: u64
 ```
 
-Each schema segment encodes **one** schema and each clem file requires at least **one** schema segment. Multimodality
+Each schema segment encodes **one** schema and each MSCA file requires at least **one** schema segment. Multimodality
 and schema evolution are achieved by appending additional segments.
 
 ### Data Segments
@@ -240,7 +240,7 @@ Refer to the dedicated [alignment documentation](./simd-alignment.md) for more d
 ##### Unsized Buffers
 
 It is not possible to predetermine the disk space required for each instance of an [unsized][1] type; there is no
-guarantee that two collections will contain the same number of elements. Clem therefore unfolds unsized types into:
+guarantee that two collections will contain the same number of elements. MSCA therefore unfolds unsized types into:
 
 1. Initial `ends` region describing boundaries.
 2. Contiguous `data` region encoding values.
@@ -288,7 +288,7 @@ collect into an owned `String`.
 
 Real-world applications often require the inclusion of columns with infrequently altered values; typically carrying
 categorical data such as sensor type, device ID, or location. It is possible for a column to contain only **one**
-repeated value across an entire data segment. Instead of repeatedly encoding identical values, clem defaults to a
+repeated value across an entire data segment. Instead of repeatedly encoding identical values, `msca` defaults to a
 **compact buffer** representation to improve storage density.
 
 > **Prefer binary segments for constant values:**
