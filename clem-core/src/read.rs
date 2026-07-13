@@ -258,128 +258,60 @@ where
 
 /* --------------------------------------------------------------------- Reader Trait Definition */
 
-/// A **stateful data source** used to construct a lazy [`Stream`].
+/// A **stateful data source** used to construct a lazy deserializing [`Iterator`].
 #[doc(hidden)] // pub required for Query::column trait bounds; not intended as a stable API
 pub trait Reader<'a, I> {
-    /// Returns a new boxed [`Stream`] trait object **without** any [filters](Filter).
-    ///
-    /// The resulting [`Stream`] will never return [`Outcome::Exclude`] but [`Outcome::Error`]
-    /// remains possible.
-    fn boxed(self) -> Stream<'a, I>
-    where
-        Self: Sized,
-    {
-        self.with_filters(&[])
-    }
-
-    /// Returns a new boxed [`Stream`] trait object that lazily [evaluates](Evaluate) each item
-    /// during [deserialization](Deserialize).
-    ///
-    /// Simple implementations use each borrowed [`Filter`] directly with zero allocation. Complex
-    /// composite readers may [`Clone`] relevant [filters](F) into one or more owned collections
-    /// which are then re-borrowed by relevant sub-readers.
-    fn with_filters<'f, F>(self, filters: &'f F) -> Stream<'a, I>
-    where
-        Self: Sized,
-        'f: 'a,
-        &'f F: IntoIterator<Item = &'f Filter>;
+    /// Return an [`Iterator`] that lazily [deserializes](Deserialize) items from the on-disk bytes.
+    #[rustfmt::skip] // single line where clause improves readability
+    fn iter(self) -> impl Iterator<Item = Result<I, Error>> + 'a where Self: Sized;
 }
 
 /* ----------------------------------------------------------------- Reader Trait Implementation */
 
 impl<'a, I> Reader<'a, I> for &'a [u8]
 where
-    I: for<'de> Deserialize<'de, Ok = I> + Evaluate,
+    I: for<'de> Deserialize<'de, Ok = I> + 'a,
 {
-    fn with_filters<'f, F>(mut self, filters: &'f F) -> Stream<'a, I>
-    where
-        'f: 'a,
-        &'f F: IntoIterator<Item = &'f Filter>,
-    {
-        iter::from_fn(move || {
-            let f = filters.into_iter();
-            I::deserialize(&mut self)
-                .map(|item| item.evaluate(f))
-                .unwrap_or_else(Outcome::Error)
-                .into()
+    fn iter(mut self) -> impl Iterator<Item = Result<I, Error>> + 'a {
+        iter::from_fn(move || match self.is_empty() {
+            false => self.deserialize_into().into(),
+            true => None,
         })
-        .into_box()
     }
 }
 
 impl<'a> Reader<'a, bool> for &'a BitSlice<u8, Lsb0> {
-    fn with_filters<'f, F>(self, filters: &'f F) -> Stream<'a, bool>
-    where
-        'f: 'a,
-        &'f F: IntoIterator<Item = &'f Filter>,
-    {
-        self.iter()
-            .by_vals()
-            .map(move |bit| {
-                let f = filters.into_iter();
-                bit.evaluate(f)
-            })
-            .into_box()
+    fn iter(self) -> impl Iterator<Item = Result<bool, Error>> + 'a {
+        self.iter().by_vals().map(Ok)
     }
 }
 
 impl<'a, I> Reader<'a, Option<I>> for OptBitVec<'a, I>
 where
-    I: Read + Evaluate + 'a,
+    I: Read + 'a,
     I::Src<'a>: Reader<'a, I>,
 {
-    fn with_filters<'f, F>(self, filters: &'f F) -> Stream<'a, Option<I>>
-    where
-        'f: 'a,
-        &'f F: IntoIterator<Item = &'f Filter>,
-    {
-        // Validity is resolved against the mask: `is_some` drops `None` rows and `is_none` drops
-        // every present row. Only value predicates reach the value reader, which cannot assess an
-        // always-present value and rightly rejects the `is_some` / `is_none` markers.
-        let some = filters.into_iter().any(|f| matches!(f, Filter::IsSome));
-        let none = filters.into_iter().any(|f| matches!(f, Filter::IsNone));
-        let mut mask = self.mask.boxed();
-        let mut data = self.data.boxed();
-        // Assess one present value against the value predicates, wrapping the survivor in [`Some`].
-        let present = move |value: Outcome<I>| {
-            let assessed = match value {
-                Outcome::Include(v) | Outcome::Exclude(v) => {
-                    let values = filters.into_iter().filter(|f| !f.validity());
-                    v.evaluate(values)
-                }
-                Outcome::Error(e) => return Outcome::Error(e),
-            };
-            match assessed {
-                Outcome::Include(v) if none => Outcome::Exclude(Some(v)),
-                other => other.map(Some),
-            }
-        };
-        iter::from_fn(move || {
-            Some(match mask.next()? {
-                Outcome::Include(true) | Outcome::Exclude(true) => present(data.next()?),
-                Outcome::Include(false) | Outcome::Exclude(false) if some => Outcome::Exclude(None),
-                Outcome::Include(false) | Outcome::Exclude(false) => Outcome::Include(None),
-                Outcome::Error(e) => Outcome::Error(e),
-            })
+    fn iter(self) -> impl Iterator<Item = Result<Option<I>, Error>> + 'a {
+        let mut mask = self.mask.iter().by_vals();
+        let mut data = self.data.iter();
+        iter::from_fn(move || match mask.next()? {
+            true => data.next()?.map(Some).into(),
+            false => Ok(None).into(),
         })
-        .into_box()
     }
 }
 
-    fn try_from_slice(src: &'a [u8]) -> Result<Self, Error>
-    where
-        Self: Sized,
-    {
-        Self::try_from(src).or_else(|b| {
-            Error::Truncated {
-                expected: NonZeroUsize::MIN.get(),
-                actual: b.len(),
-            }
-            .into()
+impl<'a, I> Reader<'a, Option<I>> for OptInSitu<'a>
+where
+    I: 'a,
+    Option<I>: for<'de> Deserialize<'de, Ok = Option<I>>,
+{
+    fn iter(self) -> impl Iterator<Item = Result<Option<I>, Error>> + 'a {
+        let mut data = self.0;
+        iter::from_fn(move || match data.is_empty() {
+            false => Option::<I>::deserialize(&mut data).into(),
+            true => None,
         })
-    }
-}
-        });
     }
 }
 
