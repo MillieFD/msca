@@ -654,6 +654,126 @@ impl Read for &str {
     type Src<'a> = Seq<'a>;
 }
 
+/* ------------------------------------------------------------------- Evaluate Trait Definition */
+
+/// A **deserialized item** that can be tested against the provided filter.
+///
+/// This trait is used to subtractively reduce the [`query`] results set.
+#[doc(hidden)] // pub required for filter trait bounds; not intended as a stable API
+pub trait Evaluate<I = Self> {
+    /// Apply the specified [`filter`](F) to the item operand and wrap in [`Outcome`].
+    #[rustfmt::skip] // Single line where clause improves readability
+    fn evaluate<F>(self, filter: F) -> Outcome<Self> where F: Fn(&I) -> bool, Self: Sized;
+
+    /// Returns `true` if `self` is [`Some`].
+    fn some(&self) -> bool;
+}
+
+/* --------------------------------------------------------------- Evaluate Trait Implementation */
+
+impl<I> Evaluate for I
+where
+    I: Unfold<RawAcc = Vec<Self>>,
+{
+    fn evaluate<F>(self, filter: F) -> Outcome<Self>
+    where
+        F: Fn(&Self) -> bool,
+        Self: Sized,
+    {
+        match filter(&self) {
+            true => Outcome::Include(self),
+            false => Outcome::Exclude(self),
+        }
+    }
+
+    fn some(&self) -> bool {
+        true
+    }
+}
+
+impl Evaluate for bool {
+    fn evaluate<F>(self, filter: F) -> Outcome<Self>
+    where
+        F: Fn(&Self) -> bool,
+    {
+        match filter(&self) {
+            true => Outcome::Include(self),
+            false => Outcome::Exclude(self),
+        }
+    }
+
+    fn some(&self) -> bool {
+        true
+    }
+}
+
+impl<I> Evaluate<I> for Option<I>
+where
+    I: Unfold + Evaluate,
+{
+    fn evaluate<F>(self, filter: F) -> Outcome<Self>
+    where
+        F: Fn(&I) -> bool,
+    {
+        match self {
+            None => Outcome::Include(None),
+            Some(item) => item.evaluate(filter).map(Some),
+        }
+    }
+
+    fn some(&self) -> bool {
+        self.is_some()
+    }
+}
+
+impl Evaluate for String {
+    fn evaluate<F>(self, filter: F) -> Outcome<Self>
+    where
+        F: Fn(&Self) -> bool,
+    {
+        match filter(&self) {
+            true => Outcome::Include(self),
+            false => Outcome::Exclude(self),
+        }
+    }
+
+    fn some(&self) -> bool {
+        true
+    }
+}
+
+impl Evaluate for &str {
+    fn evaluate<F>(self, filter: F) -> Outcome<Self>
+    where
+        F: Fn(&Self) -> bool,
+    {
+        match filter(&self) {
+            true => Outcome::Include(self),
+            false => Outcome::Exclude(self),
+        }
+    }
+
+    fn some(&self) -> bool {
+        true
+    }
+}
+
+impl<I> Evaluate for Vec<I> {
+    fn evaluate<F>(self, filter: F) -> Outcome<Self>
+    where
+        F: Fn(&Self) -> bool,
+    {
+        match filter(&self) {
+            true => Outcome::Include(self),
+            false => Outcome::Exclude(self),
+        }
+    }
+
+    fn some(&self) -> bool {
+        true
+    }
+}
+
 /* --------------------------------------------------------------------------------------- Tests */
 
 #[cfg(test)]
