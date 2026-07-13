@@ -141,6 +141,27 @@ impl<'de> Deserialize<'de> for Seq<'de> {
     }
 }
 
+/// A **deserialisation primitive** for [niche][1] [optional](Option) items; a compiler optimisation
+/// technique that leverages unused bit patterns (niches) to represent additional states without
+/// increasing the [size](Sized) of the type.
+///
+/// ### Data Layout
+///
+/// The corresponding [`OptInSitu`][2] accumulator inlines [`Some`] and [`None`] items directly into
+/// a single data buffer for supported niche types; no validity mask is required. The alternative
+/// [`OptBitVec`][3] accumulator provides a fallback implementation for non-niche types.
+///
+/// ### Guidance
+///
+/// Implementers are advised to use niche-optimised types when possible to improve storage density
+/// and random access read performance.
+///
+/// [1]: https://doc.rust-lang.org/std/option/index.html#representation
+/// [2]: crate::accumulate::OptInSitu
+/// [3]: crate::accumulate::OptBitVec
+#[doc(hidden)] // Reachable via Read::Src for optional niche readers
+pub struct OptInSitu<'a>(&'a [u8]);
+
 /* ------------------------------------------------------------------------- Read Stream Outcome */
 
 /// The result of [deserializing](Deserialize) one [`Item`](I) from a [`Read`](Read) [`Stream`].
