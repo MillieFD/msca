@@ -69,7 +69,7 @@ followed by the mutable pointers required to bootstrap navigation.
 file header
 ├─ magic: [u8; 4]      // b"clem"
 ├─ version: u8
-├─ manifest: Sector    // offset + length of the manifest segment
+├─ manifest: Sector    // size & offset of the manifest segment
 └─ alignment padding   // zero-filled to the next 64-bit boundary
 ```
 
