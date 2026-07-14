@@ -78,6 +78,7 @@ use std::io::SeekFrom;
 use std::num::{self, NonZeroU64, TryFromIntError};
 use std::ops::Add;
 use std::path::{Path, PathBuf};
+use std::str::Utf8Error;
 use std::{fmt, mem};
 
 use bitvec::order::Lsb0;
@@ -661,7 +662,7 @@ pub enum Error {
     /// The specified `u32` is not a valid [Unicode scalar value][1].
     ///
     /// [1]: https://www.unicode.org/glossary/#unicode_scalar_value
-    Utf8(u32),
+    Utf8,
     /// File version number is not recognised by this build of [clem](crate).
     Version(u8),
 }
@@ -697,7 +698,7 @@ impl fmt::Display for Error {
             Self::Segment(e) => write!(f, "Segment error → {e}"),
             Self::Slice(e) => write!(f, "Try from slice error → {e}"),
             Self::Truncated { .. } => write!(f, "Read was truncated → {self:?}"),
-            Self::Utf8(e) => write!(f, "Invalid UTF8 scalar value → {e}"),
+            Self::Utf8 => write!(f, "Invalid UTF8 scalar value"),
             Self::Version(v) => write!(f, "Unrecognised clem version → {v}"),
         }
     }
@@ -1088,7 +1089,7 @@ impl<'de> Deserialize<'de> for char {
 
     fn deserialize(src: &mut &'de [u8]) -> Result<Self, Error> {
         let utf8 = u32::deserialize(src)?;
-        char::from_u32(utf8).ok_or_else(|| Error::Utf8(utf8))
+        char::from_u32(utf8).ok_or(Error::Utf8)
     }
 }
 
@@ -1189,7 +1190,7 @@ impl<'de> Deserialize<'de> for Option<char> {
         // NOTE: serialize trait encodes none using the u32::MAX niche
         match u32::deserialize(src)? {
             u32::MAX => Ok(None),
-            utf8 => char::from_u32(utf8).map(Some).ok_or_else(|| Error::Utf8(utf8)),
+            utf8 => char::from_u32(utf8).map(Some).ok_or(Error::Utf8),
         }
     }
 }
