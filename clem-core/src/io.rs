@@ -724,6 +724,13 @@ impl From<TryFromIntError> for Error {
     }
 }
 
+impl From<Utf8Error> for Error {
+    #[allow(unused_variables)]
+    fn from(e: Utf8Error) -> Self {
+        Self::Utf8
+    }
+}
+
 impl From<minicbor::decode::Error> for Error {
     fn from(e: minicbor::decode::Error) -> Self {
         Self::Decode(e)
