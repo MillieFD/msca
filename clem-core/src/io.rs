@@ -164,6 +164,16 @@ impl Sector {
         self.length.checked_add(self.offset)
     }
 
+    /// Resolve a [`Sector`] **relative** to the specified offset.
+    ///
+    /// ### Errors
+    ///
+    /// Returns [`number::Error::Zero`] if the resolved offset overflows `u64`.
+    pub(crate) fn relative(mut self, origin: u64) -> Result<Self, number::Error> {
+        self.offset = self.offset.checked_add(origin).ok_or(number::Error::Zero)?;
+        Ok(self)
+    }
+
     /// Read the byte [slice][1] defined by [`self`](Sector) from the provided [`Mmap`].
     ///
     /// ### Errors
