@@ -1,4 +1,4 @@
-# Multimodal Segmented Compact Archive (MSCA)
+# Multimodal Segmented Compact Archive: MSCA
 
 **A high-throughput storage engine for multidimensional analytical data, written in Rust.**
 
