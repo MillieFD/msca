@@ -64,12 +64,14 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //! [5]: crate::schema::Schema
 //! [6]: crate::Data
 
+use std::ops::Not;
 use std::{iter, num};
 
 use bitvec::order::Lsb0;
 use bitvec::slice::BitSlice;
 
 use crate::io::{Deserialize, Deserializer, Error, SizedBuf};
+use crate::schema::number;
 use crate::{query, Accumulate};
 
 /* ------------------------------------------------------------------------------ Public Exports */
@@ -199,31 +201,6 @@ impl<I> Outcome<I> {
         }
     }
 
-    /// Construct a [`Stream`] that yields [`self`](Outcome) exactly [once](iter::once).
-    fn once<'a>(self) -> Stream<'a, I>
-    where
-        I: 'a,
-    {
-        iter::once(self).into_box()
-    }
-
-    /// Construct a [`Stream`] that yields [`self`](Outcome) exactly `n` times; [`Include`][1] and
-    /// [`Exclude`][2] clone the inner item while [`Error`][3] yields [`once`](Self::once).
-    ///
-    /// [1]: Outcome::Include
-    /// [2]: Outcome::Exclude
-    /// [3]: Outcome::Error
-    fn repeat<'a>(self, n: usize) -> Stream<'a, I>
-    where
-        I: Clone + 'a,
-    {
-        match self {
-            Self::Include(item) => iter::repeat_n(item, n).map(Outcome::Include).into_box(),
-            Self::Exclude(item) => iter::repeat_n(item, n).map(Outcome::Exclude).into_box(),
-            Self::Error(error) => Self::Error(error).once(),
-        }
-    }
-
     /// Convert an included outcome into an excluded outcome without changing the inner [`item`](I).
     ///
     /// - [`Include`](Outcome::Include) converted to [`Exclude`](Outcome::Exclude)
@@ -323,31 +300,26 @@ impl<'a> Reader<'a, &'a str> for Seq<'a> {
             ends.is_empty().not().then(|| {
                 let end: usize = u64::deserialize(&mut ends)?.try_into()?;
                 let len = end.checked_sub(start).ok_or(number::Error::Zero)?;
-                let utf = data
-                    .split_at_checked(len)
+                data.split_at_checked(len)
                     .ok_or_else(|| Error::Truncated { expected: len, actual: data.len() })
                     .and_then(|src| {
                         data = src.1;
                         start = end;
                         Ok(src.0)
-                    })?;
-                str::from_utf8(utf).map_err(|e| Error::Utf8(utf[e.valid_up_to().add(1)].into()))
+                    })
+                    .map(str::from_utf8)?
+                    .map_err(Error::from)
             })
         })
     }
 }
 
-    fn boxed(&self, ctx: Self::Ctx) -> Stream<bool> {
-        let iter = iter::from_fn(move || {
-            self.split_first().map_or_else(
-                |error| match error {
-                    Error::Truncated { actual: 0, .. } => None,
-                    other => Outcome::Error(other).into(),
-                },
-                |item: bool| item.evaluate(ctx).into(),
-            )
-        });
-        Box::new(iter)
+impl<'a> Reader<'a, String> for Seq<'a>
+where
+    Self: Reader<'a, &'a str>,
+{
+    fn iter(self) -> impl Iterator<Item = Result<String, Error>> + 'a {
+        self.iter().map(|r| r.map(str::to_owned))
     }
 }
 
