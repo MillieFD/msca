@@ -240,8 +240,13 @@ where
 #[doc(hidden)] // pub required for Query::column trait bounds; not intended as a stable API
 pub trait Reader<'a, I> {
     /// Return an [`Iterator`] that lazily [deserializes](Deserialize) items from the on-disk bytes.
+    ///
+    /// ### Errors
+    ///
+    /// - An iterator construction [`Error`] surfaces **eagerly** through the outer [`Result`].
+    /// - Per-item deserialisation errors surface **lazily** on [`next`](Iterator::next).
     #[rustfmt::skip] // single line where clause improves readability
-    fn iter(self) -> impl Iterator<Item = Result<I, Error>> + 'a where Self: Sized;
+    fn iter(self) -> Result<impl Iterator<Item = Result<I, Error>> + 'a, Error> where Self: Sized;
 }
 
 /* ----------------------------------------------------------------- Reader Trait Implementation */
@@ -250,17 +255,19 @@ impl<'a, I> Reader<'a, I> for &'a [u8]
 where
     I: for<'de> Deserialize<'de, Ok = I> + 'a,
 {
-    fn iter(mut self) -> impl Iterator<Item = Result<I, Error>> + 'a {
-        iter::from_fn(move || match self.is_empty() {
+    fn iter(mut self) -> Result<impl Iterator<Item = Result<I, Error>> + 'a, Error> {
+        let iter = iter::from_fn(move || match self.is_empty() {
             false => self.deserialize_into().into(),
             true => None,
-        })
+        });
+        Ok(iter)
     }
 }
 
 impl<'a> Reader<'a, bool> for &'a BitSlice<u8, Lsb0> {
-    fn iter(self) -> impl Iterator<Item = Result<bool, Error>> + 'a {
-        self.iter().by_vals().map(Ok)
+    fn iter(self) -> Result<impl Iterator<Item = Result<bool, Error>> + 'a, Error> {
+        let iter = self.iter().by_vals().map(Ok);
+        Ok(iter)
     }
 }
 
@@ -269,13 +276,14 @@ where
     I: Read + 'a,
     I::Src<'a>: Reader<'a, I>,
 {
-    fn iter(self) -> impl Iterator<Item = Result<Option<I>, Error>> + 'a {
+    fn iter(self) -> Result<impl Iterator<Item = Result<Option<I>, Error>> + 'a, Error> {
         let mut mask = self.mask.iter().by_vals();
-        let mut data = self.data.iter();
-        iter::from_fn(move || match mask.next()? {
+        let mut data = self.data.iter()?;
+        let iter = iter::from_fn(move || match mask.next()? {
             true => data.next()?.map(Some).into(),
             false => Ok(None).into(),
-        })
+        });
+        Ok(iter)
     }
 }
 
@@ -284,20 +292,21 @@ where
     I: 'a,
     Option<I>: for<'de> Deserialize<'de, Ok = Option<I>>,
 {
-    fn iter(self) -> impl Iterator<Item = Result<Option<I>, Error>> + 'a {
+    fn iter(self) -> Result<impl Iterator<Item = Result<Option<I>, Error>> + 'a, Error> {
         let mut data = self.0;
-        iter::from_fn(move || match data.is_empty() {
+        let iter = iter::from_fn(move || match data.is_empty() {
             false => Option::<I>::deserialize(&mut data).into(),
             true => None,
-        })
+        });
+        Ok(iter)
     }
 }
 
 impl<'a> Reader<'a, &'a str> for Seq<'a> {
-    fn iter(self) -> impl Iterator<Item = Result<&'a str, Error>> + 'a {
+    fn iter(self) -> Result<impl Iterator<Item = Result<&'a str, Error>> + 'a, Error> {
         let (mut ends, mut data) = (self.ends, self.data);
         let mut start = usize::MIN;
-        iter::from_fn(move || {
+        let iter = iter::from_fn(move || {
             ends.is_empty().not().then(|| {
                 let end: usize = u64::deserialize(&mut ends)?.try_into()?;
                 let len = end.checked_sub(start).ok_or(number::Error::Zero)?;
@@ -311,7 +320,8 @@ impl<'a> Reader<'a, &'a str> for Seq<'a> {
                     .map(str::from_utf8)?
                     .map_err(Error::from)
             })
-        })
+        });
+        Ok(iter)
     }
 }
 
@@ -319,16 +329,17 @@ impl<'a> Reader<'a, String> for Seq<'a>
 where
     Self: Reader<'a, &'a str>,
 {
-    fn iter(self) -> impl Iterator<Item = Result<String, Error>> + 'a {
-        self.iter().map(|r| r.map(str::to_owned))
+    fn iter(self) -> Result<impl Iterator<Item = Result<String, Error>> + 'a, Error> {
+        let iter = Reader::<&'a str>::iter(self)?.map(|item| item.map(str::to_owned));
+        Ok(iter)
     }
 }
 
 impl<'a> Reader<'a, Option<String>> for Seq<'a> {
-    fn iter(self) -> impl Iterator<Item = Result<Option<String>, Error>> + 'a {
+    fn iter(self) -> Result<impl Iterator<Item = Result<Option<String>, Error>> + 'a, Error> {
         let (mut ends, mut data) = (self.ends, self.data);
         let mut start = usize::MIN;
-        iter::from_fn(move || {
+        let iter = iter::from_fn(move || {
             ends.is_empty().not().then(|| {
                 let end: usize = match u64::deserialize(&mut ends)? {
                     u64::MAX => return Ok(None), // in-situ niche
@@ -347,31 +358,35 @@ impl<'a> Reader<'a, Option<String>> for Seq<'a> {
                     .map(Some)
                     .map_err(Error::from)
             })
-        })
+        });
+        Ok(iter)
     }
 }
 
 impl<'a, I> Reader<'a, Vec<I>> for Seq<'a>
 where
-    I: Read<Src<'a> = Self>,
+    I: Read + 'a,
+    I::Src<'a>: Deserialize<'a, Ok = I::Src<'a>> + Reader<'a, I>,
 {
-    type Ctx = &'a HashSet<Filter>;
-
-    fn boxed(&self, ctx: Self::Ctx) -> Stream<I> {
-        let mut bits = self.bits.boxed(ctx);
-        let mut data = self.data.boxed(ctx);
-        let iter = iter::from_fn(move || match bits.next()? {
-            Outcome::Include(true) => data.next()?.map(Some).into(),
-            Outcome::Include(false) => Outcome::Include(None).into(),
-            other => other.into(),
+    fn iter(self) -> Result<impl Iterator<Item = Result<Vec<I>, Error>> + 'a, Error> {
+        let (mut ends, mut start) = (self.ends, usize::MIN);
+        let mut data = I::Src::deserialize(&mut { self.data })?.iter()?;
+        let iter = iter::from_fn(move || {
+            ends.is_empty().not().then(|| {
+                let end: usize = u64::deserialize(&mut ends)?.try_into()?;
+                let n = end.checked_sub(start).ok_or(number::Error::Zero)?;
+                start = end;
+                data.by_ref().take(n).collect()
+            })
         });
-        Box::new(iter)
+        Ok(iter)
     }
 }
 
-impl<'a, I> Reader<I> for Seq<'a>
+impl<'a, I> Reader<'a, Option<Vec<I>>> for Seq<'a>
 where
-    I: Read<Src<'a> = Self>,
+    I: Read + 'a,
+    I::Src<'a>: Deserialize<'a, Ok = I::Src<'a>> + Reader<'a, I>,
 {
     type Ctx = &'a HashSet<Filter>;
 
@@ -825,17 +840,55 @@ mod tests {
         assert!(opt.data.is_empty());
     }
 
-    /// [`Outcome::repeat`] yields the cloned item exactly `n` times; excluded values repeat as
-    /// [`Outcome::Exclude`] to keep composite readers in lockstep.
+    /// [`Seq::deserialize`] accepts the omitted data sub-buffer written by an all-empty-row column;
+    /// the exhausted source yields an empty data cursor.
     #[test]
-    fn outcome_repeat_clones() {
-        let items: Vec<u32> = Outcome::Include(7u32)
-            .repeat(3)
-            .map(|out| out.result().expect("Repeat yielded an error"))
-            .collect();
-        assert_eq!(items, [7, 7, 7]);
-        let excluded: Vec<Outcome<u32>> = Outcome::Exclude(7u32).repeat(2).collect();
-        assert_eq!(excluded.len(), 2);
-        assert!(excluded.iter().all(|out| matches!(out, Outcome::Exclude(7))));
+    fn seq_deserialize_omitted_data() {
+        let mut buf = Vec::new();
+        sized(&0u64.to_le_bytes(), &mut buf); // one zero-length row end offset
+        let mut src = buf.as_slice();
+        let seq = Seq::deserialize(&mut src).expect("Deserialize failed");
+        assert_eq!(seq.ends, &0u64.to_le_bytes());
+        assert!(seq.data.is_empty());
+    }
+
+    /// [`From`] lifts a decode result onto an [`Outcome`] at the column boundary.
+    #[test]
+    fn outcome_from_result() {
+        assert!(matches!(
+            Outcome::from(Ok::<u32, Error>(7)),
+            Outcome::Include(7)
+        ));
+        assert!(matches!(
+            Outcome::from(Err::<u32, Error>(Error::Utf8)),
+            Outcome::Error(..)
+        ));
+    }
+
+    /// [`Evaluate`] tests a plain item against its own operand; an [`Option`] defers to its inner
+    /// operand and excludes an absent [`None`], which carries no operand to test.
+    #[test]
+    fn evaluate_projects_operand() {
+        assert!(matches!(7u32.evaluate(|op| *op == 7), Outcome::Include(7)));
+        assert!(matches!(7u32.evaluate(|op| *op == 8), Outcome::Exclude(7)));
+        assert!(matches!(
+            Some(7u32).evaluate(|op| *op == 7),
+            Outcome::Include(Some(7))
+        ));
+        assert!(matches!(
+            Some(7u32).evaluate(|op| *op == 8),
+            Outcome::Exclude(Some(7))
+        ));
+        assert!(matches!(
+            None::<u32>.evaluate(|op| *op == 7),
+            Outcome::Exclude(None)
+        ));
+    }
+
+    /// [`IsOption`] reports structural presence for the `is_some` / `is_none` gate.
+    #[test]
+    fn is_option_presence() {
+        assert!(Some(7u32).is_some());
+        assert!(!None::<u32>.is_some());
     }
 }
