@@ -207,6 +207,7 @@ impl<I> Outcome<I> {
     /// - [`Exclude`](Outcome::Exclude) and [`Error`](Outcome::Error) remain unchanged
     ///
     /// The resulting [`Outcome`] is guaranteed to never contain [`Outcome::Include`].
+    #[allow(unused)]
     fn exclude(self) -> Self {
         match self {
             Outcome::Include(i) => Outcome::Exclude(i),
@@ -323,7 +324,34 @@ where
     }
 }
 
-impl<'a, I> Reader<I> for OptBitVec<'a>
+impl<'a> Reader<'a, Option<String>> for Seq<'a> {
+    fn iter(self) -> impl Iterator<Item = Result<Option<String>, Error>> + 'a {
+        let (mut ends, mut data) = (self.ends, self.data);
+        let mut start = usize::MIN;
+        iter::from_fn(move || {
+            ends.is_empty().not().then(|| {
+                let end: usize = match u64::deserialize(&mut ends)? {
+                    u64::MAX => return Ok(None), // in-situ niche
+                    other => other.try_into()?,
+                };
+                let len = end.checked_sub(start).ok_or(number::Error::Zero)?;
+                data.split_at_checked(len)
+                    .ok_or_else(|| Error::Truncated { expected: len, actual: data.len() })
+                    .and_then(|src| {
+                        data = src.1;
+                        start = end;
+                        Ok(src.0)
+                    })
+                    .map(str::from_utf8)?
+                    .map(str::to_owned)
+                    .map(Some)
+                    .map_err(Error::from)
+            })
+        })
+    }
+}
+
+impl<'a, I> Reader<'a, Vec<I>> for Seq<'a>
 where
     I: Read<Src<'a> = Self>,
 {
