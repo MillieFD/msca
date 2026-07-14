@@ -16,9 +16,9 @@ unwrap_used = "deny"
 # See a full list of keys and their definitions at https://rust-lang.github.io/rust-clippy/stable/index.html
 
 [dependencies]
-smol = "2.0"
-memmap2 = "0.9"
 bitvec = "1.0"
+memmap2 = "0.9"
+smol = "2.0"
 static_assertions = "1.1"
 
 [dependencies.minicbor]
