@@ -388,13 +388,22 @@ where
     I: Read + 'a,
     I::Src<'a>: Deserialize<'a, Ok = I::Src<'a>> + Reader<'a, I>,
 {
-    type Ctx = &'a HashSet<Filter>;
-
-    fn boxed(&self, ctx: Self::Ctx) -> Stream<I> {
-        let mut offsets: Stream<u64> = self.offsets.boxed(ctx);
-        let mut data = self.data.boxed(ctx);
-        let mut start = u64::MIN;
-        Box::new(iter)
+    fn iter(self) -> Result<impl Iterator<Item = Result<Option<Vec<I>>, Error>> + 'a, Error> {
+        let (mut ends, mut start) = (self.ends, usize::MIN);
+        let mut data = I::Src::deserialize(&mut { self.data })?.iter()?;
+        let iter = iter::from_fn(move || {
+            ends.is_empty().not().then(|| {
+                let end: usize = match u64::deserialize(&mut ends)? {
+                    u64::MAX => return Ok(None),
+                    end => end.try_into()?,
+                };
+                let n = end.saturating_sub(start);
+                start = end;
+                let item: Result<Vec<I>, Error> = data.by_ref().take(n).collect();
+                Some(item).transpose()
+            })
+        });
+        Ok(iter)
     }
 }
 
@@ -707,21 +716,21 @@ where
 {
     /// Assess the wrapped [`item`](I) using the provided [`filter`](F) if the option is [`Some`].
     ///
-    /// ### Retains None
+    /// ### Excludes None
     ///
-    /// The filter has no input – and therefore cannot be executed – if the option is [`None`].
-    /// Untested items are **retained** by default; chain with [`Column::is_some`][1] to exclude
-    /// these results.
+    /// The filter has no input – and therefore cannot be executed – if the option is [`None`]. An
+    /// absent item carries no operand and therefore cannot satisfy the predicate. Untested items
+    /// are **excluded** by default. Use [`Column::is_none`][1] to include these items.
     ///
     /// Refer to the [trait documentation](Evaluate) for more details.
     ///
-    /// [1]: query::column::Column::is_some
+    /// [1]: query::column::Column::is_none
     fn evaluate<F>(self, filter: F) -> Outcome<Self>
     where
         F: Fn(&I) -> bool,
     {
         match self {
-            None => Outcome::Include(None),
+            None => Outcome::Exclude(None),
             Some(item) => item.evaluate(filter).map(Some),
         }
     }
