@@ -1074,6 +1074,7 @@ pub trait Unfold: Sized {
     /// The [accumulator](Accumulate) type used to ingest values of [`Self`] directly.
     // NOTE: Buffer must be a growable Vec; compiler cannot predict the number of accumulated items
     type RawAcc: Accumulate<Self>
+        + Descriptor
         + Serialize<Buffer = Vec<u8>>
         + FromIterator<Self>
         + Default
@@ -1082,6 +1083,7 @@ pub trait Unfold: Sized {
     /// The [accumulator](Accumulate) type used to ingest [optional](Option) values of [`Self`].
     // NOTE: Buffer must be a growable Vec; compiler cannot predict the number of accumulated items
     type OptAcc: Accumulate<Option<Self>>
+        + Descriptor
         + Serialize<Buffer = Vec<u8>>
         + FromIterator<Option<Self>>
         + Default
