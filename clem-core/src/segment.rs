@@ -34,8 +34,7 @@ use std::num::NonZeroU64;
 use minicbor::{CborLen, Decode, Encode};
 use smol::io::{AsyncSeek, AsyncWrite, AsyncWriteExt};
 
-use crate::accumulate::Buffer;
-use crate::io::{self, Checksum};
+use crate::io::{self, Buffer, Checksum};
 use crate::schema::number;
 use crate::{Sector, Serialize};
 
@@ -103,7 +102,7 @@ mod variant {
 
     use minicbor::{CborLen, Decode, Encode};
 
-    use crate::accumulate::Buffer;
+    use crate::io::Buffer;
     use crate::schema::number;
     use crate::Serialize;
 
