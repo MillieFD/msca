@@ -37,10 +37,10 @@ use crate::schema::{size_of_opt, BitMatch, Unfold};
 use crate::segment::{Align, Header, Segment, Variant};
 use crate::Sector;
 
-/// Shorthand type-erased stack-allocated [pointer](Box) to an [`Accumulate`] trait object backed by
-/// a heap-allocated growable [`Buffer`](Serialize::Buffer).
+/// Shorthand type-erased stack-allocated [pointer](Box) to a [`Describe`] trait object backed by a
+/// heap-allocated growable [`Buffer`](Serialize::Buffer).
 // NOTE: Buffer must be a growable Vec; compiler cannot predict the number of accumulated items
-pub type BoxAcc<I> = Box<dyn Accumulate<I, Buffer = Vec<u8>>>;
+pub type BoxAcc<I> = Box<dyn Describe<I, Buffer = Vec<u8>>>;
 
 /// Shorthand type-erased [`Iterator`] over mutable [`Column`] descriptors.
 // NOTE: Deterministic runtime order via BTreeMap; #[derive] ensures identical compile time order.
