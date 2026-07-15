@@ -25,9 +25,6 @@ use crate::{io, Deserialize, Sector, Serialize};
 
 /* ------------------------------------------------------------------------------ Public Exports */
 
-/// Size of each serialized [`Buffer`] statistic in bytes; determined by the largest supported type.
-pub(crate) const B: usize = size_of::<u128>();
-
 /// Manifest of file segments and accompanying metadata for random access and predicate pruning.
 /// See the [module-level documentation](self) for details.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
