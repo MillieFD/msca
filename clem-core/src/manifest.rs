@@ -10,7 +10,9 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 
 #![doc = include_str!("../../doc/manifest.md")]
 
+use std::cmp::Ordering;
 use std::collections::{BTreeMap, Bound};
+use std::hash::{Hash, Hasher};
 use std::num::NonZeroU64;
 use std::ops::RangeBounds;
 
@@ -210,6 +212,27 @@ pub struct Column {
 impl PartialEq for Column {
     fn eq(&self, other: &Self) -> bool {
         self.ty == other.ty
+    }
+}
+
+impl Ord for Column {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.ty.cmp(&other.ty)
+    }
+}
+
+impl PartialOrd for Column {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Hash for Column {
+    fn hash<H>(&self, state: &mut H)
+    where
+        H: Hasher,
+    {
+        self.ty.hash(state);
     }
 }
 
