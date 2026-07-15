@@ -16,6 +16,7 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //! - [`Seq`] → Data buffer with [offset](NonZeroU64) metadata.
 //! - [`OptSeq`] → [`Seq`] with [offset](NonZeroU64) and [validity](Option) metadata.
 //! - [`Flatten`] → Collapses nested [`Option`] layers.
+//! - [`Buffer`] → State machine to determine the appropriate encoding strategy.
 //!
 //! Each accumulator type implements the [`Accumulate`] trait, which defines a shared interface for
 //! handling in-memory value accumulation.
@@ -28,13 +29,12 @@ use std::num::*;
 use bitvec::field::BitField;
 use bitvec::vec::BitVec;
 use minicbor::{CborLen, Decode, Encode};
-use static_assertions::const_assert;
 
-use crate::io::{SizedBuf, PREFIX};
-use crate::manifest::{self, Column, B};
+use crate::io::{Buffer as _, Checksum, Register, SizedBuf, HEADER};
+use crate::manifest::{self, Column, Manifest};
 use crate::number::Error;
-use crate::schema::{size_of_opt, Unfold};
-use crate::segment::{Align, Variant};
+use crate::schema::{size_of_opt, BitMatch, Unfold};
+use crate::segment::{Align, Header, Segment, Variant};
 use crate::Sector;
 
 /// Shorthand type-erased stack-allocated [pointer](Box) to an [`Accumulate`] trait object backed by
@@ -65,13 +65,15 @@ pub type Columns<'a> = dyn Iterator<Item = &'a mut Column> + 'a;
 /// data-segment
 /// ├─ header
 /// │  ├─ variant: u8
-/// │  ├─ length: NonZeroU64
+/// │  └─ size: NonZeroU64
+/// ├─ metadata
 /// │  ├─ schema: NonZeroU64
 /// │  ├─ count: NonZeroU64
 /// │  └─ alignment padding
-/// ├─ buffer 0
+/// ├─ 1st buffer
 /// ⋮
-/// └─ buffer N
+/// ├─ Nth buffer
+/// └─ checksum: u64
 /// ```
 ///
 /// The [`Schema`][1] maps each **platform-agnostic** primitive [`Type`][3] to a contiguous buffer;
