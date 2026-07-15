@@ -1719,9 +1719,6 @@ where
     }
 
     fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
-        let prefix: u64 = size_of::<NonZeroU64>().try_into()?;
-        // NOTE: Self::size returns Error if Σ overflows u64 (not expected in production)
-        let buf = self.size()?.get().sub(prefix).to_le_bytes().serialize_into(buf)?;
         self.iter().try_fold(buf, |sink, element| element.serialize_into(sink))
     }
 
@@ -1824,16 +1821,11 @@ where
     type Buffer = Vec<u8>;
 
     fn size(&self) -> Result<NonZeroU64, Error> {
-        let data = self.data.size()?.align()?;
-        let prefix = size_of::<NonZeroU64>().try_into()?; // Length prefix
-        self.mask
-            .size()?
-            .align()?
-            .checked_add(data)
-            .ok_or(Error::Zero)?
-            .checked_add(prefix)
-            .and_then(NonZeroU64::new)
-            .ok_or(Error::Zero)
+        let mask = SizedBuf::new(&self.mask).size()?;
+        match self.data.is_empty() {
+            true => Ok(mask),
+            false => SizedBuf::new(&self.data).size()?.checked_add(mask.get()).ok_or(Error::Zero),
+        }
     }
 
     fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
@@ -1860,16 +1852,11 @@ where
     type Buffer = Vec<u8>;
 
     fn size(&self) -> Result<NonZeroU64, Error> {
-        let data = self.data.size()?.align()?;
-        let prefix = size_of::<NonZeroU64>().try_into()?; // Length prefix
-        self.offsets
-            .size()?
-            .align()?
-            .checked_add(data)
-            .ok_or(Error::Zero)?
-            .checked_add(prefix)
-            .and_then(NonZeroU64::new)
-            .ok_or(Error::Zero)
+        let ends = SizedBuf::new(&self.offsets).size()?;
+        match self.data.is_empty() {
+            true => Ok(ends),
+            false => SizedBuf::new(&self.data).size()?.checked_add(ends.get()).ok_or(Error::Zero),
+        }
     }
 
     fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
@@ -1943,7 +1930,7 @@ where
     }
 }
 
-impl<I> Serialize for Compact<I>
+impl<I> Serialize for Buffer<I>
 where
     I: Unfold + Clone,
 {
@@ -1952,24 +1939,24 @@ where
     fn size(&self) -> Result<NonZeroU64, Error> {
         match self {
             Self::Empty => Error::Zero.into(),
-            Self::Lite { item, .. } => I::once(item).size(),
-            Self::Full(acc) => acc.size(),
+            Self::Compact { item, .. } => I::once(item).size(),
+            Self::Many(acc) => acc.size(),
         }
     }
 
     fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
         match self {
             Self::Empty => Err(Error::Zero),
-            Self::Lite { item, .. } => I::once(item).serialize_into(buf),
-            Self::Full(acc) => acc.serialize_into(buf),
+            Self::Compact { item, .. } => I::once(item).serialize_into(buf),
+            Self::Many(acc) => acc.serialize_into(buf),
         }
     }
 
     fn serialize(&self) -> Result<Self::Buffer, Error> {
         match self {
             Self::Empty => Err(Error::Zero),
-            Self::Lite { item, .. } => I::once(item).serialize(),
-            Self::Full(acc) => acc.serialize(),
+            Self::Compact { item, .. } => I::once(item).serialize(),
+            Self::Many(acc) => acc.serialize(),
         }
     }
 }
@@ -1978,8 +1965,8 @@ impl<I> Serialize for Accumulator<I> {
     type Buffer = Vec<u8>;
 
     fn size(&self) -> Result<NonZeroU64, Error> {
-        let header = Self::HEADER.try_into()?;
-        self.data.size()?.align()?.checked_add(header).and_then(NonZeroU64::new).ok_or(Error::Zero)
+        let meta = { size_of::<NonZeroU64>() + size_of::<NonZeroU64>() } as u64;
+        self.data.size()?.align()?.checked_add(meta).and_then(NonZeroU64::new).ok_or(Error::Zero)
     }
 
     fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
