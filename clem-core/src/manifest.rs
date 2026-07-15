@@ -298,7 +298,9 @@ impl Buffer {
     /// Returns the logical number of items recorded in [`self`](Buffer).
     pub(crate) const fn count(&self) -> u64 {
         match self {
-            Buffer::Full { count, .. } | Buffer::Lite { count, .. } => count.get(),
+            Buffer::Detailed { count, .. }
+            | Buffer::Compact { count, .. }
+            | Buffer::Basic { count, .. } => count.get(),
         }
     }
 
