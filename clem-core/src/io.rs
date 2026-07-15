@@ -72,7 +72,6 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 #![doc = include_str!("../../doc/read-cycle.md")]
 
 use std::array::TryFromSliceError;
-use std::cmp::Ordering;
 use std::convert::{Infallible, TryInto};
 use std::io::SeekFrom;
 use std::num::{self, NonZeroU64, TryFromIntError};
@@ -124,18 +123,23 @@ const ALIGN: usize = {
 /// Implementers must [`Copy`] into an owned type when mutability is required e.g. for downstream
 /// data processing.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Debug, Copy, Clone, Eq, PartialEq, PartialOrd, Hash, Encode, Decode, CborLen)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode, CborLen)]
 pub struct Sector {
     /// Byte offset to the start of the sector.
     #[n(0)]
     pub offset: u64,
-    /// Total length of the sector in bytes.
+    /// Total size of the sector in bytes.
     #[n(1)]
-    pub length: NonZeroU64,
+    pub size: NonZeroU64,
 }
 
 impl Sector {
-    pub fn new<A, B>(offset: A, length: B) -> Result<Self, Error>
+    /// Construct a [`Sector`] spanning `size` bytes from the specified `offset`.
+    ///
+    /// ### Errors
+    ///
+    /// Returns [`Error::Number`] if `length` is zero or either argument overflows its target type.
+    pub fn new<A, B>(offset: A, size: B) -> Result<Self, Error>
     where
         A: TryInto<u64>,
         B: TryInto<NonZeroU64>,
@@ -143,7 +147,7 @@ impl Sector {
     {
         Ok(Self {
             offset: offset.try_into()?,
-            length: length.try_into()?,
+            size: size.try_into()?,
         })
     }
 
@@ -160,7 +164,7 @@ impl Sector {
 
     /// Returns the offset immediately following [`self`](Sector), or [`None`] on `u64` overflow.
     pub const fn next(&self) -> Option<NonZeroU64> {
-        self.length.checked_add(self.offset)
+        self.size.checked_add(self.offset)
     }
 
     /// Resolve a [`Sector`] **relative** to the specified offset.
@@ -196,14 +200,8 @@ impl Add for Sector {
 
     fn add(self, rhs: Self) -> Self::Output {
         let offset = self.offset.min(rhs.offset);
-        let length = self.length.checked_add(rhs.length.get())?;
-        Some(Self { offset, length })
-    }
-}
-
-impl Ord for Sector {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.offset.cmp(&other.offset)
+        let size = self.size.checked_add(rhs.size.get())?;
+        Some(Self { offset, size })
     }
 }
 
@@ -215,7 +213,7 @@ impl Serialize for Sector {
     }
 
     fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], number::Error> {
-        buf.serialize_push(&self.offset)?.serialize_push(&self.length)
+        buf.serialize_push(&self.offset)?.serialize_push(&self.size)
     }
 
     fn serialize(&self) -> Result<Self::Buffer, number::Error> {
@@ -372,13 +370,8 @@ impl Header {
     /// [2]: VERSION
     const SECTOR: Sector = Sector {
         offset: { size_of_val(&MAGIC) + size_of_val(&VERSION) } as u64,
-        length: NonZeroU64::new(size_of::<Self>() as u64).expect("Length is zero"),
+        size: NonZeroU64::new(size_of::<Self>() as u64).expect("Length is zero"),
     };
-
-    /// Create a new [clem](crate) file [`Header`] pointing to the provided manifest [`Sector`].
-    fn new(manifest: Sector) -> Self {
-        Self { manifest }
-    }
 
     /// [`Deserialize`] the file [`Header`] using the provided file [`Reader`](AsyncRead).
     ///
@@ -445,8 +438,8 @@ impl<'de> Deserialize<'de> for Header {
                 }
             })?;
         let offset = u64::deserialize(src)?;
-        let length = NonZeroU64::deserialize(src)?;
-        let manifest = Sector { offset, length };
+        let size = NonZeroU64::deserialize(src)?;
+        let manifest = Sector { offset, size };
         Ok(Self { manifest })
     }
 }
