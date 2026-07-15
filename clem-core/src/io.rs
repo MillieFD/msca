@@ -90,7 +90,6 @@ use smol::fs::{self, OpenOptions};
 use smol::io::{AsyncRead, AsyncReadExt, AsyncSeek, AsyncSeekExt, AsyncWriteExt};
 use xxhash_rust::xxh3::xxh3_64;
 
-use crate::accumulate::Buffer;
 use crate::manifest::Manifest;
 use crate::segment::{self, Align, Segment};
 use crate::{number, schema, Serialize};
