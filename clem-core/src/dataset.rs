@@ -16,15 +16,18 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //! high-level surface for registering [`Data`] types and [querying](query) stored data while
 //! delegating low-level IO to an internal [`File`] handle.
 
-use std::ops::Range;
+use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
 
 use memmap2::Mmap;
+use xxhash_rust::xxh3::Xxh3Builder;
 
 use crate::io::File;
 use crate::query::{self, Query};
-use crate::{io, manifest, Accumulate, Accumulator, Data, Schema};
+use crate::read::{Composite, Outcome, Read};
+use crate::schema::{number, AsKey};
+use crate::{io, Accumulate, Accumulator, Data, Error, Schema};
 
 /* ------------------------------------------------------------------------------ Public Exports */
 
