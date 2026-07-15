@@ -14,6 +14,7 @@ use std::collections::{BTreeMap, Bound};
 use std::num::NonZeroU64;
 use std::ops::RangeBounds;
 
+use memmap2::Mmap;
 use minicbor::{CborLen, Decode, Encode};
 use smol::io::{AsyncRead, AsyncReadExt, AsyncSeek};
 
