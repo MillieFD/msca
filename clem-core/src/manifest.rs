@@ -81,7 +81,7 @@ impl Manifest {
     where
         F: AsyncRead + AsyncSeek + Unpin + ?Sized,
     {
-        let size = sector.length.get().try_into()?;
+        let size = sector.size.get().try_into()?;
         let mut buf = vec![0u8; size];
         sector.seek_to_start(file).await?;
         file.read_exact(&mut buf).await?;
@@ -378,6 +378,8 @@ impl Buffer {
 
 #[cfg(test)]
 mod tests {
+    use memmap2::MmapMut;
+
     use super::*;
 
     /// A manifest segment round-trips: [`frame`](Segment::wrap) then [`verify`](Checksum::verify)
@@ -409,19 +411,20 @@ mod tests {
         assert!(matches!(err, io::Error::Truncated { .. }));
     }
 
-    /// Both [`Buffer`] variants round-trip through their tagged CBOR representation.
+    /// Every [`Buffer`] variant round-trips through its tagged CBOR representation.
     #[test]
     fn buffer_cbor_round_trips() {
-        let sector = Sector::new(8u64, 16u64).expect("Sector::new failed");
+        let buffer = Sector::new(8u64, 16u64).expect("Sector::new failed");
         let count = NonZeroU64::new(3).expect("Count is zero");
-        let full = Buffer::Full {
-            sector,
+        let detailed = Buffer::Detailed {
+            buffer,
             count,
-            min: [u8::MIN; B],
-            max: [u8::MAX; B],
+            min: Sector::new(8u64, 4u64).expect("Sector::new failed"),
+            max: Sector::new(20u64, 4u64).expect("Sector::new failed"),
         };
-        let lite = Buffer::Lite { sector, count };
-        for buf in [full, lite] {
+        let compact = Buffer::Compact { buffer, count };
+        let basic = Buffer::Basic { buffer, count };
+        for buf in [detailed, compact, basic] {
             let mut bytes = vec![u8::MIN; minicbor::len(&buf)];
             let mut sink = bytes.as_mut_slice();
             // SAFETY: minicbor::encode is infallible when writing to &mut [u8]
@@ -431,37 +434,75 @@ mod tests {
         }
     }
 
-    /// [`Lite`](Buffer::Lite) descriptors carry no statistics and are never provably disjoint.
+    /// [`Detailed`](Buffer::Detailed) resolves its statistic sectors against the memory map and
+    /// deserializes each as exactly one item: `[10, 30]` is disjoint from `100..200` but overlaps
+    /// `20..40`.
     #[test]
-    fn lite_never_disjoint() {
-        let sector = Sector::new(8u64, 16u64).expect("Sector::new failed");
-        let count = NonZeroU64::new(3).expect("Count is zero");
-        let lite = Buffer::Lite { sector, count };
-        // SAFETY: Lite descriptors return before any type-dependent statistic is deserialized
-        let disjoint = unsafe { lite.disjoint(&(10u32..20)) }.expect("Disjoint failed");
-        assert!(!disjoint);
+    fn detailed_disjoint_by_statistics() {
+        let bytes = [10u32.to_le_bytes(), 30u32.to_le_bytes()].concat();
+        let mut mmap = MmapMut::map_anon(bytes.len()).expect("Anonymous map failed");
+        mmap[..bytes.len()].copy_from_slice(&bytes);
+        let mmap = mmap.make_read_only().expect("Read-only conversion failed");
+        let width = size_of::<u32>() as u64;
+        let detailed = Buffer::Detailed {
+            buffer: Sector::new(0u64, bytes.len() as u64).expect("Sector::new failed"),
+            count: NonZeroU64::new(2).expect("Count is zero"),
+            min: Sector::new(0u64, width).expect("Sector::new failed"),
+            max: Sector::new(width, width).expect("Sector::new failed"),
+        };
+        // SAFETY: the statistic sectors span serialized `u32` items matching the requested type
+        let away = unsafe { detailed.disjoint(&(100u32..200), &mmap) }.expect("Disjoint failed");
+        assert!(away);
+        // SAFETY: as above
+        let over = unsafe { detailed.disjoint(&(20u32..40), &mmap) }.expect("Disjoint failed");
+        assert!(!over);
     }
 
-    /// [`Schema::count`] sums the item counts across every buffer of the first column, spanning both
-    /// [`Full`](Buffer::Full) and [`Lite`](Buffer::Lite) descriptors.
+    /// [`Compact`](Buffer::Compact) and [`Basic`](Buffer::Basic) descriptors carry no statistics and
+    /// are never provably disjoint; a compact item is instead evaluated exactly by a value filter.
+    #[test]
+    fn compact_and_basic_never_disjoint() {
+        let mmap = MmapMut::map_anon(1).expect("Anonymous map failed");
+        let mmap = mmap.make_read_only().expect("Read-only conversion failed");
+        let buffer = Sector::new(8u64, 16u64).expect("Sector::new failed");
+        let count = NonZeroU64::new(3).expect("Count is zero");
+        for buf in [
+            Buffer::Compact { buffer, count },
+            Buffer::Basic { buffer, count },
+        ] {
+            // SAFETY: both variants return before any type-dependent statistic is deserialized
+            let disjoint = unsafe { buf.disjoint(&(10u32..20), &mmap) }.expect("Disjoint failed");
+            assert!(!disjoint);
+        }
+    }
+
+    /// [`Schema::count`] sums the item counts across every buffer of the first column, spanning all
+    /// three descriptor variants.
     #[test]
     fn schema_count_sums_buffers() {
         let sector = Sector::new(8u64, 16u64).expect("Sector::new failed");
-        let full = Buffer::Full {
-            sector,
+        let detailed = Buffer::Detailed {
+            buffer: sector,
             count: NonZeroU64::new(3).expect("Count is zero"),
-            min: [u8::MIN; B],
-            max: [u8::MAX; B],
+            min: sector,
+            max: sector,
         };
-        let lite = Buffer::Lite {
-            sector,
+        let compact = Buffer::Compact {
+            buffer: sector,
             count: NonZeroU64::new(2).expect("Count is zero"),
         };
-        let column = Column { ty: Type::U32, buffers: vec![full, lite] };
+        let basic = Buffer::Basic {
+            buffer: sector,
+            count: NonZeroU64::new(4).expect("Count is zero"),
+        };
+        let column = Column {
+            ty: Type::U32,
+            buffers: vec![detailed, compact, basic],
+        };
         let schema = Schema {
             sector,
             columns: BTreeMap::from([(String::from("v"), column)]),
         };
-        assert_eq!(schema.count(), 5);
+        assert_eq!(schema.count(), 9);
     }
 }
