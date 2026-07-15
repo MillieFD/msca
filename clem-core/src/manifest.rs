@@ -98,6 +98,7 @@ impl Manifest {
     ///
     /// Used to recover a corrupt or truncated manifest by replaying intact segments. Each segment
     /// header is decoded sequentially and re-registered in a fresh [`Manifest`].
+    #[allow(unused)]
     pub fn rebuild(data: &[u8], tail: NonZeroU64) -> Self {
         unimplemented!("Manifest::rebuild is not yet implemented")
     }
