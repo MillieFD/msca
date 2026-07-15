@@ -428,7 +428,7 @@ where
 #[doc(hidden)]
 pub struct Flatten<I>(#[n(0)] pub I);
 
-/// A **state machine** used to build [data buffers](Buffer) for the specified [`Column`].
+/// A **state machine** used to build [data buffers](manifest::Buffer) for the specified [`Column`].
 ///
 /// ### Buffer Composition
 ///
@@ -440,35 +440,35 @@ pub struct Flatten<I>(#[n(0)] pub I);
 ///
 /// ##### 1. Empty
 ///
-/// Each column begins in the [`Empty`](Compact::Empty) state which is never written to disk. If an
+/// Each column begins in the [`Empty`](Buffer::Empty) state, which is never written to disk. If an
 /// empty [`Buffer`] is encountered during the [write-cycle](crate::io), the entire data segment is
 /// discarded. This behaviour may change in future releases; using absent buffers to encode a
-/// type-dependant default value.
+/// type-dependent default value.
 ///
-/// ##### 2. Lite
+/// ##### 2. Compact
 ///
-/// The column transitions to the [`Lite`](Compact::Lite) state when the first [`item`](I) is
+/// The column transitions to the [`Compact`](Buffer::Compact) state when the first [`item`](I) is
 /// [pushed](Accumulate::push). This state holds the item directly and tracks the number of
 /// accumulated repetitions to coalesce homogenous runs. All subsequently [accumulated](Accumulate)
 /// items are compared against this value.
 ///
-/// ##### 3. Full
+/// ##### 3. Many
 ///
-/// The column transitions to the [`Full`](Compact::Full) state when a [pushed](Accumulate::push)
-/// item is not [bit-identical](Unfold::same) to the [accumulated](Accumulate) item; materialising
+/// The column transitions to the [`Many`](Buffer::Many) state when a [pushed](Accumulate::push)
+/// item is not [bit-identical](BitMatch::eq) to the [accumulated](Accumulate) item; materialising
 /// the required [accumulator](`I::RawAcc`) with the specified number of repeated items.
 ///
-/// Buffer `Empty → Lite → Full` variant escalation is unidirectional; a `Lite` buffer can never
-/// return to the `Empty` state.
+/// Buffer `Empty → Compact → Many` variant escalation is unidirectional; a `Compact` buffer can
+/// never return to the `Empty` state.
 ///
 /// ### Guidance
 ///
-/// Implementers are encouraged to use a `bin` segment for genuinely constant values that never
+/// Implementers are encouraged to use a [`bin`] segment for genuinely constant values that never
 /// change across the entire file lifetime. This improves storage efficiency by eliminating an
 /// unnecessary column from the schema.
 // TODO → add doc link to binary segment
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub(crate) enum Compact<I>
+pub(crate) enum Buffer<I>
 where
     I: Unfold,
 {
@@ -476,32 +476,32 @@ where
     Empty,
     /// A buffer containing a single [`item`](I) repeated `count` times; used to coalesce homogenous
     /// runs into an efficient on-disk representation to improve storage density.
-    Lite {
+    Compact {
         /// The single repeated value.
         item: I,
         /// The number of accumulated repetitions.
         count: u64,
     },
     /// A buffer containing many different [items](I) collected into an [accumulator](I::RawAcc).
-    Full(I::RawAcc),
+    Many(I::RawAcc),
 }
 
-impl<I> Compact<I>
+impl<I> Buffer<I>
 where
     I: Unfold + Clone,
 {
-    /// Constructor for [`Compact::Full`] that materialises the required [accumulator](`I::RawAcc`)
+    /// Constructor for [`Buffer::Many`] that materialises the required [accumulator](`I::RawAcc`)
     /// containing the specified number of [repeated](iter::repeat_n) identical [items](I) followed
     /// by the one new item.
     fn upgrade(item: &I, count: &u64, new: I) -> Self {
         let one = iter::once(new);
         let acc = iter::repeat_n(item.clone(), *count as usize).chain(one).collect();
-        Self::Full(acc)
+        Self::Many(acc)
     }
 }
 
-/// Constructor for [`Compact::Empty`].
-impl<I> Default for Compact<I>
+/// Constructor for [`Buffer::Empty`].
+impl<I> Default for Buffer<I>
 where
     I: Unfold,
 {
@@ -510,13 +510,13 @@ where
     }
 }
 
-/// Constructor for [`Compact::Lite`] wrapping the specified [`item`](I) with a count of one.
-impl<I> From<I> for Compact<I>
+/// Constructor for [`Buffer::Compact`] wrapping the specified [`item`](I) with a count of one.
+impl<I> From<I> for Buffer<I>
 where
     I: Unfold,
 {
     fn from(item: I) -> Self {
-        Self::Lite { item, count: 1 }
+        Self::Compact { item, count: 1 }
     }
 }
 
