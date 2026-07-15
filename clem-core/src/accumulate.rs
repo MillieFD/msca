@@ -579,14 +579,6 @@ impl<I> Accumulate<I> for Accumulator<I> {
     fn contains(&self, item: &I) -> bool {
         self.data.contains(item)
     }
-
-    fn min(&self) -> Option<I> {
-        self.data.min()
-    }
-
-    fn max(&self) -> Option<I> {
-        self.data.max()
-    }
 }
 
 impl Accumulate<bool> for BitVec {
@@ -609,21 +601,11 @@ impl Accumulate<bool> for BitVec {
     fn contains(&self, item: &bool) -> bool {
         if *item { self.any() } else { self.not_all() }
     }
-
-    fn min(&self) -> Option<bool> {
-        const_assert!(false < true);
-        self.iter().min().as_deref().copied()
-    }
-
-    fn max(&self) -> Option<bool> {
-        const_assert!(false < true);
-        self.iter().max().as_deref().copied()
-    }
 }
 
 impl<I> Accumulate<I> for Vec<I>
 where
-    I: Copy + PartialOrd + Serialize + Unfold + 'static,
+    I: BitMatch + Copy + PartialOrd + Serialize + Unfold + 'static,
 {
     fn push(&mut self, item: I) {
         Vec::push(self, item);
@@ -642,30 +624,14 @@ where
     }
 
     fn contains(&self, item: &I) -> bool {
-        self.iter().any(|i| !i.unique(item))
-    }
-
-    fn min(&self) -> Option<I> {
-        let rm_nan = |item: &I| item.partial_cmp(item).is_some();
-        self.iter().copied().filter(rm_nan).reduce(|a, b| match a < b {
-            true => a,
-            false => b,
-        })
-    }
-
-    fn max(&self) -> Option<I> {
-        let rm_nan = |item: &I| item.partial_cmp(item).is_some();
-        self.iter().copied().filter(rm_nan).reduce(|a, b| match a > b {
-            true => a,
-            false => b,
-        })
+        self.iter().any(|i| BitMatch::eq(i, item))
     }
 }
 
 impl<I> Accumulate<Option<I>> for OptInSitu<I>
 where
     Option<I>: Serialize,
-    I: Copy + PartialOrd + Unfold + 'static,
+    I: BitMatch + Copy + PartialOrd + Unfold + 'static,
 {
     fn push(&mut self, item: Option<I>) {
         self.data.push(item);
@@ -685,14 +651,6 @@ where
 
     fn contains(&self, item: &Option<I>) -> bool {
         self.data.contains(item)
-    }
-
-    fn min(&self) -> Option<Option<I>> {
-        self.data.min()
-    }
-
-    fn max(&self) -> Option<Option<I>> {
-        self.data.max()
     }
 }
 
@@ -775,10 +733,6 @@ where
 }
 
 impl Accumulate<String> for Seq<u8> {
-    fn boxed(&self) -> BoxAcc<String> {
-        Box::new(Self::default())
-    }
-
     fn push(&mut self, item: String) {
         let bytes = item.into_bytes();
         self.push(bytes);
@@ -805,10 +759,6 @@ impl<I> Accumulate<Option<Vec<I>>> for OptSeq<I>
 where
     I: Unfold + 'static,
 {
-    fn boxed(&self) -> BoxAcc<Option<Vec<I>>> {
-        Box::new(Self::default())
-    }
-
     fn push(&mut self, item: Option<Vec<I>>) {
         if let Some(i) = item {
             let next = self
@@ -859,10 +809,6 @@ where
 }
 
 impl Accumulate<Option<String>> for OptSeq<u8> {
-    fn boxed(&self) -> BoxAcc<Option<String>> {
-        Box::new(Self::default())
-    }
-
     fn push(&mut self, item: Option<String>) {
         let bytes = item.map(String::into_bytes);
         self.push(bytes);
@@ -913,21 +859,16 @@ where
     }
 }
 
-impl<I> Accumulate<I> for Compact<I>
+impl<I> Accumulate<I> for Buffer<I>
 where
-    I: Unfold + Clone + 'static,
+    I: BitMatch + Clone + Unfold,
 {
-    fn boxed(&self) -> BoxAcc<I> {
-        let buf = Self::default();
-        Box::new(buf)
-    }
-
     fn push(&mut self, new: I) {
         match self {
             Self::Empty => *self = new.into(),
-            Self::Lite { item, count } if item.same(&new) => *count += 1,
-            Self::Lite { item, count } => *self = Self::upgrade(item, count, new),
-            Self::Full(acc) => acc.push(new),
+            Self::Compact { item, count } if new.eq(item) => *count += 1,
+            Self::Compact { item, count } => *self = Self::upgrade(item, count, new),
+            Self::Many(acc) => acc.push(new),
         };
     }
 
@@ -938,24 +879,24 @@ where
     fn is_empty(&self) -> bool {
         match self {
             Self::Empty => true,
-            Self::Lite { .. } => false,
-            Self::Full(acc) => acc.is_empty(),
+            Self::Compact { .. } => false,
+            Self::Many(acc) => acc.is_empty(),
         }
     }
 
     fn count(&self) -> u64 {
         match self {
             Self::Empty => u64::MIN,
-            Self::Lite { count, .. } => *count,
-            Self::Full(acc) => acc.count(),
+            Self::Compact { count, .. } => *count,
+            Self::Many(acc) => acc.count(),
         }
     }
 
     fn contains(&self, other: &I) -> bool {
         match self {
             Self::Empty => false,
-            Self::Lite { item, .. } => !item.unique(other),
-            Self::Full(acc) => acc.contains(other),
+            Self::Compact { item, .. } => item.eq(other),
+            Self::Many(acc) => acc.contains(other),
         }
     }
 
