@@ -5,17 +5,21 @@ message: If you use this software, please cite it using the metadata from this f
 
 # See a full list of keys and their definitions at https://citation-file-format.github.io
 
-title: clem
+title: msca
 type: software
-abstract: A high-throughput storage engine for multidimensional analytical data.
+abstract: A high-throughput multimodal segmented compact archive format for multidimensional analytical data.
 authors:
   - given-names: Amelia
     family-names: Fraser-Dale
     orcid: 'https://orcid.org/0009-0005-1160-1367'
     affiliation: Imperial College London
-repository-code: 'https://github.com/MillieFD/clem'
+repository-code: 'https://github.com/MillieFD/msca'
 keywords:
   - data-storage
+  - archive
+  - multimodal
+  - segmented
+  - compact
   - columnar
   - analytical-data
   - edge-computing
