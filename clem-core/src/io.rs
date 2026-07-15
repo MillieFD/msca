@@ -437,10 +437,12 @@ impl<'de> Deserialize<'de> for Header {
                     &other => Error::Version(other).into(),
                 }
             })?;
-        let offset = u64::deserialize(src)?;
-        let size = NonZeroU64::deserialize(src)?;
-        let manifest = Sector { offset, size };
-        Ok(Self { manifest })
+        let header = Sector {
+            offset: u64::deserialize(src)?,
+            size: NonZeroU64::deserialize(src)?,
+        }
+        .into();
+        Ok(header)
     }
 }
 
