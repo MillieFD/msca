@@ -125,7 +125,7 @@ impl Serialize for Manifest {
 
     fn serialize(&self) -> Result<Self::Buffer, Error> {
         // NOTE: Scoped trait import avoids namespace conflict with Buffer struct (below)
-        use crate::accumulate::Buffer;
+        use crate::io::Buffer;
         let size = self.size()?.get().try_into()?;
         let buf = vec![0u8; size].serialize_push(self)?;
         // NOTE: cannot use static assertion as size is dependent on runtime data accumulation.
