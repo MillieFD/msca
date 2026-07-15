@@ -647,7 +647,6 @@ where
 ///
 /// For example, two [`f64::NAN`] are bit-identical – meaning [`BitMatch::eq`] returns `true` – but
 /// logically non-equivalent – meaning [`PartialEq::eq`] returns `false`.
-// NOTE: used by accumulate::Compact to identify when Buffer::Lite must transform into Buffer::Full
 #[doc(hidden)]
 pub trait BitMatch {
     /// Returns `true` if [`self`](Self) and `other` are **bit-identical**.
