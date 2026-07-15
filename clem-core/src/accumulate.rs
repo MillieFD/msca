@@ -110,7 +110,7 @@ pub type Columns<'a> = dyn Iterator<Item = &'a mut Column> + 'a;
 /// [4]: crate::Dataset::schema
 /// [5]: crate::Dataset::write
 pub struct Accumulator<I> {
-    /// Type-erased [`Accumulate`] trait object.
+    /// Type-erased [`Describe`] trait object.
     pub data: BoxAcc<I>,
     /// [Name](String) of the corresponding [`Schema`][1] registered in the [`Manifest`][2].
     ///
