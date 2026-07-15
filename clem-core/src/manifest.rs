@@ -194,7 +194,7 @@ impl Schema {
 ///
 /// [`Vec`] order in-memory is **not** guaranteed to reflect [`Sector`] order on-disk.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Debug, Clone, Eq, Ord, PartialOrd, Hash, Encode, Decode, CborLen)]
+#[derive(Debug, Clone, Eq, Encode, Decode, CborLen)]
 #[doc(hidden)] // Reachable through Accumulate::buffers for the #[derive(Data)] macro.
 pub struct Column {
     /// The [`Type`] of values contained within this column.
