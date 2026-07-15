@@ -264,6 +264,22 @@ where
     }
 }
 
+impl<I> OptBitVec<I>
+where
+    I: Unfold,
+{
+    /// Byte offset of the `data` sub-buffer within the serialized [`OptBitVec`] body; excludes the
+    /// `mask` sub-buffer and data size prefix.
+    ///
+    /// ### Errors
+    ///
+    /// Returns [`Error::Zero`] if the offset overflows `u64`.
+    fn origin(&self) -> Result<u64, Error> {
+        let mask = SizedBuf::new(&self.mask).size()?.get();
+        mask.checked_add(SizedBuf::<I::RawAcc>::PREFIX).ok_or(Error::Zero)
+    }
+}
+
 /// Data **accumulator** for [unsized][1] values.
 ///
 /// ### Data Layout
