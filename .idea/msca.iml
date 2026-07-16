@@ -2,8 +2,8 @@
 <module type="EMPTY_MODULE" version="4">
   <component name="NewModuleRootManager">
     <content url="file://$MODULE_DIR$">
-      <sourceFolder url="file://$MODULE_DIR$/clem-core/src" isTestSource="false" />
-      <sourceFolder url="file://$MODULE_DIR$/clem-derive/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/msca-core/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/msca-derive/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/tests" isTestSource="true" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
