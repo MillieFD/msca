@@ -638,6 +638,134 @@ where
     }
 }
 
+/* --------------------------------------------------------------------- AsType Trait Definition */
+
+/// A **supported type** with a constant on-disk [`Type`] descriptor for compile-time evaluation.
+///
+/// This trait is exclusively implemented for [msca](crate) supported primitive types and fixes the
+/// [`Type`] mapping in one location. A single blanket [`Unfolder`] implementation can serve every
+/// supported [primitive][1]. The trait is also usable in a `const` context.
+///
+/// ### Guidance
+///
+/// `usize` and `isize` are deliberately omitted: each has a platform-dependent size that is not
+/// portable across targets. Refer to the [module documentation](self) for more details.
+///
+/// This trait is not implemented for wrapper types such as [`Option`] or [`Vec`] due to `const fn`
+/// limitations on [`Box::new`].
+///
+/// [1]: https://doc.rust-lang.org/book/ch03-02-data-types.html
+pub trait AsType {
+    /// The on-disk [`Type`] used to describe [`Self`].
+    const TYPE: Type;
+}
+
+/* ----------------------------------------------------------------- AsType Trait Implementation */
+
+impl AsType for bool {
+    const TYPE: Type = Type::Bool;
+}
+
+impl AsType for u8 {
+    const TYPE: Type = Type::U8;
+}
+
+impl AsType for u16 {
+    const TYPE: Type = Type::U16;
+}
+
+impl AsType for u32 {
+    const TYPE: Type = Type::U32;
+}
+
+impl AsType for u64 {
+    const TYPE: Type = Type::U64;
+}
+
+impl AsType for u128 {
+    const TYPE: Type = Type::U128;
+}
+
+impl AsType for num::NonZeroU8 {
+    const TYPE: Type = Type::NZU8;
+}
+
+impl AsType for num::NonZeroU16 {
+    const TYPE: Type = Type::NZU16;
+}
+
+impl AsType for num::NonZeroU32 {
+    const TYPE: Type = Type::NZU32;
+}
+
+impl AsType for num::NonZeroU64 {
+    const TYPE: Type = Type::NZU64;
+}
+
+impl AsType for num::NonZeroU128 {
+    const TYPE: Type = Type::NZU128;
+}
+
+impl AsType for i8 {
+    const TYPE: Type = Type::I8;
+}
+
+impl AsType for i16 {
+    const TYPE: Type = Type::I16;
+}
+
+impl AsType for i32 {
+    const TYPE: Type = Type::I32;
+}
+
+impl AsType for i64 {
+    const TYPE: Type = Type::I64;
+}
+
+impl AsType for i128 {
+    const TYPE: Type = Type::I128;
+}
+
+impl AsType for num::NonZeroI8 {
+    const TYPE: Type = Type::NZI8;
+}
+
+impl AsType for num::NonZeroI16 {
+    const TYPE: Type = Type::NZI16;
+}
+
+impl AsType for num::NonZeroI32 {
+    const TYPE: Type = Type::NZI32;
+}
+
+impl AsType for num::NonZeroI64 {
+    const TYPE: Type = Type::NZI64;
+}
+
+impl AsType for num::NonZeroI128 {
+    const TYPE: Type = Type::NZI128;
+}
+
+impl AsType for f32 {
+    const TYPE: Type = Type::F32;
+}
+
+impl AsType for f64 {
+    const TYPE: Type = Type::F64;
+}
+
+impl AsType for char {
+    const TYPE: Type = Type::Char;
+}
+
+impl AsType for String {
+    const TYPE: Type = Type::String;
+}
+
+impl AsType for &str {
+    const TYPE: Type = Type::String;
+}
+
 /* ------------------------------------------------------------------- BitMatch Trait Definition */
 
 /// Compares two items by their exact **bit pattern**.
