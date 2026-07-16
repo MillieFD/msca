@@ -366,6 +366,7 @@ where
     /// an implicit leading `0`.
     ///
     /// Refer to the [unsized accumulator documentation](Seq) for more details.
+    #[allow(unused)]
     fn bounds(&self) -> impl Iterator<Item = Range<u64>> {
         let ubs = self.ends.iter().copied();
         let lbs = ubs.clone();
@@ -435,6 +436,7 @@ where
     /// an implicit leading `0`.
     ///
     /// Refer to the [optional unsized accumulator](OptSeq) documentation for more details.
+    #[allow(unused)]
     fn bounds(&self) -> impl Iterator<Item = Range<u64>> {
         let ubs = self.ends.iter().copied().filter(|&end| end != u64::MAX);
         let lbs = ubs.clone();
