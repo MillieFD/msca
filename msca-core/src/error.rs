@@ -1,6 +1,6 @@
 /*
-Project: clem
-GitHub: https://github.com/MillieFD/clem
+Project: msca
+GitHub: https://github.com/MillieFD/msca
 
 BSD 3-Clause License, Copyright (c) 2026, Amelia Fraser-Dale
 
@@ -15,7 +15,7 @@ use crate::{io, query, schema, segment};
 
 /* ------------------------------------------------------------------------------ Public Exports */
 
-/// Errors returned by [`clem`](crate).
+/// Errors returned by [msca](crate).
 ///
 /// Enum variants cover various granular error cases that may arise when working with datasets,
 /// schemas, or column operations. Users should consider handling errors explicitly wherever
@@ -29,7 +29,7 @@ use crate::{io, query, schema, segment};
 #[derive(Debug)]
 #[non_exhaustive] // To accommodate potential future error cases.
 pub enum Error {
-    /// Underlying [`io::Error`] from the [clem](crate) [file](io::File).
+    /// Underlying [`io::Error`] from the [msca](crate) [file](io::File).
     Io(io::Error),
     /// Underlying [`number::Error`] from a numerical operation or conversion.
     Number(number::Error),
