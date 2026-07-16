@@ -83,7 +83,7 @@ pub type Columns<'a> = dyn Iterator<Item = &'a mut Column> + 'a;
 /// for the corresponding schema which is written to disk within each data segment header. All
 /// columns contain an equal number of rows indicated by `count` in the segment header.
 ///
-/// Refer to the [schema module documentation](crate::schema) for more details.
+/// Refer to the [schema module documentation](schema) for more details.
 ///
 /// ### Concurrent Producers
 ///
