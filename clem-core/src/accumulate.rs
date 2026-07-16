@@ -716,40 +716,25 @@ where
 {
     fn push(&mut self, item: Vec<I>) {
         let size = item.len() as u64;
-        let next = self.offsets.last().copied().unwrap_or(u64::MIN).saturating_add(size);
+        let next = self.ends.last().copied().unwrap_or(u64::MIN).saturating_add(size);
         item.into_iter().for_each(|i| self.data.push(i));
-        self.offsets.push(next);
+        self.ends.push(next);
     }
 
     fn discard(&mut self) {
-        self.offsets.discard();
+        self.ends.discard();
         self.data.discard();
     }
 
     fn is_empty(&self) -> bool {
-        self.offsets.is_empty() && self.data.is_empty()
+        self.ends.is_empty() && self.data.is_empty()
     }
 
     fn count(&self) -> u64 {
-        self.offsets.len() as u64
+        self.ends.len() as u64
     }
 
-    fn buffers(&self, offset: u64, columns: &mut Columns) -> Result<u64, Error> {
-        // TODO → move manifest::Buffer construction to accumulate::Compact & match variants?
-        let sector = Sector {
-            offset: offset.checked_add(PREFIX).ok_or(Error::Zero)?,
-            length: self.size()?,
-        };
-        let next = sector.next().ok_or(Error::Zero)?.align()?;
-        let buf = manifest::Buffer::Full {
-            sector,
-            count: self.count().try_into()?,
-            // NOTE: unsized collections are not meaningfully orderable; min and max are unpopulated
-            min: [u8::MIN; B],
-            max: [u8::MAX; B],
-        };
-        columns.next().map(|column| column.buffers.push(buf));
-        Ok(next)
+    fn contains(&self, item: &Vec<I>) -> bool {
     }
 }
 
@@ -783,7 +768,7 @@ where
     fn push(&mut self, item: Option<Vec<I>>) {
         if let Some(i) = item {
             let next = self
-                .offsets
+                .ends
                 .iter()
                 .rev()
                 .find(|&o| o != &u64::MAX)
@@ -791,41 +776,29 @@ where
                 .unwrap_or(u64::MIN)
                 .saturating_add(i.len() as u64);
             i.into_iter().for_each(|x| self.data.push(x));
-            self.offsets.push(next);
+            self.ends.push(next);
         } else {
             // NOTE: contiguous payload of Some items only; None items append no data.
-            self.offsets.push(u64::MAX);
+            self.ends.push(u64::MAX);
         }
     }
 
     fn discard(&mut self) {
-        self.offsets.discard();
+        self.ends.discard();
         self.data.discard();
     }
 
     fn is_empty(&self) -> bool {
-        self.offsets.is_empty() && self.data.is_empty()
+        self.ends.is_empty() && self.data.is_empty()
     }
 
     fn count(&self) -> u64 {
-        self.offsets.len() as u64
+        self.ends.len() as u64
     }
 
-    fn buffers(&self, offset: u64, columns: &mut Columns) -> Result<u64, Error> {
-        // TODO → move manifest::Buffer construction to accumulate::Compact & match variants?
-        let sector = Sector {
-            offset: offset.checked_add(PREFIX).ok_or(Error::Zero)?,
-            length: self.size()?,
-        };
-        let next = sector.next().ok_or(Error::Zero)?.align()?;
-        let buf = manifest::Buffer::Full {
-            sector,
-            count: self.count().try_into()?,
-            min: [u8::MIN; B],
-            max: [u8::MAX; B],
-        };
-        columns.next().map(|column| column.buffers.push(buf));
-        Ok(next)
+    fn contains(&self, item: &Option<Vec<I>>) -> bool {
+        match item {
+        }
     }
 }
 
@@ -847,8 +820,7 @@ impl Accumulate<Option<String>> for OptSeq<u8> {
         Accumulate::<Option<Vec<u8>>>::count(self)
     }
 
-    fn buffers(&self, offset: u64, columns: &mut Columns) -> Result<u64, Error> {
-        Accumulate::<Option<Vec<u8>>>::buffers(self, offset, columns)
+    fn contains(&self, item: &Option<String>) -> bool {
     }
 }
 
