@@ -104,20 +104,19 @@ pub type Columns<'a> = dyn Iterator<Item = &'a mut Column> + 'a;
 /// 3. Each thread accumulates data independently.
 /// 4. Commit each accumulator sequentially via [`Dataset::write`][5].
 ///
-/// Refer to the [write-cycle documentation](crate::io) for more details.
+/// Refer to the [write-cycle documentation](io) for more details.
 ///
-/// [1]: crate::schema::Schema
+/// [1]: schema::Schema
 /// [2]: crate::Data
-/// [3]: crate::schema::Type
+/// [3]: schema::Type
 /// [4]: crate::Dataset::schema
 /// [5]: crate::Dataset::write
 pub struct Accumulator<I> {
     /// Type-erased [`Describe`] trait object.
     pub data: BoxAcc<I>,
-    /// [Name](String) of the corresponding [`Schema`][1] registered in the [`Manifest`][2].
+    /// [Name](String) of the corresponding [`Schema`][1] registered in the [`Manifest`].
     ///
     /// [1]: crate::Schema
-    /// [2]: manifest::Manifest
     pub(crate) name: String,
     /// [`Sector`] of the corresponding [`Schema`](crate::Schema) segment describing the structure
     /// of accumulated data.
