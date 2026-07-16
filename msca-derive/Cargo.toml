@@ -1,11 +1,11 @@
 [package]
-name = "clem-derive"
+name = "msca-derive"
 version = "0.1.0"
 edition = "2024"
-description = "Derive macros for the clem storage engine."
+description = "Derive macros for the MSCA storage engine."
 license = "BSD-3-Clause"
 authors = ["Amelia Fraser-Dale"]
-repository = "https://github.com/MillieFD/clem"
+repository = "https://github.com/MillieFD/msca"
 
 [lib]
 proc-macro = true

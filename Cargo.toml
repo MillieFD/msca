@@ -1,11 +1,11 @@
 [package]
-name = "clem"
+name = "msca"
 version = "0.1.0"
 edition = "2024"
 description = "A high-throughput storage engine for multidimensional analytical data, written in Rust."
 license = "BSD-3-Clause"
 authors = ["Amelia Fraser-Dale"]
-repository = "https://github.com/MillieFD/clem"
+repository = "https://github.com/MillieFD/msca"
 
 # See a full list of keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -16,21 +16,21 @@ unwrap_used = "deny"
 # See a full list of keys and their definitions at https://rust-lang.github.io/rust-clippy/stable/index.html
 
 [workspace]
-members = ["clem-core", "clem-derive"]
+members = ["msca-core", "msca-derive"]
 
-[dependencies.clem-derive]
-path = "clem-derive"
+[dependencies.msca-derive]
+path = "msca-derive"
 optional = true
 
-[dependencies.clem-core]
-path = "clem-core"
+[dependencies.msca-core]
+path = "msca-core"
 
 [dev-dependencies]
 smol = "2.0"
 
 [features]
 default = ["derive"]
-derive = ["dep:clem-derive"]
-log = ["clem-core/log"] # TODO Implement logging.
-metadata = ["clem-core/metadata"]
-serde = ["clem-core/serde"]
+derive = ["dep:msca-derive"]
+log = ["msca-core/log"] # TODO Implement logging.
+metadata = ["msca-core/metadata"]
+serde = ["msca-core/serde"]

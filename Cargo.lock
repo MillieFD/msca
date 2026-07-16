@@ -171,40 +171,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9330f8b2ff13f34540b44e946ef35111825727b38d33286ef986142615121801"
 
 [[package]]
-name = "clem"
-version = "0.1.0"
-dependencies = [
- "clem-core",
- "clem-derive",
- "smol",
-]
-
-[[package]]
-name = "clem-core"
-version = "0.1.0"
-dependencies = [
- "bitvec",
- "funty",
- "log",
- "memmap2",
- "minicbor",
- "serde",
- "smol",
- "static_assertions",
- "toml",
- "xxhash-rust",
-]
-
-[[package]]
-name = "clem-derive"
-version = "0.1.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
 name = "concurrent-queue"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -356,6 +322,40 @@ name = "minicbor-derive"
 version = "0.19.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "294f0a0c161c510e9746adf546b8b044fbb0b00677d7dfc9a2452f9fdf63439b"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "msca"
+version = "0.1.0"
+dependencies = [
+ "msca-core",
+ "msca-derive",
+ "smol",
+]
+
+[[package]]
+name = "msca-core"
+version = "0.1.0"
+dependencies = [
+ "bitvec",
+ "funty",
+ "log",
+ "memmap2",
+ "minicbor",
+ "serde",
+ "smol",
+ "static_assertions",
+ "toml",
+ "xxhash-rust",
+]
+
+[[package]]
+name = "msca-derive"
+version = "0.1.0"
 dependencies = [
  "proc-macro2",
  "quote",

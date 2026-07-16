@@ -1,11 +1,11 @@
 [package]
-name = "clem-core"
+name = "msca-core"
 version = "0.1.0"
 edition = "2024"
 description = "A high-throughput storage engine for multidimensional analytical data, written in Rust."
 license = "BSD-3-Clause"
 authors = ["Amelia Fraser-Dale"]
-repository = "https://github.com/MillieFD/clem"
+repository = "https://github.com/MillieFD/msca"
 
 # See a full list of keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
