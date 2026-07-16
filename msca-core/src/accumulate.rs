@@ -1,6 +1,6 @@
 /*
-Project: clem
-GitHub: https://github.com/MillieFD/clem
+Project: msca
+GitHub: https://github.com/MillieFD/msca
 
 BSD 3-Clause License, Copyright (c) 2026, Amelia Fraser-Dale
 
@@ -52,7 +52,7 @@ pub type Columns<'a> = dyn Iterator<Item = &'a mut Column> + 'a;
 ///
 /// ### Segment Composition
 ///
-/// Each [clem](crate) file is partitioned into self-describing segments which are immutable once
+/// Each [msca](crate) file is partitioned into self-describing segments which are immutable once
 /// written. Each segment begins with a minimal header consisting of a [`variant`](Variant) ID and
 /// [`length`](NonZeroU64).
 ///
@@ -294,7 +294,7 @@ where
 ///
 /// It is not possible to predetermine the on-disk space required by each instance of an unsized
 /// type; there is no guarantee that two [`Vec<I>`] contain the same number of elements.
-/// [Clem](crate) therefore unfolds unsized types into:
+/// The [msca](crate) engine therefore unfolds unsized types into:
 ///
 /// 1. Columnar `ends` region describing boundaries.
 /// 2. Contiguous `data` region encoding items.
@@ -396,8 +396,8 @@ where
 /// ### Data Layout
 ///
 /// It is not possible to predetermine the disk space required by each instance of an unsized type;
-/// there is no guarantee that two [`Vec<T>`] contain the same number of elements. [Clem](crate)
-/// therefore unfolds unsized types into:
+/// there is no guarantee that two [`Vec<T>`] contain the same number of elements. The [msca](crate)
+/// engine therefore unfolds unsized types into:
 ///
 /// 1. Columnar `ends` region describing boundaries.
 /// 2. Contiguous `data` region encoding items.
@@ -474,7 +474,7 @@ pub struct Flatten<I>(#[n(0)] pub I);
 ///
 /// Real-world applications often require the inclusion of columns with infrequently altered items.
 /// It is possible for a column to contain only **one** repeated item across an entire data segment.
-/// Instead of repeatedly encoding identical items, clem defaults to a **compact buffer**
+/// Instead of repeatedly encoding identical items, [msca](crate) defaults to a **compact buffer**
 /// representation to improve storage density.
 // TODO → Add link to on-disk-format.md for more information.
 ///
@@ -565,8 +565,8 @@ where
 /// An in-memory **data accumulator** that ingests [items](I) of the specified [`Type`][1] and
 /// [serializes](Serialize) into an optimised on-disk format.
 ///
-/// [1]: crate::schema::Type
-pub trait Accumulate<I>: Serialize {
+/// [1]: schema::Type
+pub trait Accumulate<I> {
     /// Append one [`Item`](I) to the [accumulator](Self)
     fn push(&mut self, item: I);
 
@@ -1103,7 +1103,7 @@ where
 
 /* ------------------------------------------------------------------ Serialize Trait Definition */
 
-/// A **type** that can be serialized into a canonical [`clem`](crate) binary representation for
+/// A **type** that can be serialized into a canonical [`msca`](crate) binary representation for
 /// on-disk storage.
 #[doc(hidden)]
 pub trait Serialize {
