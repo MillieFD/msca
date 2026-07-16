@@ -81,7 +81,7 @@ use self::number::Number;
 use crate::accumulate::{self, Accumulate, BoxAcc, Describe, Descriptor, OptBitVec, OptInSitu};
 use crate::io::{Buffer, Checksum, Register};
 use crate::manifest::{self, Manifest};
-use crate::segment::{Segment, Variant};
+use crate::segment::{Header, Segment, Variant};
 use crate::{io, Dataset, Sector, Serialize};
 
 /// Shorthand [`OccupiedEntry`] for a [`Schema`][1] that already exists in the [`Schema`].
@@ -227,6 +227,21 @@ impl Serialize for Schema {
 
 impl Segment for Schema {
     const VARIANT: Variant = Variant::Schema;
+
+    #[allow(unused_variables, reason = "schema segment body does not align to a 64-bit boundary")]
+    fn wrap(&self, offset: u64) -> Result<Vec<u8>, number::Error> {
+        let size = self.size()?.get();
+        let full = { size as usize }
+            .checked_add(Header::SIZE + size_of::<u64>())
+            .ok_or(number::Error::Zero)?;
+        let mut buf = vec![u8::MIN; full];
+        buf.as_mut_slice()
+            .serialize_push(&{ Self::VARIANT as u8 })?
+            .serialize_push(&size)?
+            .serialize_push(self)?;
+        Self::checksum(&mut buf)?;
+        Ok(buf)
+    }
 }
 
 impl Checksum for Schema {}
