@@ -1995,10 +1995,11 @@ where
     }
 
     fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
-        let prefix: u64 = size_of::<NonZeroU64>().try_into()?;
-        // NOTE: Self::size returns Error if Σ overflows u64 (not expected in production)
-        let buf = self.size()?.get().sub(prefix).to_le_bytes().serialize_into(buf)?;
-        buf.serialize_push_aligned(&self.mask)?.serialize_push_aligned(&self.data)
+        let buf = SizedBuf::new(&self.mask).serialize_into(buf)?;
+        match self.data.is_empty() {
+            true => Ok(buf),
+            false => SizedBuf::new(&self.data).serialize_into(buf),
+        }
     }
 
     fn serialize(&self) -> Result<Self::Buffer, Error> {
