@@ -2059,7 +2059,7 @@ where
     }
 
     fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
-        let buf = SizedBuf::new(&self.offsets).serialize_into(buf)?;
+        let buf = SizedBuf::new(&self.ends).serialize_into(buf)?;
         match self.data.is_empty() {
             true => Ok(buf),
             false => SizedBuf::new(&self.data).serialize_into(buf),
