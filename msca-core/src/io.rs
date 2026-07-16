@@ -1,6 +1,6 @@
 /*
-Project: clem
-GitHub: https://github.com/MillieFD/clem
+Project: msca
+GitHub: https://github.com/MillieFD/msca
 
 BSD 3-Clause License, Copyright (c) 2026, Amelia Fraser-Dale
 
@@ -12,7 +12,7 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //!
 //! ---
 //!
-//! [clem](crate) maximises IO performance by separating the data lifecycle into two phases:
+//! The [msca](crate) format maximises performance by separating the data lifecycle into two phases:
 //!
 //! 1. **In-memory** accumulator optimised for high-throughput ingestion.
 //! 2. **On-disk** columnar buffers optimised for range-based querying across arbitrary dimensions.
@@ -95,10 +95,10 @@ use crate::{number, schema, Serialize};
 
 /* ------------------------------------------------------------------------------ Public Exports */
 
-/// Magic byte sequence used to identify a valid [clem](crate) file.
+/// Magic byte sequence used to identify a valid [msca](crate) file.
 const MAGIC: [u8; 4] = *b"msca";
 
-/// Current [clem](crate) major version number which is embedded in the file header to indicate
+/// Current [msca](crate) major version number which is embedded in the file header to indicate
 /// breaking changes in the format specification. Forwards and backwards compatibility across
 /// version numbers is not guaranteed. Implementers must reject any unrecognised version number.
 const VERSION: u8 = 0;
@@ -117,7 +117,7 @@ const ALIGN: usize = {
     n.next_multiple_of(8).saturating_sub(n)
 };
 
-/// A contiguous byte region within the [clem](crate) file.
+/// A contiguous byte region within the [msca](crate) file.
 ///
 /// Implementers must [`Copy`] into an owned type when mutability is required e.g. for downstream
 /// data processing.
@@ -262,7 +262,7 @@ impl Serialize for Sector {
 /// such as [segments](segment) and [buffers][2]; the exact size depends upon runtime variables such
 /// as the number of [accumulated](crate::accumulate) items.
 ///
-/// The [clem](crate) format is **self-describing** to improve data integrity and file robustness.
+/// The [msca](crate) format is **self-describing** to improve data integrity and file robustness.
 /// Unsized regions therefore record a [`NonZeroU64`] size prefix that describes the exact number of
 /// additional bytes required to [`Read`] the region.
 ///
@@ -479,7 +479,7 @@ impl<'de> Deserialize<'de> for Header {
     }
 }
 
-/// An exclusive owned file handle for an open [clem](crate) dataset.
+/// An exclusive owned file handle for an open [msca](crate) dataset.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug)]
 pub(crate) struct File {
@@ -494,7 +494,7 @@ pub(crate) struct File {
 }
 
 impl File {
-    /// Create a new [clem](crate) file with read and write permissions at the specified
+    /// Create a new [msca](crate) file with read and write permissions at the specified
     /// [`path`](P).
     ///
     /// The file is initialised in a valid empty state with a default [`Manifest`] segment and no
@@ -544,7 +544,7 @@ impl File {
         Ok(Self { file, header, manifest, path })
     }
 
-    /// Open an existing [clem](crate) file with read and write permissions at the specified
+    /// Open an existing [msca](crate) file with read and write permissions at the specified
     /// [`path`](P).
     ///
     /// The [magic bytes](MAGIC) and [version number](VERSION) are validated immediately on open.
@@ -579,7 +579,7 @@ impl File {
         Ok(Self { file, header, manifest, path })
     }
 
-    /// Create a read-only [memory map](Mmap) backed by the [clem](crate) file.
+    /// Create a read-only [memory map](Mmap) backed by the [msca](crate) file.
     ///
     /// ### Errors
     ///
@@ -678,7 +678,7 @@ pub enum Error {
     Decode(minicbor::decode::Error),
     /// Underlying [`std::io::Error`] from the file backing the [`Dataset`](crate::Dataset).
     Io(std::io::Error),
-    /// File magic bytes did not match the expected `clem` signature.
+    /// File magic bytes did not match the expected [msca](MAGIC) signature.
     Magic,
     /// Underlying [`Error`](number::Error) from a numerical operation or conversion.
     Number(number::Error),
@@ -700,7 +700,7 @@ pub enum Error {
     ///
     /// [1]: https://www.unicode.org/glossary/#unicode_scalar_value
     Utf8,
-    /// File version number is not recognised by this build of [clem](crate).
+    /// File version number is not recognised by this build of [msca](crate).
     Version(u8),
 }
 
@@ -710,14 +710,14 @@ impl fmt::Display for Error {
             Self::Checksum => write!(f, "Checksum error"),
             Self::Decode(e) => write!(f, "CBOR decode error → {e}"),
             Self::Io(e) => write!(f, "File IO error → {e}"),
-            Self::Magic => f.write_str("File is not a valid clem dataset"),
+            Self::Magic => f.write_str("File is not a valid MSCA dataset"),
             Self::Number(e) => write!(f, "Number error → {e}"),
             Self::Schema(e) => write!(f, "Schema error → {e}"),
             Self::Segment(e) => write!(f, "Segment error → {e}"),
             Self::Slice(e) => write!(f, "Try from slice error → {e}"),
             Self::Truncated { .. } => write!(f, "Read was truncated → {self:?}"),
             Self::Utf8 => write!(f, "Invalid UTF8 scalar value"),
-            Self::Version(v) => write!(f, "Unrecognised clem version → {v}"),
+            Self::Version(v) => write!(f, "Unrecognised MSCA version → {v}"),
         }
     }
 }
