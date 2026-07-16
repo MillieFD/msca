@@ -920,6 +920,7 @@ where
             Self::Many(acc) => acc.contains(other),
         }
     }
+}
 
     fn min(&self) -> Option<I> {
         match self {
@@ -929,11 +930,145 @@ where
         }
     }
 
-    fn max(&self) -> Option<I> {
+/* ------------------------------------------------------------- Descriptor Trait Implementation */
+
+impl<I> Descriptor for Vec<I>
+where
+    I: PartialOrd + Copy,
+{
+    fn describe(&self, buffer: Sector, count: NonZeroU64) -> Result<manifest::Buffer, Error> {
+        self.detail(buffer, count)
+    }
+}
+
+impl Descriptor for BitVec {
+    /// [`Detailed`][1] descriptor statistics are meaningless for `bool`: [`Buffer::Basic`][2]
+    /// implies that both `true`/`max` and `false`/`min` items were accumulated.
+    ///
+    /// Refer to the [trait documentation](Descriptor::describe) for more information.
+    ///
+    /// [1]: manifest::Buffer::Detailed
+    /// [2]: manifest::Buffer::Basic
+    fn describe(&self, buffer: Sector, count: NonZeroU64) -> Result<manifest::Buffer, Error> {
+        Ok(manifest::Buffer::Basic { buffer, count })
+    }
+}
+
+impl<I> Descriptor for OptInSitu<I>
+where
+    I: PartialOrd + Copy,
+{
+    fn describe(&self, buffer: Sector, count: NonZeroU64) -> Result<manifest::Buffer, Error> {
+        self.detail(buffer, count)
+    }
+}
+
+impl<I> Descriptor for OptBitVec<I>
+where
+    I: Unfold,
+    I::RawAcc: Extreme,
+{
+    fn describe(&self, buffer: Sector, count: NonZeroU64) -> Result<manifest::Buffer, Error> {
+        self.detail(buffer, count)
+    }
+}
+
+impl Descriptor for OptBitVec<bool> {
+    /// [`Detailed`][1] descriptor statistics are meaningless for `bool`: [`Buffer::Basic`][2]
+    /// implies that both `true`/`max` and `false`/`min` items were accumulated.
+    ///
+    /// Refer to the [trait documentation](Descriptor::describe) for more information.
+    ///
+    /// [1]: manifest::Buffer::Detailed
+    /// [2]: manifest::Buffer::Basic
+    fn describe(&self, buffer: Sector, count: NonZeroU64) -> Result<manifest::Buffer, Error> {
+        Ok(manifest::Buffer::Basic { buffer, count })
+    }
+}
+
+impl<I> Descriptor for Seq<I>
+where
+    I: Unfold,
+{
+    /// [Unsized][1] items do not currently support [`Detailed`][2] descriptor statistics.
+    ///
+    /// Refer to the [trait documentation](Descriptor::describe) for more information.
+    ///
+    /// [1]: https://doc.rust-lang.org/reference/dynamically-sized-types.html
+    /// [2]: manifest::Buffer::Detailed
+    fn describe(&self, buffer: Sector, count: NonZeroU64) -> Result<manifest::Buffer, Error> {
+        Ok(manifest::Buffer::Basic { buffer, count })
+    }
+}
+
+impl<I> Descriptor for OptSeq<I>
+where
+    I: Unfold,
+{
+    /// [Unsized][1] items do not currently support [`Detailed`][2] descriptor statistics.
+    ///
+    /// Refer to the [trait documentation](Descriptor::describe) for more information.
+    ///
+    /// [1]: https://doc.rust-lang.org/reference/dynamically-sized-types.html
+    /// [2]: manifest::Buffer::Detailed
+    fn describe(&self, buffer: Sector, count: NonZeroU64) -> Result<manifest::Buffer, Error> {
+        Ok(manifest::Buffer::Basic { buffer, count })
+    }
+}
+
+impl<A> Descriptor for Flatten<A>
+where
+    A: Descriptor,
+{
+    fn describe(&self, buffer: Sector, count: NonZeroU64) -> Result<manifest::Buffer, Error> {
+        self.0.describe(buffer, count)
+    }
+}
+
+impl<I> Descriptor for Buffer<I>
+where
+    I: Unfold,
+{
+    /// Maps each state onto its descriptor variant.
+    ///
+    /// Refer to the [trait documentation](Descriptor::describe) for more information.
+    ///
+    /// ### Errors
+    ///
+    /// Returns [`Error::Zero`] for an [`Empty`](Buffer::Empty) accumulator; empty buffers are never
+    /// written to disk and must be caught before registration.
+    fn describe(&self, buffer: Sector, count: NonZeroU64) -> Result<manifest::Buffer, Error> {
         match self {
-            Self::Empty => None,
-            Self::Lite { item, .. } => item.clone().into(),
-            Self::Full(acc) => acc.max(),
+            Buffer::Empty => Error::Zero.into(),
+            Buffer::Compact { .. } => Ok(manifest::Buffer::Compact { buffer, count }),
+            Buffer::Many(acc) => acc.describe(buffer, count),
+        }
+    }
+}
+
+/* --------------------------------------------------------------- Describe Trait Implementation */
+
+impl<I> Describe<I> for Buffer<I>
+where
+    I: BitMatch + Clone + Unfold + 'static,
+{
+    fn boxed(&self) -> BoxAcc<I> {
+        let buf = Self::default();
+        Box::new(buf)
+    }
+
+    fn buffers(&self, offset: u64, columns: &mut Columns) -> Result<u64, Error> {
+        if let Some(column) = columns.next() {
+            let sector = Sector {
+                offset: offset.checked_add(SizedBuf::<I>::PREFIX).ok_or(Error::Zero)?,
+                size: self.size()?,
+            };
+            let count = self.count().try_into()?;
+            let buf = self.describe(sector, count)?;
+            column.buffers.push(buf);
+            sector.next().ok_or(Error::Zero)?.align()
+        } else {
+            Error::Zero.into() // expected column is not present
         }
     }
 }
