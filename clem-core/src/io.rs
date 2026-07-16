@@ -104,18 +104,17 @@ const MAGIC: [u8; 4] = *b"msca";
 const VERSION: u8 = 0;
 
 /// Total length of the file header in bytes. Includes the [magic][1] bytes, [version][2] number,
-/// and [SIMD alignment][3] bytes.
+/// and zero-filled [alignment](segment) bytes.
 ///
 /// [1]: MAGIC
 /// [2]: VERSION
-/// [3]: crate::Align
 pub const HEADER: usize = size_of_val(&MAGIC) + size_of_val(&VERSION) + size_of::<Header>() + ALIGN;
 
-/// Number of trailing zero bytes required to pad the [`File`](File) [`Header`] to the next 64-bit
-/// SIMD [alignment boundary](crate::segment).
+/// Number of trailing zero bytes required to align the [`File`](File) [`Header`] to the next
+/// [64-bit boundary](segment) for SIMD vectorisation support.
 const ALIGN: usize = {
     let n = size_of_val(&MAGIC) + size_of_val(&VERSION) + size_of::<Header>() & 7;
-    (8 - n) & 7
+    n.next_multiple_of(8).saturating_sub(n)
 };
 
 /// A contiguous byte region within the [clem](crate) file.
@@ -175,6 +174,40 @@ impl Sector {
     pub(crate) fn relative(mut self, origin: u64) -> Result<Self, number::Error> {
         self.offset = self.offset.checked_add(origin).ok_or(number::Error::Zero)?;
         Ok(self)
+    }
+
+    /// [`Sector`] spanning the single fixed-`width` item selected from `items` by the `better`
+    /// comparison, or [`None`] if no item is present.
+    ///
+    /// Each candidate is paired with its element index, so the located sector spans exactly one
+    /// serialized item at `index × width`. An absent [`None`] item carries no operand to compare and
+    /// is skipped **without** disturbing the element index of its neighbours.
+    ///
+    /// ### Guidance
+    ///
+    /// Comparison follows standard [`PartialOrd`] semantics; no ordering is invented for items that
+    /// [`PartialOrd`] leaves incomparable. An item that compares `false` against every other –
+    /// IEEE-754 `NaN` – therefore wins only as the opening candidate. That outcome is conservative:
+    /// a `NaN` statistic satisfies no bounded predicate, so [`disjoint`][1] proves nothing and the
+    /// buffer is retained rather than pruned.
+    ///
+    /// [1]: crate::manifest::Buffer::disjoint
+    pub(crate) fn locate<I, S, O>(items: S, width: usize, better: O) -> Option<Self>
+    where
+        S: IntoIterator<Item = Option<I>>,
+        O: Fn(&I, &I) -> bool,
+    {
+        let best = items
+            .into_iter()
+            .enumerate()
+            .filter_map(|(index, item)| Some((index, item?))) // Absent items carry no operand
+            .reduce(|best, next| match better(&next.1, &best.1) {
+                true => next,
+                false => best,
+            })?;
+        let width = u64::try_from(width).ok()?;
+        let offset = u64::try_from(best.0).ok()?.checked_mul(width)?;
+        Self::new(offset, width).ok()
     }
 
     /// Read the byte [slice][1] defined by [`self`](Sector) from the provided [`Mmap`].
