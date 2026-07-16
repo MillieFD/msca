@@ -315,7 +315,7 @@ mod tests {
             Box::new(Acc { v: self.v.boxed() })
         }
 
-        fn buffers(&self, offset: u64, columns: &mut Columns) -> Result<u64, number::Error> {
+        fn buffers(&self, offset: u64, columns: &mut Columns) -> Result<u64, schema::Error> {
             self.v.buffers(offset, columns)
         }
     }
