@@ -2001,36 +2001,6 @@ where
     }
 }
 
-impl<I> Serialize for Accumulator<I> {
-    type Buffer = Vec<u8>;
-
-    fn size(&self) -> Result<NonZeroU64, Error> {
-        let meta = { size_of::<NonZeroU64>() + size_of::<NonZeroU64>() } as u64;
-        self.data.size()?.align()?.checked_add(meta).and_then(NonZeroU64::new).ok_or(Error::Zero)
-    }
-
-    fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
-        // 1. Serialize header fields (see accumulator documentation)
-        let buf = { Variant::Data as u8 }.serialize_into(buf)?;
-        let buf = self.data.size()?.align()?.serialize_into(buf)?;
-        let buf = self.schema.offset.serialize_into(buf)?;
-        let buf = self.data.count().serialize_into(buf)?;
-        // 2. Align to the next 64-bit boundary
-        buf[..Self::ALIGN].fill(u8::MIN);
-        // 3. Serialize columnar data buffers
-        self.data.serialize_into(&mut buf[Self::ALIGN..])
-    }
-
-    fn serialize(&self) -> Result<Self::Buffer, Error> {
-        use io::Buffer;
-        let size = self.size()?.get().try_into()?;
-        let buf = vec![0u8; size].serialize_push(self)?;
-        // NOTE: cannot use static assertion as size is dependent on runtime data accumulation.
-        debug_assert_eq!(buf.len(), size, "actual size ≠ predicted size");
-        Ok(buf)
-    }
-}
-
 impl<I> Segment for Accumulator<I> {
     const VARIANT: Variant = Variant::Data;
 
