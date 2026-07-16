@@ -2156,6 +2156,28 @@ impl<I> Serialize for Accumulator<I> {
     }
 }
 
+impl<I> Segment for Accumulator<I> {
+    const VARIANT: Variant = Variant::Data;
+
+    fn wrap(&self, offset: u64) -> Result<Vec<u8>, Error> {
+        const ADD: u64 = { Header::SIZE + size_of::<u64>() } as u64;
+        let pad = offset.checked_add(Self::HEADER as u64).ok_or(Error::Zero)?.pad()?;
+        let size = self.size()?.get().checked_add(pad as u64).ok_or(Error::Zero)?;
+        let full = size.checked_add(ADD).ok_or(Error::Zero)?.try_into()?;
+        let mut buf = vec![u8::MIN; full];
+        let rem = buf
+            .as_mut_slice()
+            .serialize_push(&{ Self::VARIANT as u8 })?
+            .serialize_push(&size)?
+            .serialize_push(&self.schema.offset)?
+            .serialize_push(&self.data.count())?;
+        rem[..pad].fill(u8::MIN);
+        self.data.serialize_into(&mut rem[pad..])?;
+        Self::checksum(&mut buf)?;
+        Ok(buf)
+    }
+}
+
 impl<I> Checksum for Accumulator<I> {}
 
 impl<I> Register for Accumulator<I> {
