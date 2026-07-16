@@ -2181,14 +2181,14 @@ impl<I> Segment for Accumulator<I> {
 impl<I> Checksum for Accumulator<I> {}
 
 impl<I> Register for Accumulator<I> {
-    type Error = Error;
+    type Error = schema::Error;
 
-    fn register<'a>(self, s: &'a Sector, m: &mut Manifest) -> Result<&'a Sector, Error> {
+    fn register<'a>(self, s: &'a Sector, m: &mut Manifest) -> Result<&'a Sector, schema::Error> {
         let mut columns = m
             .schemas
             .get_mut(&self.name)
-            // SAFETY: Dataset::schema registers the schema before producing an Accumulator
-            .expect("Schema missing from manifest")
+            // NOTE: Dataset::schema registers the schema before producing an Accumulator
+            .ok_or(schema::Error::NotFound)?
             .columns
             .values_mut();
         let offset = s
