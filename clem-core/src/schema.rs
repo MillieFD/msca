@@ -596,6 +596,9 @@ pub enum Error {
         /// Name shared by the new and existing columns.
         name: String,
     },
+    /// The [`Schema`] does not contain the requested [`Column`] or contains fewer than the
+    /// requested number of columns.
+    NotFound,
     /// Underlying [`Error`](number::Error) from a numerical operation or conversion.
     Number(number::Error),
     /// The requested type is not supported by this version of [`clem`](crate).
@@ -610,6 +613,7 @@ impl Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Collision { name } => write!(f, "Name collision → {name}"),
+            Self::NotFound => f.write_str("Column not found in this schema"),
             Self::Number(e) => write!(f, "Number error → {e}"),
             Self::Unsupported(msg) => write!(f, "Unsupported type → {msg}"),
         }
