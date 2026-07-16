@@ -147,20 +147,43 @@ impl Dataset {
         Ok(count)
     }
 
-    /// [`Write`][1] the accumulated data and return the **insertion indices** of the written items.
+    /// Returns a **stable on-disk index** per unique [`item`](I) – in request order – writing
+    /// unseen items to the [`Dataset`].
     ///
-    /// Exclusive `&mut` access ensures indices are assigned atomically at write-time. The starting
-    /// index is resolved from the number of existing items for this [`Schema`]. The returned
-    /// [`Range`] therefore contains one index per item in [`Accumulator`] insertion order.
+    /// The provided [collection](S) is deduplicated in a single **O(N)** pass, with unseen items
+    /// [pushed](Accumulate::push) to an in-memory [`Accumulator`]:
     ///
-    /// An empty accumulator yields an empty range without file [`IO`](io).
+    /// - [`I`] matches an existing or accumulated item → Reuse existing [`index`](N).
+    /// - [`I`] is genuinely unique → Assign the next available index.
+    ///
+    /// Any accumulated items are then written to the [`Dataset`] as a single [`Segment`][1]. An
+    /// empty accumulator performs no [`IO`](io). Exclusive `&mut` access ensures indices are
+    /// assigned atomically. Indices are guaranteed to remain stable due to the immutable nature of
+    /// the on-disk segment region.
+    ///
+    /// ### Guidance
+    ///
+    /// Items are deduplicated according to their [`Hash`] implementation. Implementers are advised
+    /// to manually implement the [`Hash`] trait for full control over deduplication behaviour. A
+    /// [transparent][2] wrapper may be necessary to override a pre-existing hash implementation.
+    ///
+    /// This function is generic over [`N`]; implementers can specify any [`Unsigned`] integer type
+    /// according to the expected number of unique items and the desired return type. An [`Error`]
+    /// is raised if any index overflows [`N`].
     ///
     /// ### Errors
     ///
-    /// - [`Error::Schema`] if `name` is registered with an incompatible column layout.
-    /// - [`Error::Query`] if the committed stream cannot be constructed.
-    /// - [`Error::Number`] if an index does not fit in [`N`].
-    /// - [`Error::Io`] if deserialization or the underlying [write-cycle](io) fails.
+    /// - [`Error::Schema`] wrapping [`Error::Collision`][3] if a [`Schema`] is already registered
+    ///   with the requested `name` but an incompatible column layout.
+    /// - [`Error::Query`] if a failure occurs during [`Iterator`] construction.
+    /// - [`Error::Number`] if an index overflows [`N`].
+    /// - [`Error::Io`] if [deserialization][3] or the underlying [write-cycle](io) fails.
+    ///
+    /// [1]: crate::segment::Segment
+    /// [2]: https://doc.rust-lang.org/nomicon/other-reprs.html#reprtransparent
+    /// [3]: crate::schema::Error::Collision
+    /// [3]: io::Deserialize
+
     pub async fn get_or_insert<N, I, S>(&mut self, name: &str, items: S) -> Result<Box<[N]>, Error>
     where
         N: Unsigned,
