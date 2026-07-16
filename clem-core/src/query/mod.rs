@@ -79,3 +79,34 @@ pub struct Query {
     /// [1]: crate::accumulate::Serialize
     pub(crate) columns: BTreeMap<String, Column>,
 }
+
+impl Query {
+    /// Generate a [`HashMap`] containing the position [index](N) for each unique on-disk [item](I).
+    ///
+    /// The [`Dataset`][1] is read in ascending insertion order; items record their first index and
+    /// subsequent duplicate items are discarded.
+    ///
+    /// ### Errors
+    ///
+    /// - [`Error::Number`] if a first-occurrence index overflows [`N`].
+    /// - [`Error::Io`] if a deserialization failure occurs.
+    ///
+    /// [1]: crate::dataset::Dataset
+    fn committed<I, N>(&self) -> Result<HashMap<I, N, Xxh3Builder>, Error>
+    where
+        N: Unsigned,
+        I: Read + Eq + Hash + 'static,
+        for<'q> I::Src<'q>: Composite<'q, Query> + Iterator<Item = Outcome<I>> + 'q,
+    {
+        let mut map = HashMap::with_hasher(Xxh3Builder::new());
+        let mut next = Some(N::MIN);
+        for item in self.read::<I>()? {
+            let i = next.ok_or(number::Error::Zero)?;
+            if let Entry::Vacant(entry) = map.entry(item?) {
+                entry.insert(i);
+            }
+            next = i.checked_add(N::ONE);
+        }
+        Ok(map)
+    }
+}
