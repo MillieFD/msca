@@ -49,6 +49,7 @@ use std::sync::Arc;
 
 use funty::Unsigned;
 use memmap2::Mmap;
+use minicbor::{CborLen, Decode, Encode};
 use xxhash_rust::xxh3::Xxh3Builder;
 
 use crate::io::{self, Deserialize};
@@ -116,12 +117,19 @@ impl Query {
 
 /* --------------------------------------------------------------------------- Column Descriptor */
 
-/// A minimal column **descriptor** for [`Query`] planning; keyed by name in the [`Query`] map.
-#[derive(Clone, Debug)]
+/// A minimal column **descriptor** for [`Query`] planning and execution.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Debug, Clone, Eq, PartialEq, Encode, Decode, CborLen)]
 pub struct Column {
-    /// The [`Type`] of items contained within this column.
-    pub(crate) ty: Type,
-    /// List of [`Buffer`](manifest::Buffer) descriptors for this column across all data segments.
+    /// The [`Type`] of items contained within this [`Column`].
+    #[n(0)]
+    pub ty: Type,
+    /// [`Buffer`](manifest::Buffer) descriptors for the [`Column`] across all data segments.
+    #[cbor(n(1), skip_if = "Vec::is_empty")]
+    #[cfg_attr(
+        feature = "serde",
+        serde(default, skip_serializing_if = "Vec::is_empty")
+    )]
     pub(crate) buffers: Vec<manifest::Buffer>,
 }
 
