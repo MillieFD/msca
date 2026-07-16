@@ -2019,7 +2019,7 @@ where
     type Buffer = Vec<u8>;
 
     fn size(&self) -> Result<NonZeroU64, Error> {
-        let ends = SizedBuf::new(&self.offsets).size()?;
+        let ends = SizedBuf::new(&self.ends).size()?;
         match self.data.is_empty() {
             true => Ok(ends),
             false => SizedBuf::new(&self.data).size()?.checked_add(ends.get()).ok_or(Error::Zero),
