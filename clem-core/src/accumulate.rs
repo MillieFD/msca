@@ -35,7 +35,7 @@ use minicbor::{CborLen, Decode, Encode};
 use crate::io::{Buffer as _, Checksum, Register, SizedBuf, HEADER};
 use crate::manifest::{self, Column, Manifest};
 use crate::number::Error;
-use crate::schema::{size_of_opt, BitMatch, Unfold};
+use crate::schema::{self, size_of_opt, BitMatch, Unfold};
 use crate::segment::{Align, Header, Segment, Variant};
 use crate::Sector;
 
