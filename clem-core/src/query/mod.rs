@@ -113,4 +113,35 @@ impl Query {
         }
         Ok(map)
     }
+
+/* --------------------------------------------------------------------------- Column Descriptor */
+
+/// A minimal column **descriptor** for [`Query`] planning; keyed by name in the [`Query`] map.
+#[derive(Clone, Debug)]
+pub struct Column {
+    /// The [`Type`] of items contained within this column.
+    pub(crate) ty: Type,
+    /// List of [`Buffer`](manifest::Buffer) descriptors for this column across all data segments.
+    pub(crate) buffers: Vec<manifest::Buffer>,
+}
+
+impl Column {
+    /// Returns [`Error::Type`] if the requested [`Type`] does not match the on-disk [`Column`]
+    /// type; otherwise returns an immutable reference to [`self`](Column) for method chaining.
+    ///
+    /// ### Guidance
+    ///
+    /// Refer to [`Column::accepts`] if a direct **or** nested inner-type match is permissible. Use
+    /// [`Column::exact_mut`] if a mutable reference is required for downstream functions.
+    pub fn exact<I>(&self) -> Result<&Self, Error>
+    where
+        Schema: Unfolder<I>,
+    {
+        let expect = Schema::unfold();
+        match self.ty == expect {
+            true => Ok(self),
+            false => Error::Type { expect, actual: self.ty.clone() }.into(),
+        }
+    }
+}
 }
