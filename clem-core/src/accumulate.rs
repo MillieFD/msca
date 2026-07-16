@@ -844,52 +844,6 @@ where
     }
 }
 
-    fn min(&self) -> Option<I> {
-        match self {
-            Self::Empty => None,
-            Self::Lite { item, .. } => item.clone().into(),
-            Self::Full(acc) => acc.min(),
-        }
-    }
-
-impl<I> Extreme for OptInSitu<I>
-where
-    I: PartialOrd + Copy,
-{
-    /// A [niche][1] body inlines [`Some`] and [`None`] items directly, so the extreme is located by
-    /// scanning the [`Option`] slots and skipping the absent items: a [`None`] slot carries no
-    /// operand, and its niche bytes are not a valid inner item for a statistic to resolve as. The
-    /// sibling [`OptBitVec`] is [`Some`]-only structurally, so both agree that statistics describe
-    /// the operand items alone.
-    ///
-    /// A niche [`Some`] serializes to exactly the inner item bytes, so a located statistic
-    /// [deserializes](crate::Deserialize) as the inner operand type.
-    ///
-    /// [1]: https://doc.rust-lang.org/std/option/index.html#representation
-    fn extreme(&self, best: Ordering) -> Option<Sector> {
-        let cmp = |a: &I, b: &I| a.partial_cmp(b) == Some(best);
-        Sector::locate(self.data.iter().copied(), size_of_opt::<I>(), cmp)
-    }
-}
-
-impl<I> Extreme for OptBitVec<I>
-where
-    I: Unfold,
-    I::RawAcc: Extreme,
-{
-    /// The `data` sub-buffer holds the [`Some`] items alone and locates within its own payload, so
-    /// the statistic is shifted by [`origin`](Self::origin) to become relative to the whole body.
-    ///
-    /// Offsets compose by addition: [`detail`](Extreme::detail) later resolves the shifted
-    /// statistic against the buffer offset, so the anchor is applied exactly **once**. An offset
-    /// overflow yields [`None`], conservatively degrading the column to
-    /// [`Basic`](manifest::Buffer::Basic) rather than recording an unresolvable statistic.
-    fn extreme(&self, best: Ordering) -> Option<Sector> {
-        let origin = self.origin().ok()?;
-        self.data.extreme(best)?.relative(origin).ok()
-    }
-}
-
 /* ------------------------------------------------------------- Descriptor Trait Implementation */
 
 impl<I> Descriptor for Vec<I>
