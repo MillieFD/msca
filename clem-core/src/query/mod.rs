@@ -291,4 +291,499 @@ where
         Err(E::from(error))
     }
 }
+
+/* --------------------------------------------------------------------------------------- Tests */
+
+#[cfg(test)]
+mod tests {
+    use std::num::NonZeroU64;
+
+    use bitvec::vec::BitVec;
+    use memmap2::MmapMut;
+
+    use super::column::{Adapter, Column as _};
+    use super::*;
+    use crate::accumulate::{Accumulate, OptBitVec, OptInSitu, Seq};
+    use crate::{Sector, Serialize};
+
+    /// Collect the [`Include`](Outcome::Include) items from a stream, dropping
+    /// [`Exclude`](Outcome::Exclude) and panicking on a failed eager construction or any
+    /// [`Error`](Outcome::Error).
+    fn collected<I, S>(stream: Result<S, Error>) -> Vec<I>
+    where
+        S: Iterator<Item = Outcome<I>>,
+    {
+        stream
+            .expect("Stream construction failed")
+            .filter_map(|outcome| match outcome {
+                Outcome::Include(item) => Some(item),
+                Outcome::Exclude(..) => None,
+                Outcome::Error(error) => panic!("Read error → {error}"),
+            })
+            .collect()
+    }
+
+    /// A [`Sector`] spanning the one `u32` at element `slot` of a serialized body.
+    fn stat(slot: u64) -> Sector {
+        let width = size_of::<u32>() as u64;
+        Sector::new(slot * width, width).expect("Sector::new failed")
+    }
+
+    /// Build a [`Detailed`](manifest::Buffer::Detailed) `u32` descriptor over a serialized body,
+    /// pointing `min` and `max` at the real items held at those element slots.
+    fn detailed(len: usize, count: u64, min: u64, max: u64) -> manifest::Buffer {
+        manifest::Buffer::Detailed {
+            buffer: Sector {
+                offset: u64::MIN,
+                size: NonZeroU64::new(len as u64).expect("Empty body"),
+            },
+            count: NonZeroU64::new(count).expect("Zero rows"),
+            min: stat(min),
+            max: stat(max),
+        }
+    }
+
+    /// Build a single-column `u32` [`Query`] named `v` whose descriptor carries real statistics.
+    fn root(items: &[u32]) -> Query {
+        let bytes = items.to_vec().serialize().expect("Serialize failed");
+        let last = items.len() as u64 - 1;
+        let buffer = detailed(bytes.len(), items.len() as u64, 0, last);
+        with(&bytes, Type::U32, buffer)
+    }
+
+    /// Build a single-column [`Query`] named `v` over the provided serialized bytes and [`Buffer`].
+    fn with(bytes: &[u8], ty: Type, buffer: manifest::Buffer) -> Query {
+        let mut mmap = MmapMut::map_anon(bytes.len().max(1)).expect("Anonymous map failed");
+        mmap[..bytes.len()].copy_from_slice(bytes);
+        Query {
+            mmap: Arc::new(mmap.make_read_only().expect("Read-only conversion failed")),
+            columns: BTreeMap::from([(String::from("v"), Column { ty, buffers: vec![buffer] })]),
+        }
+    }
+
+    /// Build a single-column [`Query`] named `v` over the provided serialized bytes; the descriptor
+    /// is [`Basic`](manifest::Buffer::Basic), so it carries no statistics and is never pruned.
+    fn query(bytes: &[u8], ty: Type, count: u64) -> Query {
+        let buffer = manifest::Buffer::Basic {
+            buffer: Sector {
+                offset: u64::MIN,
+                size: NonZeroU64::new(bytes.len() as u64).expect("Empty body"),
+            },
+            count: NonZeroU64::new(count).expect("Zero rows"),
+        };
+        with(bytes, ty, buffer)
+    }
+
+    /// Build a single-column [`Query`] named `v` whose descriptor is a
+    /// [`Compact`](manifest::Buffer::Compact) buffer spanning one repeated item.
+    fn compact(bytes: &[u8], ty: Type, count: u64) -> Query {
+        let buffer = manifest::Buffer::Compact {
+            buffer: Sector {
+                offset: u64::MIN,
+                size: NonZeroU64::new(bytes.len() as u64).expect("Empty body"),
+            },
+            count: NonZeroU64::new(count).expect("Zero rows"),
+        };
+        with(bytes, ty, buffer)
+    }
+
+    /// Build a two-column [`Query`] (`a` then `b`) with a distinct `u32` [`Buffer`] per column.
+    fn pair(a: &[u32], b: &[u32]) -> Query {
+        let ab = a.to_vec().serialize().expect("Serialize a");
+        let bb = b.to_vec().serialize().expect("Serialize b");
+        let mut mmap = MmapMut::map_anon(ab.len() + bb.len()).expect("Anonymous map failed");
+        mmap[..ab.len()].copy_from_slice(&ab);
+        mmap[ab.len()..].copy_from_slice(&bb);
+        let buffer = |offset: usize, len: usize, count: usize| manifest::Buffer::Basic {
+            buffer: Sector {
+                offset: offset as u64,
+                size: NonZeroU64::new(len as u64).expect("Empty body"),
+            },
+            count: NonZeroU64::new(count as u64).expect("Zero rows"),
+        };
+        Query {
+            mmap: Arc::new(mmap.make_read_only().expect("Read-only conversion failed")),
+            columns: BTreeMap::from([
+                (
+                    String::from("a"),
+                    Column {
+                        ty: Type::U32,
+                        buffers: vec![buffer(0, ab.len(), a.len())],
+                    },
+                ),
+                (
+                    String::from("b"),
+                    Column {
+                        ty: Type::U32,
+                        buffers: vec![buffer(ab.len(), bb.len(), b.len())],
+                    },
+                ),
+            ]),
+        }
+    }
+
+    #[test]
+    fn column_round_trip() {
+        let data: Vec<u32> = vec![10, 20, 30];
+        let bytes = data.serialize().expect("Serialize failed");
+        let query = query(&bytes, Type::U32, 3);
+        let rows = collected(query.column::<u32>("v").expect("Column failed").stream());
+        assert_eq!(rows, data);
+    }
+
+    #[test]
+    fn column_type_mismatch_errors() {
+        let bytes = vec![1u32].serialize().expect("Serialize failed");
+        let query = query(&bytes, Type::U32, 1);
+        assert!(matches!(
+            query.column::<u16>("v").err(),
+            Some(Error::Type { .. })
+        ));
+    }
+
+    /// A [`Compact`](manifest::Buffer::Compact) descriptor decodes its single item once and repeats
+    /// it exactly `count` times without further file access.
+    #[test]
+    fn compact_column_decodes_once() {
+        let bytes = vec![7u32].serialize().expect("Serialize failed");
+        let query = compact(&bytes, Type::U32, 3);
+        let rows = collected(query.column::<u32>("v").expect("Column failed").stream());
+        assert_eq!(rows, [7, 7, 7]);
+    }
+
+    /// A range **containing** the item of a [`Compact`](manifest::Buffer::Compact) column retains the
+    /// buffer and repeats the item; a disjoint range prunes it eagerly instead of repeating an
+    /// [`Exclude`](Outcome::Exclude) outcome to exhaust it.
+    #[test]
+    fn compact_repeats_contained_range() {
+        let bytes = vec![7u32].serialize().expect("Serialize failed");
+        let query = compact(&bytes, Type::U32, 3);
+        let handle =
+            query.column::<u32>("v").expect("Column failed").range(5u32..10).expect("range");
+        assert_eq!(handle.buffers().len(), 1); // the item falls inside the range
+        assert_eq!(collected(handle.stream()), [7, 7, 7]);
+    }
+
+    /// Every value filter evaluates a [`Compact`](manifest::Buffer::Compact) item **exactly** at
+    /// query time, so a provably excluded compact buffer is pruned before any streaming.
+    #[test]
+    fn compact_prunes_disjoint_item() {
+        let bytes = vec![7u32].serialize().expect("Serialize failed");
+        let away = compact(&bytes, Type::U32, 3);
+        let away = away.column::<u32>("v").expect("Column failed").eq(100u32).expect("eq");
+        assert!(away.buffers().is_empty()); // pruned before iteration
+        assert!(collected(away.stream()).is_empty());
+        let kept = compact(&bytes, Type::U32, 3);
+        let kept = kept.column::<u32>("v").expect("Column failed").eq(7u32).expect("eq");
+        assert_eq!(collected(kept.stream()), [7, 7, 7]);
+    }
+
+    /// Inequality proves nothing from a statistic range, but prunes a
+    /// [`Compact`](manifest::Buffer::Compact) buffer whose item is bit-identical to the operand.
+    #[test]
+    fn compact_prunes_ne() {
+        let bytes = vec![7u32].serialize().expect("Serialize failed");
+        let away = compact(&bytes, Type::U32, 3);
+        let away = away.column::<u32>("v").expect("Column failed").ne(7u32).expect("ne");
+        assert!(away.buffers().is_empty()); // every item is rejected
+        let kept = compact(&bytes, Type::U32, 3);
+        let kept = kept.column::<u32>("v").expect("Column failed").ne(9u32).expect("ne");
+        assert_eq!(collected(kept.stream()), [7, 7, 7]);
+    }
+
+    /// A [`Basic`](manifest::Buffer::Basic) buffer carries no statistics: a range filter retains the
+    /// buffer and filters its items at read time instead.
+    #[test]
+    fn basic_streams_unpruned() {
+        let bytes = vec![10u32, 20, 30].serialize().expect("Serialize failed");
+        let query = query(&bytes, Type::U32, 3);
+        let handle =
+            query.column::<u32>("v").expect("Column failed").range(15u32..25).expect("range");
+        assert_eq!(handle.buffers().len(), 1); // never pruned
+        assert_eq!(collected(handle.stream()), [20]); // filtered at read time
+    }
+
+    /// A compact `String` column resolves its framed composite item through the reader pipeline, so
+    /// value filters prune and retain it correctly.
+    #[test]
+    fn string_filters_prune_compact() {
+        let bytes = {
+            let mut acc = Seq::<u8>::default();
+            acc.push(String::from("red"));
+            acc.serialize().expect("Serialize failed")
+        };
+        let away = compact(&bytes, Type::String, 3);
+        let away = away
+            .column::<String>("v")
+            .expect("Column failed")
+            .eq(String::from("blue"))
+            .expect("eq");
+        assert!(away.buffers().is_empty());
+        let kept = compact(&bytes, Type::String, 3);
+        let kept =
+            kept.column::<String>("v").expect("Column failed").eq(String::from("red")).expect("eq");
+        assert_eq!(collected(kept.stream()).len(), 3);
+    }
+
+    #[test]
+    fn bool_column_round_trip() {
+        let mut acc = BitVec::default();
+        [true, false, true].into_iter().for_each(|bit| acc.push(bit));
+        let bytes = acc.serialize().expect("Serialize failed");
+        let query = query(&bytes, Type::Bool, 3);
+        let rows = collected(query.column::<bool>("v").expect("Column failed").stream());
+        assert_eq!(rows, vec![true, false, true]);
+    }
+
+    #[test]
+    fn opt_bit_vec_column_round_trip() {
+        let mut acc = OptBitVec::<u32>::default();
+        [Some(1u32), None, Some(3)].into_iter().for_each(|v| acc.push(v));
+        let bytes = acc.serialize().expect("Serialize failed");
+        let query = query(&bytes, Type::option(Type::U32), 3);
+        let rows = collected(query.column::<Option<u32>>("v").expect("Column failed").stream());
+        assert_eq!(rows, vec![Some(1), None, Some(3)]);
+    }
+
+    #[test]
+    fn niche_option_column_round_trip() {
+        let mut acc = OptInSitu::<NonZeroU64>::default();
+        [NonZeroU64::new(5), None, NonZeroU64::new(7)].into_iter().for_each(|v| acc.push(v));
+        let bytes = acc.serialize().expect("Serialize failed");
+        let query = query(&bytes, Type::option(Type::NZU64), 3);
+        let rows =
+            collected(query.column::<Option<NonZeroU64>>("v").expect("Column failed").stream());
+        assert_eq!(rows, vec![NonZeroU64::new(5), None, NonZeroU64::new(7)]);
+    }
+
+    #[test]
+    fn seq_column_round_trip() {
+        let mut acc = Seq::<u8>::default();
+        acc.push(vec![97, 98, 99]);
+        acc.push(vec![100, 101]);
+        let bytes = acc.serialize().expect("Serialize failed");
+        let query = query(&bytes, Type::sequence(Type::U8), 2);
+        let rows = collected(query.column::<Vec<u8>>("v").expect("Column failed").stream());
+        assert_eq!(rows, vec![vec![97, 98, 99], vec![100, 101]]);
+    }
+
+    #[test]
+    fn string_column_round_trip() {
+        let mut acc = Seq::<u8>::default();
+        acc.push("héllo".as_bytes().to_vec());
+        acc.push("xyz".as_bytes().to_vec());
+        let bytes = acc.serialize().expect("Serialize failed");
+        let query = query(&bytes, Type::String, 2);
+        let rows = collected(query.column::<String>("v").expect("Column failed").stream());
+        assert_eq!(rows, vec![String::from("héllo"), String::from("xyz")]);
+    }
+
+    #[test]
+    fn str_column_zero_copy() {
+        let mut acc = Seq::<u8>::default();
+        acc.push(b"abc".to_vec());
+        acc.push(b"de".to_vec());
+        let bytes = acc.serialize().expect("Serialize failed");
+        let query = query(&bytes, Type::String, 2);
+        let rows = collected(query.column::<&str>("v").expect("Column failed").stream());
+        assert_eq!(rows, vec!["abc", "de"]);
+    }
+
+    #[test]
+    fn eq_filter_excludes_non_matching() {
+        let bytes = vec![10u32, 20, 30].serialize().expect("Serialize failed");
+        let query = query(&bytes, Type::U32, 3);
+        let handle = query.column::<u32>("v").expect("Column failed").eq(20u32).expect("eq failed");
+        assert_eq!(collected(handle.stream()), vec![20]);
+    }
+
+    #[test]
+    fn ne_filter_excludes_matching() {
+        let bytes = vec![10u32, 20, 30].serialize().expect("Serialize failed");
+        let query = query(&bytes, Type::U32, 3);
+        let handle = query.column::<u32>("v").expect("Column failed").ne(20u32).expect("ne failed");
+        assert_eq!(collected(handle.stream()), vec![10, 30]);
+    }
+
+    #[test]
+    fn set_membership_filters() {
+        let bytes = vec![10u32, 20, 30].serialize().expect("Serialize failed");
+        let one = query(&bytes, Type::U32, 3);
+        let one = one.column::<u32>("v").expect("Column").one_of([20u32, 30]).expect("one_of");
+        assert_eq!(collected(one.stream()), [20, 30]);
+        let none = query(&bytes, Type::U32, 3);
+        let none = none.column::<u32>("v").expect("Column").none_of([20u32]).expect("none_of");
+        assert_eq!(collected(none.stream()), [10, 30]);
+    }
+
+    /// [`is_some`](column::Column::is_some) retains [`Some`] rows; [`is_none`](column::Column::is_none)
+    /// retains [`None`] rows, delegating validity to the optional mask.
+    #[test]
+    fn validity_filters_split_optionals() {
+        let bytes = {
+            let mut acc = OptBitVec::<u32>::default();
+            [Some(1u32), None, Some(3)].into_iter().for_each(|v| acc.push(v));
+            acc.serialize().expect("Serialize failed")
+        };
+        let some = query(&bytes, Type::option(Type::U32), 3);
+        let some = some.column::<Option<u32>>("v").expect("Column").is_some();
+        assert_eq!(collected(some.stream()), vec![Some(1), Some(3)]);
+        let none = query(&bytes, Type::option(Type::U32), 3);
+        let none = none.column::<Option<u32>>("v").expect("Column").is_none();
+        assert_eq!(collected(none.stream()), vec![None]);
+    }
+
+    /// A value filter on an optional column tests each [`Some`]; a [`None`] item carries no operand
+    /// to test and is **excluded**. Chaining `is_some` is therefore redundant, whereas `is_none`
+    /// selects the absent items instead.
+    #[test]
+    fn value_filter_excludes_none_on_optional() {
+        let bytes = {
+            let mut acc = OptBitVec::<u32>::default();
+            [Some(1u32), None, Some(20)].into_iter().for_each(|v| acc.push(v));
+            acc.serialize().expect("Serialize failed")
+        };
+        let ty = || Type::option(Type::U32);
+        let kept = query(&bytes, ty(), 3);
+        let kept = kept.column::<Option<u32>>("v").expect("Column").eq(20u32).expect("eq");
+        assert_eq!(collected(kept.stream()), vec![Some(20)]);
+        let chained = query(&bytes, ty(), 3);
+        let chained =
+            chained.column::<Option<u32>>("v").expect("Column").eq(20u32).expect("eq").is_some();
+        assert_eq!(collected(chained.stream()), vec![Some(20)]); // no further effect
+        let absent = query(&bytes, ty(), 3);
+        let absent = absent.column::<Option<u32>>("v").expect("Column").is_none();
+        assert_eq!(collected(absent.stream()), vec![None]);
+    }
+
+    #[test]
+    fn eq_type_mismatch_errors() {
+        let bytes = vec![1u32].serialize().expect("Serialize failed");
+        let query = query(&bytes, Type::U32, 1);
+        assert!(query.column::<bool>("v").is_err());
+    }
+
+    /// An [`eq`](column::Column::eq) disjoint from the buffer statistics prunes it; the handle empties
+    /// and its stream is empty.
+    #[test]
+    fn eq_prunes_disjoint_column() {
+        let query = root(&[10u32, 15, 20]);
+        let handle = query.column::<u32>("v").expect("Column").eq(100u32).expect("eq failed");
+        assert!(handle.buffers().is_empty());
+        assert!(collected(handle.stream()).is_empty());
+    }
+
+    #[test]
+    fn column_unknown_name_errors() {
+        let bytes = vec![1u32].serialize().expect("Serialize failed");
+        let query = query(&bytes, Type::U32, 1);
+        assert!(matches!(
+            query.column::<u32>("missing").err(),
+            Some(Error::Column { .. })
+        ));
+    }
+
+    /// Two handles filter independently: filtering `a` leaves `b` untouched.
+    #[test]
+    fn handles_filter_per_column() {
+        let query = pair(&[10, 20, 30], &[1, 2, 3]);
+        let a = query.column::<u32>("a").expect("Column a").range(15u32..25).expect("range");
+        assert_eq!(collected(a.stream()), [20]);
+        assert_eq!(
+            collected(query.column::<u32>("b").expect("Column b").stream()),
+            [1, 2, 3]
+        );
+    }
+
+    /// [`join`](column::Column::join) intersects the tagged buffer lists of two handles; a value
+    /// filter that prunes one side prunes the sibling on sync.
+    #[test]
+    fn join_syncs_buffers() {
+        // Column `a` carries restrictive statistics [10, 30]; `b` spans the full range. An
+        // `eq(100)` on `a` is provably disjoint, so its sole buffer is pruned before the join.
+        let bytes = vec![10u32, 20, 30].serialize().expect("Serialize failed");
+        let mut mmap = MmapMut::map_anon(bytes.len()).expect("Anonymous map failed");
+        mmap[..bytes.len()].copy_from_slice(&bytes);
+        let sector = Sector {
+            offset: u64::MIN,
+            size: NonZeroU64::new(bytes.len() as u64).expect("Empty"),
+        };
+        let count = NonZeroU64::new(3).expect("Zero rows");
+        // Column `a` carries real statistics resolved from the map; `b` carries none.
+        let stats = detailed(bytes.len(), 3, 0, 2);
+        let basic = manifest::Buffer::Basic { buffer: sector, count };
+        let query = Query {
+            mmap: Arc::new(mmap.make_read_only().expect("Read-only conversion failed")),
+            columns: BTreeMap::from([
+                (
+                    String::from("a"),
+                    Column { ty: Type::U32, buffers: vec![stats] },
+                ),
+                (
+                    String::from("b"),
+                    Column { ty: Type::U32, buffers: vec![basic] },
+                ),
+            ]),
+        };
+        let a = query.column::<u32>("a").expect("Column a").eq(100u32).expect("eq"); // prunes a
+        let b = query.column::<u32>("b").expect("Column b");
+        let (a, b) = a.join(b).expect("join failed").unpack();
+        assert!(a.buffers().is_empty()); // the disjoint buffer is dropped
+        assert!(b.buffers().is_empty()); // and intersected out of the sibling
+    }
+
+    /// A [`join`](column::Column::join) across handles from different queries is rejected.
+    #[test]
+    fn cross_query_join_errors() {
+        let one = pair(&[1, 2], &[3, 4]);
+        let two = pair(&[1, 2], &[3, 4]);
+        let a = one.column::<u32>("a").expect("Column a");
+        let b = two.column::<u32>("b").expect("Column b");
+        assert!(matches!(a.join(b).err(), Some(Error::Join { .. })));
+    }
+
+    /// [`Column::get`](column::Column::get) windows a handle by positional slot without deserializing
+    /// outside the window; [`item`](column::Column::item) extracts one slot.
+    #[test]
+    fn column_get_and_item() {
+        let bytes = vec![10u32, 20, 30, 40].serialize().expect("Serialize failed");
+        let query = query(&bytes, Type::U32, 4);
+        let window = query.column::<u32>("v").expect("Column").get(1..3).expect("get failed");
+        assert_eq!(collected(window.stream()), [20, 30]);
+        let item = query.column::<u32>("v").expect("Column").item(3).expect("item failed");
+        assert_eq!(item, 40);
+    }
+
+    /// [`Query::get`](Query::get) windows the whole query before extraction; each extracted column
+    /// sees the identical slot window.
+    #[test]
+    fn query_get_windows_lockstep() {
+        let query = pair(&[10, 20, 30], &[1, 2, 3]).get(1..3).expect("get failed");
+        assert_eq!(
+            collected(query.column::<u32>("a").expect("Column a").stream()),
+            [20, 30]
+        );
+        assert_eq!(
+            collected(query.column::<u32>("b").expect("Column b").stream()),
+            [2, 3]
+        );
+    }
+
+    /// [`Window::locate`] resolves half-open ranges over cumulative buffer counts, spanning a
+    /// boundary, and rejects an empty range.
+    #[test]
+    fn window_locate_resolves_ranges() {
+        let counts = [3u64, 3];
+        let across = Window::locate(&counts, 2, 5).expect("window");
+        assert_eq!(
+            (across.first, across.last, across.skip, across.take.get()),
+            (0, 1, 2, 3)
+        );
+        let inside = Window::locate(&counts, 1, 2).expect("window");
+        assert_eq!(
+            (inside.first, inside.last, inside.skip, inside.take.get()),
+            (0, 0, 1, 1)
+        );
+        assert!(Window::locate(&counts, 3, 3).is_none());
+    }
 }
