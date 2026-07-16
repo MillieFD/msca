@@ -16,19 +16,18 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //! high-level surface for registering [`Data`] types and [querying](query) stored data while
 //! delegating low-level IO to an internal [`File`] handle.
 
-use std::collections::hash_map::Entry;
-use std::collections::HashMap;
+use std::collections::hash_map::{Entry, VacantEntry};
 use std::hash::Hash;
-use std::iter;
 use std::path::Path;
 use std::sync::Arc;
 
+use funty::{Fundamental, Unsigned};
 use memmap2::Mmap;
-use xxhash_rust::xxh3::Xxh3Builder;
 
 use crate::io::File;
 use crate::query::{self, Query};
 use crate::read::{Composite, Outcome, Read};
+use crate::schema::number;
 use crate::{io, Accumulate, Accumulator, Data, Error, Schema};
 
 /* ------------------------------------------------------------------------------ Public Exports */
@@ -158,21 +157,52 @@ impl Dataset {
     ///
     /// ### Errors
     ///
-    /// - [`Error::Io`][2] from the underlying [write-cycle](io)
-    /// - [`Error::Number`][3] if the segment `size` or `offset` overflow `u64`.
+    /// - [`Error::Schema`] if `name` is registered with an incompatible column layout.
+    /// - [`Error::Query`] if the committed stream cannot be constructed.
+    /// - [`Error::Number`] if an index does not fit in [`N`].
+    /// - [`Error::Io`] if deserialization or the underlying [write-cycle](io) fails.
+    pub async fn get_or_insert<N, I, S>(&mut self, name: &str, items: S) -> Result<Box<[N]>, Error>
+    where
+        N: Unsigned,
+        S: IntoIterator<Item = I>,
+        I: Data + Read + Eq + Hash + 'static,
+        for<'q> I::Src<'q>: Composite<'q, Query> + Iterator<Item = Outcome<I>> + 'q,
+    {
+        let mut acc = self.schema::<I>(name).await?;
+        let query = self.query(name)?;
+        let mut map = query.unique::<I, N>()?;
+        let count = query.count(); // initial number of items (includes duplicates)
+        let mut next = N::try_from(count).ok();
+        let items = items.into_iter();
+        let mut out = Vec::with_capacity(items.size_hint().0);
+        for item in items {
+            out.push(match map.entry(item) {
+                Entry::Occupied(entry) => *entry.get(),
+                Entry::Vacant(entry) => Self::insert(entry, &mut next)?,
+            });
+        }
+        let mut new: Box<[(I, N)]> = map.into_iter().filter(|e| e.1.as_u64() >= count).collect();
+        new.sort_unstable_by_key(|e| e.1);
+        new.into_iter().for_each(|e| acc.push(e.0));
+        self.write(acc).await?;
+        Ok(out.into_boxed_slice())
+    }
+
+    /// [`Insert`](VacantEntry::insert) the next available index into the provided [`VacantEntry`].
     ///
-    /// [1]: crate::segment::Segment::write
-    /// [2]: io::Error::Io
-    /// [3]: io::Error::Number
-    pub async fn index<I>(&mut self, accumulator: Accumulator<I>) -> Result<Range<u64>, io::Error> {
-        let start = self
-            .file
-            .manifest
-            .schemas
-            .get(&accumulator.name)
-            .map_or(u64::MIN, manifest::Schema::count);
-        let end = start + self.write(accumulator).await?;
-        Ok(start..end)
+    /// ### Errors
+    ///
+    /// Returns [`Error::Zero`][1] if the inserted index overflows [`N`].
+    ///
+    /// [1]: number::Error::Zero
+    fn insert<I, N>(entry: VacantEntry<I, N>, next: &mut Option<N>) -> Result<N, number::Error>
+    where
+        N: Unsigned,
+    {
+        let index = next.ok_or(number::Error::Zero)?;
+        *next = index.checked_add(N::ONE);
+        entry.insert(index);
+        Ok(index)
     }
 
     /// Initialise a new [`Query`] over the named [`Schema`](manifest::Schema).
@@ -323,9 +353,7 @@ mod tests {
                 .values()
                 .flat_map(|schema| schema.columns.values())
                 .flat_map(|column| column.buffers.iter())
-                .map(|buffer| match buffer {
-                    Buffer::Full { sector, .. } | Buffer::Lite { sector, .. } => sector.offset,
-                })
+                .map(Buffer::offset)
                 .collect();
             std::fs::remove_file(&path).ok();
             assert_eq!(offsets.len(), 2);
