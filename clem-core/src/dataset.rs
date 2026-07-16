@@ -16,7 +16,10 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //! high-level surface for registering [`Data`] types and [querying](query) stored data while
 //! delegating low-level IO to an internal [`File`] handle.
 
+use std::collections::hash_map::Entry;
 use std::collections::HashMap;
+use std::hash::Hash;
+use std::iter;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -26,7 +29,6 @@ use xxhash_rust::xxh3::Xxh3Builder;
 use crate::io::File;
 use crate::query::{self, Query};
 use crate::read::{Composite, Outcome, Read};
-use crate::schema::{number, AsKey};
 use crate::{io, Accumulate, Accumulator, Data, Error, Schema};
 
 /* ------------------------------------------------------------------------------ Public Exports */
@@ -128,10 +130,13 @@ impl Dataset {
     ///
     /// ### Errors
     ///
-    /// Returns [`io::Error::Io`] if the underlying [write-cycle](io) fails, or [`io::Error::Number`]
-    /// if a `u64` overflow occurs while computing a segment `size` or `offset`.
+    /// Returns [`Error::Io`][2] if the underlying [write-cycle](io) fails, or [`Error::Number`][3]
+    /// if a `u64` overflow occurs while computing the on-disk [`Sector`][4].
     ///
     /// [1]: crate::segment::Segment::write
+    /// [2]: io::Error::Io
+    /// [3]: io::Error::Number
+    /// [4]: io::Sector
     pub async fn write<I>(&mut self, accumulator: Accumulator<I>) -> Result<u64, io::Error> {
         let count = match accumulator.is_empty() {
             true => return Ok(0),
