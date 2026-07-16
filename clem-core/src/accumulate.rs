@@ -21,10 +21,12 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //! Each accumulator type implements the [`Accumulate`] trait, which defines a shared interface for
 //! handling in-memory value accumulation.
 
+use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::fmt::{self, Debug};
 use std::iter;
 use std::num::*;
+use std::ops::Range;
 
 use bitvec::field::BitField;
 use bitvec::vec::BitVec;
@@ -277,20 +279,20 @@ where
 /// type; there is no guarantee that two [`Vec<I>`] contain the same number of elements.
 /// [Clem](crate) therefore unfolds unsized types into:
 ///
-/// 1. Columnar `offsets` region describing boundaries.
-/// 2. Contiguous `data` region encoding values.
+/// 1. Columnar `ends` region describing boundaries.
+/// 2. Contiguous `data` region encoding items.
 ///
 /// This design ensures **O(1) random access** and avoids per-element pointer chasing. Sequential
 /// scans across the contained [items](I) remain linear; leveraging columnar optimisations for SIMD
 /// and prefetch.
 ///
 /// Each offset records one **zero-based** cumulative end per row, with `0` corresponding to the
-/// start of the concatenated `data` region. Item `i` spans `offset[i - 1] → offset[i]` with an
+/// start of the concatenated `data` region. Item `i` spans `ends[i - 1] → ends[i]` with an
 /// implicit leading `0` if not otherwise specified. The offset count therefore equals the item
 /// count recorded in the segment header.
 ///
 /// ```text
-/// offsets: [3, 6, 6, 8]
+/// ends: [3, 6, 6, 8]
 /// data:  [a, b, c, d, e, f, g, h]
 /// ```
 ///
@@ -306,14 +308,14 @@ where
 /// ```
 ///
 /// Nested unsized types use **multiple offset layers** alongside a **single data region**. This
-/// composable design preserves the performance advantages associated with contiguous value storage;
+/// composable design preserves the performance advantages associated with contiguous item storage;
 /// namely predictable vectorised traversal. Scanning performance across the contiguous inner `data`
-/// region is unaffected by deep nesting. The inner offsets buffer is aligned in memory order of
+/// region is unaffected by deep nesting. The inner ends buffer is aligned in memory order of
 /// traversal to improve cache locality during nested iteration and reduce TLB misses.
 ///
 /// ```text
-/// inner offsets
-/// outer offsets
+/// inner ends
+/// outer ends
 /// data
 /// ```
 ///
@@ -325,7 +327,7 @@ pub struct Seq<I>
 where
     I: Unfold,
 {
-    /// Cumulative end offsets.
+    /// Cumulative ends.
     ///
     /// Offset `n` marks the exclusive end of item `n` and the inclusive start of item `n + 1`.
     #[cfg_attr(
@@ -333,7 +335,7 @@ where
         serde(default, skip_serializing_if = "Vec::is_empty")
     )]
     // TODO Allow users to specify the offset type based on the number of expected elements.
-    pub offsets: Vec<u64>,
+    pub ends: Vec<u64>,
     /// Flattened and concatenated [item](I) accumulator.
     #[cfg_attr(
         feature = "serde",
@@ -349,13 +351,24 @@ where
 {
     fn default() -> Self {
         Self {
-            offsets: Vec::new(),
+            ends: Vec::new(),
             data: I::RawAcc::default(),
         }
     }
 }
 
-/// Data **accumulator** for [optional](Option) [unsized][1] values.
+impl<I> Seq<I>
+where
+    I: Unfold + Clone + 'static,
+{
+    fn bounds(&self) -> impl Iterator<Item = Range<u64>> {
+        let ubs = self.ends.iter().copied();
+        let lbs = ubs.clone();
+        iter::once(u64::MIN).chain(lbs).zip(ubs).map(|b| b.0..b.1)
+    }
+}
+
+/// Data **accumulator** for [optional](Option) [unsized][1] items.
 ///
 /// ### Data Layout
 ///
@@ -363,11 +376,11 @@ where
 /// there is no guarantee that two [`Vec<T>`] contain the same number of elements. [Clem](crate)
 /// therefore unfolds unsized types into:
 ///
-/// 1. Columnar `offsets` region describing boundaries.
-/// 2. Contiguous `data` region encoding values.
+/// 1. Columnar `ends` region describing boundaries.
+/// 2. Contiguous `data` region encoding items.
 ///
-/// [`OptSeq`] encodes validity in the `offsets` buffer without an auxiliary bitmap. [`None`] items
-/// are marked using a [`u64::MAX`] sentinel offset and append no data.
+/// [`OptSeq`] encodes validity in the `ends` buffer without an auxiliary bitmap. [`None`] items are
+/// marked using a [`u64::MAX`] sentinel offset and append no data.
 ///
 /// Refer to the [documentation](Seq) on non-optional unsized type accumulation for more details.
 ///
@@ -387,7 +400,7 @@ where
         feature = "serde",
         serde(default, skip_serializing_if = "Vec::is_empty")
     )]
-    pub offsets: Vec<u64>,
+    pub ends: Vec<u64>,
     /// Flattened and concatenated [item](I) accumulator; only [`Some`] items contribute entries.
     #[cfg_attr(
         feature = "serde",
@@ -402,7 +415,7 @@ where
 {
     fn default() -> Self {
         Self {
-            offsets: Vec::new(),
+            ends: Vec::new(),
             data: I::RawAcc::default(),
         }
     }
@@ -419,9 +432,9 @@ pub struct Flatten<I>(#[n(0)] pub I);
 ///
 /// ### Buffer Composition
 ///
-/// Real-world applications often require the inclusion of columns with infrequently altered values.
-/// It is possible for a column to contain only **one** repeated value across an entire data
-/// segment. Instead of repeatedly encoding identical values, clem defaults to a **compact buffer**
+/// Real-world applications often require the inclusion of columns with infrequently altered items.
+/// It is possible for a column to contain only **one** repeated item across an entire data segment.
+/// Instead of repeatedly encoding identical items, clem defaults to a **compact buffer**
 /// representation to improve storage density.
 // TODO → Add link to on-disk-format.md for more information.
 ///
@@ -430,7 +443,7 @@ pub struct Flatten<I>(#[n(0)] pub I);
 /// Each column begins in the [`Empty`](Buffer::Empty) state, which is never written to disk. If an
 /// empty [`Buffer`] is encountered during the [write-cycle](crate::io), the entire data segment is
 /// discarded. This behaviour may change in future releases; using absent buffers to encode a
-/// type-dependent default value.
+/// type-dependent [`Default`].
 ///
 /// ##### 2. Compact
 ///
@@ -450,8 +463,8 @@ pub struct Flatten<I>(#[n(0)] pub I);
 ///
 /// ### Guidance
 ///
-/// Implementers are encouraged to use a [`bin`] segment for genuinely constant values that never
-/// change across the entire file lifetime. This improves storage efficiency by eliminating an
+/// Implementers are encouraged to use a [`bin`] segment for genuinely constant data that never
+/// changes across the entire file lifetime. This improves storage efficiency by eliminating an
 /// unnecessary column from the schema.
 // TODO → add doc link to binary segment
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -464,7 +477,7 @@ where
     /// A buffer containing a single [`item`](I) repeated `count` times; used to coalesce homogenous
     /// runs into an efficient on-disk representation to improve storage density.
     Compact {
-        /// The single repeated value.
+        /// The single repeated item.
         item: I,
         /// The number of accumulated repetitions.
         count: u64,
