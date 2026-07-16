@@ -1,6 +1,6 @@
 /*
-Project: clem
-GitHub: https://github.com/MillieFD/clem
+Project: msca
+GitHub: https://github.com/MillieFD/msca
 
 BSD 3-Clause License, Copyright (c) 2026, Amelia Fraser-Dale
 
@@ -12,7 +12,7 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //!
 //! ---
 //!
-//! [clem](crate) maximises IO performance by storing on-disk data as columnar [buffers][1]
+//! [msca](crate) maximises IO performance by storing on-disk data as columnar [buffers][1]
 //! optimised for range-based queries across an arbitrary number of dimensions; however, this
 //! underlying format is generally unsuitable for direct manipulation by end-users.
 //!
@@ -415,7 +415,7 @@ where
 ///
 /// Default implementations are provided for all supported primitive types. Implementors are advised
 /// to [`derive`][1] this trait for composite types, which zips one [sub-stream](Stream) per field.
-// [1]: TODO → add link to clem-derive crate or feature
+// [1]: TODO → add link to msca-derive crate or feature
 pub trait Read {
     /// The [stateful data source](Reader) from which to [`Deserialize`] values of [`Self`].
     type Src<'a>;
