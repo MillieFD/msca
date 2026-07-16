@@ -339,7 +339,7 @@ where
     fn pad(self) -> Result<usize, number::Error> {
         let n = self.try_into()?;
         // NOTE: pad ≤ seven bytes; conversion to usize is infallible in practice.
-        { n.next_multiple_of(8) - n }.try_into().map_err(number::Error::Convert)
+        n.next_multiple_of(8).saturating_sub(n).try_into().map_err(number::Error::Convert)
     }
 }
 
