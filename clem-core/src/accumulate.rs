@@ -32,12 +32,12 @@ use bitvec::field::BitField;
 use bitvec::vec::BitVec;
 use minicbor::{CborLen, Decode, Encode};
 
-use crate::io::{Buffer as _, Checksum, Register, SizedBuf, HEADER};
+use crate::io::{Checksum, Register, SizedBuf, HEADER};
 use crate::manifest::{self, Column, Manifest};
 use crate::number::Error;
 use crate::schema::{self, size_of_opt, BitMatch, Unfold};
 use crate::segment::{Align, Header, Segment, Variant};
-use crate::Sector;
+use crate::{io, Sector};
 
 /// Shorthand type-erased stack-allocated [pointer](Box) to a [`Describe`] trait object backed by a
 /// heap-allocated growable [`Buffer`](Serialize::Buffer).
@@ -1800,6 +1800,7 @@ where
     }
 
     fn serialize(&self) -> Result<Self::Buffer, Error> {
+        use io::Buffer;
         let size = self.size()?.get().try_into()?;
         let buf = vec![0u8; size].serialize_push(self)?;
         // NOTE: cannot use static assertion as size is dependent on runtime data accumulation.
@@ -1836,6 +1837,7 @@ where
     }
 
     fn serialize(&self) -> Result<Self::Buffer, Error> {
+        use io::Buffer;
         let size = self.size()?.get().try_into()?;
         let buf = vec![0u8; size].serialize_push(self)?;
         // NOTE: cannot use static assertion as size is dependent on runtime data accumulation.
@@ -1859,6 +1861,7 @@ impl Serialize for BitVec {
     }
 
     fn serialize(&self) -> Result<Self::Buffer, Error> {
+        use io::Buffer;
         let size = self.size()?.get().try_into()?;
         let buf = vec![0u8; size].serialize_push(self)?;
         // NOTE: cannot use static assertion as size is dependent on runtime data accumulation.
@@ -1914,6 +1917,7 @@ where
     }
 
     fn serialize(&self) -> Result<Self::Buffer, Error> {
+        use io::Buffer;
         let size = self.size()?.get().try_into()?;
         let buf = vec![0u8; size].serialize_push(self)?;
         // NOTE: cannot use static assertion as size is dependent on runtime data accumulation.
@@ -1946,6 +1950,7 @@ where
     }
 
     fn serialize(&self) -> Result<Self::Buffer, Error> {
+        use io::Buffer;
         let size = self.size()?.get().try_into()?;
         let buf = vec![0u8; size].serialize_push(self)?;
         // NOTE: cannot use static assertion as size is dependent on runtime data accumulation.
@@ -1978,6 +1983,7 @@ where
     }
 
     fn serialize(&self) -> Result<Self::Buffer, Error> {
+        use io::Buffer;
         let size = self.size()?.get().try_into()?;
         let buf = vec![0u8; size].serialize_push(self)?;
         // NOTE: cannot use static assertion as size is dependent on runtime data accumulation.
@@ -2061,6 +2067,7 @@ impl<I> Serialize for Accumulator<I> {
     }
 
     fn serialize(&self) -> Result<Self::Buffer, Error> {
+        use io::Buffer;
         let size = self.size()?.get().try_into()?;
         let buf = vec![0u8; size].serialize_push(self)?;
         // NOTE: cannot use static assertion as size is dependent on runtime data accumulation.
@@ -2073,6 +2080,7 @@ impl<I> Segment for Accumulator<I> {
     const VARIANT: Variant = Variant::Data;
 
     fn wrap(&self, offset: u64) -> Result<Vec<u8>, Error> {
+        use io::Buffer;
         const ADD: u64 = { Header::SIZE + size_of::<u64>() } as u64;
         let pad = offset.checked_add(Self::HEADER as u64).ok_or(Error::Zero)?.pad()?;
         let size = self.size()?.get().checked_add(pad as u64).ok_or(Error::Zero)?;
