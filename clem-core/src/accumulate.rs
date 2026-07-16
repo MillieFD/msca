@@ -563,6 +563,7 @@ pub trait Accumulate<I>: Serialize {
 
     /// Returns the number of accumulated [`items`](I).
     fn count(&self) -> u64;
+}
 
     /// Returns `true` if **any** accumulated [`item`](I) is **bit-identical** to the provided item.
     fn contains(&self, item: &I) -> bool;
