@@ -1,6 +1,6 @@
 /*
-Project: clem
-GitHub: https://github.com/MillieFD/clem
+Project: msca
+GitHub: https://github.com/MillieFD/msca
 
 BSD 3-Clause License, Copyright (c) 2026, Amelia Fraser-Dale
 
@@ -14,7 +14,7 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //!
 //! ### Unfolding Arbitrary Types
 //!
-//! [`clem`](crate) understands **platform-agnostic** primitive types such as `u32` or `f64` out of
+//! [`msca`](crate) understands **platform-agnostic** primitive types such as `u32` or `f64` out of
 //! the box. Platform-dependent types such as `usize` are deliberately omitted to ensure file
 //! portability. Arbitrary user-defined algebraic data types such as structs and enums are
 //! [unfolded](Unfold) into their primitive [components](Type).
@@ -25,7 +25,7 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //! ### Unsized Types
 //!
 //! It is not possible to predetermine the disk space required by each instance of an unsized type;
-//! there is no guarantee that two [`Vec<T>`] contain the same number of elements. [`Clem`](crate)
+//! there is no guarantee that two [`Vec<T>`] contain the same number of elements. [`msca`](crate)
 //! therefore unfolds unsized types into:
 //!
 //! 1. Columnar `offsets` bufffer describing boundaries.
@@ -65,7 +65,7 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //!
 //! Readers can directly query data from a named field – without reconstructing the full type – by
 //! reading only the required columnar data buffer. Each schema segment encodes **one** schema, and
-//! each `clem` file requires at least **one** schema segment. Multimodality and schema evolution
+//! each `msca` file requires at least **one** schema segment. Multimodality and schema evolution
 //! are achieved by appending additional schema segments.
 
 use std::collections::btree_map::{BTreeMap, Entry, OccupiedEntry};
@@ -616,7 +616,7 @@ pub enum Error {
     NotFound,
     /// Underlying [`Error`](number::Error) from a numerical operation or conversion.
     Number(number::Error),
-    /// The requested type is not supported by this version of [`clem`](crate).
+    /// The requested type is not supported by this version of [`msca`](crate).
     ///
     /// Some types are deliberately omitted. Please read the [type documentation](Type) for more
     /// details. If you think a type should be supported, please open a new GitHub feature request
@@ -984,12 +984,13 @@ where
 /// A platform-agnostic **type** that can be unfolded into its primitive [components](Type) using
 /// an [`Unfolder`].
 ///
-/// [`Clem`](crate) provides `Unfold` implementations for many Rust primitive and standard library
-/// types. The complete list is [here](crate::schema). All of these types can be unfolded using clem
+/// [`Msca`](crate) provides `Unfold` implementations for many Rust primitive and standard library
+/// types. The complete list is [here](crate::schema). All of these types can be unfolded using msca
 /// out of the box. Some types are deliberately omitted to preserve cross-platform support.
 ///
-/// Clem provides the [`#[derive(unfold)]`][1] procedural macro to automatically generate `Unfold`
-/// implementations for structs and enums in your program. See the [user guide][2] for more details.
+/// The `msca-derive` crate provides a [`#[derive(unfold)]`][1] procedural macro to automatically
+/// generate `Unfold` implementations for structs and enums in your program. See the [user guide][2]
+/// for more details.
 ///
 /// Third-party crates are encouraged to implement `Unfold` on their public types to enable seamless
 /// integration with on-disk storage.
