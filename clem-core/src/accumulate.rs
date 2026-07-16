@@ -1161,23 +1161,6 @@ impl<const N: usize> Serialize for [u8; N] {
     }
 }
 
-impl Serialize for char {
-    type Buffer = [u8; size_of::<Self>()];
-
-    fn size(&self) -> Result<NonZeroU64, Error> {
-        { size_of::<Self>() as u64 }.try_into().map_err(Error::from)
-    }
-
-    fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
-        static_assertions::assert_eq_size!(char, u32);
-        u32::from(*self).serialize_into(buf)
-    }
-
-    fn serialize(&self) -> Result<Self::Buffer, Error> {
-        u32::from(*self).serialize()
-    }
-}
-
 impl Serialize for bool {
     type Buffer = [u8; size_of::<Self>()];
 
@@ -1546,7 +1529,7 @@ impl Serialize for f64 {
     }
 }
 
-impl Serialize for Option<char> {
+impl Serialize for char {
     type Buffer = [u8; size_of::<Self>()];
 
     fn size(&self) -> Result<NonZeroU64, Error> {
@@ -1554,12 +1537,12 @@ impl Serialize for Option<char> {
     }
 
     fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
-        // None writes u32::MAX (outside the valid scalar range).
-        self.map_or(u32::MAX, u32::from).serialize_into(buf)
+        static_assertions::assert_eq_size!(char, u32);
+        u32::from(*self).serialize_into(buf)
     }
 
     fn serialize(&self) -> Result<Self::Buffer, Error> {
-        self.map_or(u32::MAX, u32::from).serialize()
+        u32::from(*self).serialize()
     }
 }
 
@@ -1733,6 +1716,23 @@ impl Serialize for Option<NonZeroI128> {
     }
 }
 
+impl Serialize for Option<char> {
+    type Buffer = [u8; size_of::<Self>()];
+
+    fn size(&self) -> Result<NonZeroU64, Error> {
+        { size_of::<Self>() as u64 }.try_into().map_err(Error::from)
+    }
+
+    fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
+        // None writes u32::MAX (outside the valid scalar range).
+        self.map_or(u32::MAX, u32::from).serialize_into(buf)
+    }
+
+    fn serialize(&self) -> Result<Self::Buffer, Error> {
+        self.map_or(u32::MAX, u32::from).serialize()
+    }
+}
+
 impl<T> Serialize for Vec<T>
 where
     T: Serialize,
@@ -1765,7 +1765,6 @@ where
         Ok(buf)
     }
 }
-
 impl<K, I> Serialize for BTreeMap<K, I>
 where
     K: Serialize + Ord,
