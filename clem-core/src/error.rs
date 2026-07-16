@@ -133,7 +133,10 @@ impl From<number::Error> for Error {
 
 impl From<query::Error> for Error {
     fn from(error: query::Error) -> Self {
-        Self::Query(error)
+        match error {
+            query::Error::Number(e) => Self::Number(e),
+            other => Self::Query(other),
+        }
     }
 }
 
