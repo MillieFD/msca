@@ -347,22 +347,26 @@ impl Buffer {
     /// - [`Buffer::Detailed`] is evaluated using `min` and `max` statistics resolved from disk.
     /// - [`Buffer::Compact`] and [`Buffer::Basic`] carry no statistics; never provably disjoint.
     ///
-    /// Compact buffers always return `false` from this function; the repeated value is instead
-    /// [evaluated][2] **exactly once** during [`Stream`](crate::Stream) initialisation.
+    /// A compact buffer [`Sector`] spans exactly **one** on-disk item that is resolved and
+    /// evaluated at read-time. The compact body may contain a [`Composite`][2] item that is
+    /// computationally-expensive to [`Deserialize`]. Compact buffer exclusion is therefore assessed
+    /// through the common [`Reader`](crate::Reader) pipeline instead of the bare statistic path
+    /// used here. This behaviour may change in future releases.
     ///
     /// ### ⚠️ Safety
     ///
-    /// This function is marked as [unsafe][2] due to the potential for undefined behaviour if the
+    /// This function is marked as [unsafe][3] due to the potential for undefined behaviour if the
     /// requested type [`I`] does not match the actual [`Column`](Column) [`Type`].
     ///
     /// ### Errors
     ///
-    /// - [`Error::Truncated`][3] if a statistic sector extends beyond the memory map
+    /// - [`Error::Truncated`][4] if a statistic sector extends beyond the memory map
     /// - [`io::Error`] if an error occurs while [deserializing](Deserialize) a statistic from disk.
     ///
     /// [1]: RangeBounds
-    /// [2]: https://doc.rust-lang.org/book/ch20-01-unsafe-rust.html
-    /// [3]: io::Error::Truncated
+    /// [2]: crate::read::Composite
+    /// [3]: https://doc.rust-lang.org/book/ch20-01-unsafe-rust.html
+    /// [4]: io::Error::Truncated
     pub(crate) unsafe fn disjoint<I, B>(&self, bounds: &B, mmap: &Mmap) -> Result<bool, io::Error>
     where
         B: RangeBounds<I>,
