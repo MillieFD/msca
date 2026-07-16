@@ -1,6 +1,6 @@
 /*
-Project: clem
-GitHub: https://github.com/MillieFD/clem
+Project: msca
+GitHub: https://github.com/MillieFD/msca
 
 BSD 3-Clause License, Copyright (c) 2026, Amelia Fraser-Dale
 
@@ -14,7 +14,7 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //!
 //! ### Segment Composition
 //!
-//! A [clem](crate) file is partitioned into self-describing **segments** which are immutable once
+//! A [msca](crate) file is partitioned into self-describing **segments** which are immutable once
 //! written. Each segment begins with a minimal header, consisting of a [`variant: u8`](Variant)
 //! identifier and [`length: NonZeroU64`](NonZeroU64), followed by a variant-specific payload.
 //!
@@ -93,7 +93,7 @@ impl Serialize for Header {
 mod variant {
     //! This module defines the segment [`Variant`] identifier and associated parsing [`Error`].
     //!
-    //! A [clem](crate) file is partitioned into self-describing **segments** which are immutable
+    //! A [msca](crate) file is partitioned into self-describing **segments** which are immutable
     //! once written. Each segment begins with a single [`Variant`] byte to identify the segment
     //! type and payload structure. Readers dispatch on the variant byte to specific decoders.
 
