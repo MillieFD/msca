@@ -328,6 +328,15 @@ impl Buffer {
         }
     }
 
+    /// Returns the [`Sector`] recorded in [`self`](Buffer).
+    pub(crate) const fn sector(&self) -> &Sector {
+        match self {
+            Buffer::Compact { buffer, .. }
+            | Buffer::Basic { buffer, .. }
+            | Buffer::Detailed { buffer, .. } => buffer,
+        }
+    }
+
     /// Returns `true` if [`self`](Buffer) is provably disjoint from the specified [`Bounds`][1].
     ///
     /// - [`Buffer::Detailed`] is evaluated using `min` and `max` statistics resolved from disk.
