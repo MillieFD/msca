@@ -1154,6 +1154,22 @@ impl<'de> Deserialize<'de> for char {
     }
 }
 
+impl<'de> Deserialize<'de> for String {
+    type Ok = Self;
+
+    /// Consumes the provided source into one UTF8 [`String`].
+    ///
+    /// ### Errors
+    ///
+    /// Returns [`Error::Utf8`] if the source bytes are not valid UTF8.
+    ///
+    /// Refer to the [trait documentation](Deserialize) for more information.
+    fn deserialize(src: &mut &'de [u8]) -> Result<Self, Error> {
+        // NOTE: consumes the entire source; the byte slice must be sized externally
+        <&[u8]>::deserialize(src).map(str::from_utf8)?.map(str::to_owned).map_err(Error::from)
+    }
+}
+
 impl<'de> Deserialize<'de> for Option<num::NonZeroU8> {
     type Ok = Self;
 
@@ -1255,23 +1271,6 @@ impl<'de> Deserialize<'de> for Option<char> {
         }
     }
 }
-
-impl<'de> Deserialize<'de> for String {
-    type Ok = Self;
-
-    /// Consumes the provided source into one UTF8 [`String`].
-    ///
-    /// ### Errors
-    ///
-    /// Returns [`Error::Utf8`] if the source bytes are not valid UTF8.
-    ///
-    /// Refer to the [trait documentation](Deserialize) for more information.
-    fn deserialize(src: &mut &'de [u8]) -> Result<Self, Error> {
-        // NOTE: consumes the entire source; the byte slice must be sized externally
-        <&[u8]>::deserialize(src).map(str::from_utf8)?.map(str::to_owned).map_err(Error::from)
-    }
-}
-
 impl<'de> Deserialize<'de> for [u8] {
     type Ok = &'de [u8];
 
