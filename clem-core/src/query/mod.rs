@@ -12,9 +12,9 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //!
 //! ---
 //!
-//! Each new [`Query`] begins with **every** column and **every** buffer from the specified schema.
-//! Individual [columns](column::Column) can be resolved and filtered to subtractively reduce the
-//! result set. Some filters are evaluated eagerly **before** file IO; removing individual
+//! Each new [`Query`] begins with every [`Column`](column::Column) and every [`Buffer`] from the
+//! specified [`Schema`]. Individual columns can be resolved and filtered to subtractively reduce
+//! the result set. Some filters are evaluated eagerly **before** file IO; removing individual
 //! [buffers](Buffer) using [manifest] statistics. Other filters are attached to read-time
 //! [adapters](column::Adapter) and evaluated lazily **during** [deserialization](Deserialize).
 //!
