@@ -130,6 +130,24 @@ impl<I> Accumulator<I> {
     pub(crate) const HEADER: usize = Header::SIZE
         + size_of::<NonZeroU64>() // corresponding schema segment offset
         + size_of::<NonZeroU64>(); // number of items in this segment (count)
+
+    /// Returns the exact number of bytes required to encode the data segment body for `self`;
+    /// including segment metadata and metadata→body [alignment](Align) bytes.
+    ///
+    /// ### ⚠️ Caution
+    ///
+    /// This function **cannot** predict the exact on-disk segment size. The number of
+    /// header→metadata alignment bytes is determined by the absolute [`Segment`] offset. This
+    /// function also excludes the segment [`Header`] and [`Checksum`]. Refer to [`Segment::wrap`]
+    /// for an accurate on-disk representation.
+    ///
+    /// ### Errors
+    ///
+    /// Returns [`Error::Zero`] if the size overflows `u64` or the [`Accumulator`] is empty.
+    fn size(&self) -> Result<NonZeroU64, Error> {
+        let meta = { size_of::<NonZeroU64>() + size_of::<NonZeroU64>() } as u64;
+        self.data.size()?.align()?.checked_add(meta).and_then(NonZeroU64::new).ok_or(Error::Zero)
+    }
 }
 
 /// Returns a new empty [`Accumulator`] for the same [`Schema`][1] and [`Item`](I) type.
