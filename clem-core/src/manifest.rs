@@ -16,6 +16,7 @@ use std::hash::{Hash, Hasher};
 use std::num::NonZeroU64;
 use std::ops::RangeBounds;
 
+use funty::Fundamental;
 use memmap2::Mmap;
 use minicbor::{CborLen, Decode, Encode};
 use smol::io::{AsyncRead, AsyncReadExt, AsyncSeek};
@@ -106,6 +107,21 @@ impl Manifest {
 
 impl Segment for Manifest {
     const VARIANT: Variant = Variant::Manifest;
+
+    #[allow(unused_variables, reason = "manifest segment is not aligned")]
+    fn wrap(&self, offset: u64) -> Result<Vec<u8>, Error> {
+        use crate::io::Buffer;
+        const PREFIX: usize = Header::SIZE + size_of::<u64>(); // Σ bytes before the segment body
+        let size = self.size()?.get();
+        let full = size.as_usize().checked_add(PREFIX).ok_or(Error::Zero)?;
+        let mut buf = vec![u8::MIN; full];
+        buf.as_mut_slice()
+            .serialize_push(&{ Self::VARIANT as u8 })?
+            .serialize_push(&size)?
+            .serialize_push(self)?;
+        Self::checksum(&mut buf)?;
+        Ok(buf)
+    }
 }
 
 impl Checksum for Manifest {}
