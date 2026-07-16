@@ -255,7 +255,7 @@ mod variant {
 /// zero-filled padding between the segment body and [`Checksum`].
 ///
 /// Refer to the [module level documentation](self) for more details.
-pub(crate) trait Segment: Checksum + Serialize + Sized {
+pub(crate) trait Segment: Checksum + Sized {
     /// On-disk variant identifier for [`Self`]. Stored in the first byte of the segment header.
     const VARIANT: Variant;
 
@@ -266,19 +266,7 @@ pub(crate) trait Segment: Checksum + Serialize + Sized {
     /// Returns [`Error::Zero`][1] on `u64` or `usize` overflow.
     ///
     /// [1]: number::Error::Zero
-    fn wrap(&self, offset: u64) -> Result<Vec<u8>, number::Error> {
-        let size = self.size()?.get();
-        let full = { size as usize }
-            .checked_add(Header::SIZE + size_of::<u64>())
-            .ok_or(number::Error::Zero)?;
-        let mut buf = vec![u8::MIN; full];
-        buf.as_mut_slice()
-            .serialize_push(&{ Self::VARIANT as u8 })?
-            .serialize_push(&size)?
-            .serialize_push(self)?;
-        Self::checksum(&mut buf)?;
-        Ok(buf)
-    }
+    fn wrap(&self, offset: u64) -> Result<Vec<u8>, number::Error>;
 
     /// Write [`Self`] to the [`file`](F). Returns the written [`Sector`] for subsequent function
     /// chaining.
