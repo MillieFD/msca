@@ -184,6 +184,7 @@ name = "clem-core"
 version = "0.1.0"
 dependencies = [
  "bitvec",
+ "funty",
  "log",
  "memmap2",
  "minicbor",

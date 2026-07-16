@@ -17,6 +17,7 @@ unwrap_used = "deny"
 
 [dependencies]
 bitvec = "1.0"
+funty = "2.0"
 memmap2 = "0.9"
 smol = "2.0"
 static_assertions = "1.1"
