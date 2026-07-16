@@ -228,7 +228,7 @@ impl Serialize for Schema {
 impl Segment for Schema {
     const VARIANT: Variant = Variant::Schema;
 
-    #[allow(unused_variables, reason = "schema segment does not align to a 64-bit boundary")]
+    #[allow(unused_variables, reason = "manifest segment is not aligned")]
     fn wrap(&self, offset: u64) -> Result<Vec<u8>, number::Error> {
         let size = self.size()?.get();
         let full = { size as usize }
