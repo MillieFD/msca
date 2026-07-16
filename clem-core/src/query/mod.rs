@@ -151,5 +151,60 @@ impl Column {
             false => Error::Type { expect, actual: self.ty.clone() }.into(),
         }
     }
+
+    /// Returns [`Error::Type`] if the requested [`Type`] does not match the on-disk [`Column`]
+    /// type; otherwise returns a mutable reference to [`self`](Column) for method chaining.
+    ///
+    /// ### Guidance
+    ///
+    /// Refer to [`Column::accepts`] if a direct **or** nested inner-type match is permissible. Use
+    /// [`Column::exact`] if an immutable reference is required for downstream functions.
+    pub fn exact_mut<I>(&mut self) -> Result<&mut Self, Error>
+    where
+        Schema: Unfolder<I>,
+    {
+        self.exact::<I>()?;
+        Ok(self)
+    }
+
+    /// Returns [`Error::Type`] if the requested [`Type`] does not match the on-disk [`Column`]
+    /// type **or** nested inner subtype; otherwise returns an immutable reference to
+    /// [`self`](Column) for method chaining.
+    ///
+    /// ### Guidance
+    ///
+    /// Refer to [`Type::exact`] if a direct non-nested match is required. Use
+    /// [`Column::accepts_mut`] if a mutable reference is required for downstream functions.
+    pub fn accepts<I>(&self) -> Result<&Self, Error>
+    where
+        Schema: Unfolder<I>,
+    {
+        let inner = Schema::unfold();
+        match self.ty == inner || matches!(&self.ty, Type::Option { subtype: s } if **s == inner) {
+            true => Ok(self),
+            false => Error::Type { expect: inner, actual: self.ty.clone() }.into(),
+        }
+    }
+
+    /// Returns [`Error::Type`] if the requested [`Type`] does not match the on-disk [`Column`]
+    /// type **or** nested inner subtype; otherwise returns a mutable reference to [`self`](Column)
+    /// for method chaining.
+    ///
+    /// ### Guidance
+    ///
+    /// Refer to [`Type::exact`] if a direct non-nested match is required. Use [`Column::accepts`]
+    /// if an immutable reference is required for downstream functions.
+    pub fn accepts_mut<I>(&mut self) -> Result<&mut Self, Error>
+    where
+        Schema: Unfolder<I>,
+    {
+        self.accepts()?;
+        Ok(self)
+    }
+
+    /// Map the provided [`Key`](String) to a new empty [`Column`].
+    pub(crate) fn map(entry: (&String, &manifest::Column)) -> (String, Self) {
+        (entry.0.clone(), entry.1.clone().into())
+    }
 }
 }
