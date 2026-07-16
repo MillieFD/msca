@@ -1127,42 +1127,6 @@ where
     }
 }
 
-/* --------------------------------------------------------------------- Buffer Trait Definition */
-
-/// A **buffer** that can hold the serialized byte representation of a value.
-///
-/// Blanket implementations are provided for stack-allocated byte arrays and heap-allocated byte
-/// vectors. This design defines a fixed-size buffer for types with a known size at compile time,
-/// while facilitating dynamic buffer sizing for types that require heap allocation.
-pub trait Buffer: AsRef<[u8]> + AsMut<[u8]> + Into<Vec<u8>> {
-    /// [`Serialize`] the provided [`item`](I) and append into [`self`](Buffer).
-    ///
-    /// Writing always begins at the **start** of the buffer; chained calls overwrite. Chain
-    /// sequential writes through [`Serialize::serialize_into`], which returns the advanced slice.
-    fn serialize_push<I: Serialize>(self, item: &I) -> Result<Self, Error>;
-}
-
-/* ----------------------------------------------------------------- Buffer Trait Implementation */
-
-impl Buffer for &mut [u8] {
-    fn serialize_push<I: Serialize>(self, item: &I) -> Result<Self, Error> {
-        item.serialize_into(self)
-    }
-}
-
-impl<const N: usize> Buffer for [u8; N] {
-    fn serialize_push<I: Serialize>(mut self, item: &I) -> Result<Self, Error> {
-        item.serialize_into(&mut self)?;
-        Ok(self)
-    }
-}
-
-impl Buffer for Vec<u8> {
-    fn serialize_push<I: Serialize>(self, item: &I) -> Result<Self, Error> {
-        item.extend(self)
-    }
-}
-
 /* ------------------------------------------------------------------ Serialize Trait Definition */
 
 /// A **type** that can be serialized into a canonical [`clem`](crate) binary representation for
