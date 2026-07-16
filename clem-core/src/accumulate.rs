@@ -596,10 +596,6 @@ impl<I> Accumulate<I> for Accumulator<I> {
     fn count(&self) -> u64 {
         self.data.count()
     }
-
-    fn contains(&self, item: &I) -> bool {
-        self.data.contains(item)
-    }
 }
 
 impl Accumulate<bool> for BitVec {
@@ -617,10 +613,6 @@ impl Accumulate<bool> for BitVec {
 
     fn count(&self) -> u64 {
         BitVec::len(self) as u64
-    }
-
-    fn contains(&self, item: &bool) -> bool {
-        if *item { self.any() } else { self.not_all() }
     }
 }
 
@@ -643,10 +635,6 @@ where
     fn count(&self) -> u64 {
         Vec::len(self) as u64
     }
-
-    fn contains(&self, item: &I) -> bool {
-        self.iter().any(|i| BitMatch::eq(i, item))
-    }
 }
 
 impl<I> Accumulate<Option<I>> for OptInSitu<I>
@@ -668,10 +656,6 @@ where
 
     fn count(&self) -> u64 {
         self.data.count()
-    }
-
-    fn contains(&self, item: &Option<I>) -> bool {
-        self.data.contains(item)
     }
 }
 
@@ -701,13 +685,6 @@ where
     fn count(&self) -> u64 {
         self.mask.len() as u64
     }
-
-    fn contains(&self, item: &Option<I>) -> bool {
-        match item {
-            None => self.mask.not_all(),
-            Some(i) => self.data.contains(i),
-        }
-    }
 }
 
 impl<I> Accumulate<Vec<I>> for Seq<I>
@@ -733,9 +710,6 @@ where
     fn count(&self) -> u64 {
         self.ends.len() as u64
     }
-
-    fn contains(&self, item: &Vec<I>) -> bool {
-    }
 }
 
 impl Accumulate<String> for Seq<u8> {
@@ -754,10 +728,6 @@ impl Accumulate<String> for Seq<u8> {
 
     fn count(&self) -> u64 {
         Accumulate::<Vec<u8>>::count(self)
-    }
-
-    fn buffers(&self, offset: u64, columns: &mut Columns) -> Result<u64, Error> {
-        Accumulate::<Vec<u8>>::buffers(self, offset, columns)
     }
 }
 
@@ -795,11 +765,6 @@ where
     fn count(&self) -> u64 {
         self.ends.len() as u64
     }
-
-    fn contains(&self, item: &Option<Vec<I>>) -> bool {
-        match item {
-        }
-    }
 }
 
 impl Accumulate<Option<String>> for OptSeq<u8> {
@@ -818,9 +783,6 @@ impl Accumulate<Option<String>> for OptSeq<u8> {
 
     fn count(&self) -> u64 {
         Accumulate::<Option<Vec<u8>>>::count(self)
-    }
-
-    fn contains(&self, item: &Option<String>) -> bool {
     }
 }
 
@@ -842,13 +804,6 @@ where
 
     fn count(&self) -> u64 {
         self.0.count()
-    }
-
-    fn contains(&self, item: &Option<Option<B>>) -> bool {
-        match item {
-            Some(i) => self.0.contains(i),
-            None => self.0.contains(&None),
-        }
     }
 }
 
@@ -882,14 +837,6 @@ where
             Self::Empty => u64::MIN,
             Self::Compact { count, .. } => *count,
             Self::Many(acc) => acc.count(),
-        }
-    }
-
-    fn contains(&self, other: &I) -> bool {
-        match self {
-            Self::Empty => false,
-            Self::Compact { item, .. } => item.eq(other),
-            Self::Many(acc) => acc.contains(other),
         }
     }
 }
