@@ -207,4 +207,10 @@ impl Column {
         (entry.0.clone(), entry.1.clone().into())
     }
 }
+
+impl From<manifest::Column> for Column {
+    fn from(src: manifest::Column) -> Self {
+        Self { ty: src.ty, buffers: src.buffers }
+    }
+}
 }
