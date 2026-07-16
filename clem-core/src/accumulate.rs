@@ -1067,18 +1067,18 @@ where
         Box::new(buf)
     }
 
-    fn buffers(&self, offset: u64, columns: &mut Columns) -> Result<u64, Error> {
+    fn buffers(&self, offset: u64, columns: &mut Columns) -> Result<u64, schema::Error> {
         if let Some(column) = columns.next() {
             let sector = Sector {
                 offset: offset.checked_add(SizedBuf::<I>::PREFIX).ok_or(Error::Zero)?,
                 size: self.size()?,
             };
-            let count = self.count().try_into()?;
+            let count = self.count().try_into().map_err(Error::from)?;
             let buf = self.describe(sector, count)?;
             column.buffers.push(buf);
-            sector.next().ok_or(Error::Zero)?.align()
+            sector.next().ok_or(Error::Zero)?.align().map_err(Into::into)
         } else {
-            Error::Zero.into() // expected column is not present
+            schema::Error::NotFound.into() // expected column is not present
         }
     }
 }
