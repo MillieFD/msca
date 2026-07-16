@@ -426,6 +426,22 @@ where
     }
 }
 
+impl<I> OptSeq<I>
+where
+    I: Unfold,
+{
+    /// Returns an [`Iterator`] over [`Range`] instances that each describe the location of one item
+    /// within the concatenated `data` sub-buffer, where item `n` spans `ends[n - 1] → ends[n]` with
+    /// an implicit leading `0`.
+    ///
+    /// Refer to the [optional unsized accumulator](OptSeq) documentation for more details.
+    fn bounds(&self) -> impl Iterator<Item = Range<u64>> {
+        let ubs = self.ends.iter().copied().filter(|&end| end != u64::MAX);
+        let lbs = ubs.clone();
+        iter::once(u64::MIN).chain(lbs).zip(ubs).map(|b| b.0..b.1)
+    }
+}
+
 /// Stateless type-level wrapper that flattens nested types on [`push`](Accumulate::push). All
 /// storage lives in the inner accumulator.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
