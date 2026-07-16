@@ -38,14 +38,18 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 #![doc = include_str!("../../../doc/query-filters.md")]
 #![doc = include_str!("../../../doc/query-columns.md")]
 
-use std::collections::BTreeMap;
+use std::collections::hash_map::Entry;
+use std::collections::{BTreeMap, HashMap};
 use std::fmt::{self, Display};
+use std::hash::Hash;
 use std::iter;
 use std::num::{self, TryFromIntError};
 use std::ops::{Bound, RangeBounds};
 use std::sync::Arc;
 
+use funty::Unsigned;
 use memmap2::Mmap;
+use xxhash_rust::xxh3::Xxh3Builder;
 
 use crate::io::{self, Deserialize};
 use crate::manifest;
@@ -92,7 +96,7 @@ impl Query {
     /// - [`Error::Io`] if a deserialization failure occurs.
     ///
     /// [1]: crate::dataset::Dataset
-    fn committed<I, N>(&self) -> Result<HashMap<I, N, Xxh3Builder>, Error>
+    fn unique<I, N>(&self) -> Result<HashMap<I, N, Xxh3Builder>, Error>
     where
         N: Unsigned,
         I: Read + Eq + Hash + 'static,
