@@ -304,10 +304,6 @@ mod tests {
         fn count(&self) -> u64 {
             self.v.count()
         }
-
-        fn contains(&self, item: &Row) -> bool {
-            self.v.contains(&item.v)
-        }
     }
 
     impl Describe<Row> for Acc {
