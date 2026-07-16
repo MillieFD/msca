@@ -361,6 +361,11 @@ impl<I> Seq<I>
 where
     I: Unfold + Clone + 'static,
 {
+    /// Returns an [`Iterator`] over [`Range`] instances that each describe the location of a single
+    /// item within the concatenated `data` sub-buffer, where item `n` spans `ends[n - 1] → ends[n]`
+    /// with an implicit leading `0`.
+    ///
+    /// Refer to the [unsized accumulator documentation](Seq) for more details.
     fn bounds(&self) -> impl Iterator<Item = Range<u64>> {
         let ubs = self.ends.iter().copied();
         let lbs = ubs.clone();
