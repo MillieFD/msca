@@ -798,12 +798,6 @@ impl BitMatch for bool {
     }
 }
 
-impl BitMatch for char {
-    fn eq(&self, other: &Self) -> bool {
-        self == other
-    }
-}
-
 impl BitMatch for u8 {
     fn eq(&self, other: &Self) -> bool {
         self == other
@@ -938,6 +932,18 @@ impl BitMatch for f64 {
     }
 }
 
+impl BitMatch for char {
+    fn eq(&self, other: &Self) -> bool {
+        self == other
+    }
+}
+
+impl BitMatch for String {
+    fn eq(&self, other: &Self) -> bool {
+        self.as_bytes() == other.as_bytes()
+    }
+}
+
 impl<I> BitMatch for Option<I>
 where
     I: BitMatch,
@@ -958,13 +964,6 @@ where
         self.len() == other.len() && self.iter().zip(other).all(|both| both.0.eq(both.1))
     }
 }
-
-impl BitMatch for String {
-    fn eq(&self, other: &Self) -> bool {
-        self.as_bytes() == other.as_bytes()
-    }
-}
-
 /* --------------------------------------------------------------------- Unfold Trait Definition */
 
 /// A platform-agnostic **type** that can be unfolded into its primitive [components](Type) using
@@ -1057,11 +1056,6 @@ const_assert_ne!(size_of::<f64>(), size_of_opt::<f64>());
 impl Unfold for bool {
     type RawAcc = BitVec;
     type OptAcc = OptBitVec<Self>;
-}
-
-impl Unfold for char {
-    type RawAcc = Vec<Self>;
-    type OptAcc = OptInSitu<Self>;
 }
 
 impl Unfold for u8 {
@@ -1174,9 +1168,19 @@ impl Unfold for f64 {
     type OptAcc = OptBitVec<Self>;
 }
 
+impl Unfold for char {
+    type RawAcc = Vec<Self>;
+    type OptAcc = OptInSitu<Self>;
+}
+
+impl Unfold for String {
+    type RawAcc = accumulate::Seq<u8>;
+    type OptAcc = accumulate::OptSeq<u8>;
+}
+
 impl<I> Unfold for Option<I>
 where
-    I: Unfold + 'static,
+    I: Unfold,
 {
     type RawAcc = I::OptAcc;
     type OptAcc = accumulate::Flatten<I::OptAcc>;
@@ -1188,11 +1192,6 @@ where
 {
     type RawAcc = accumulate::Seq<I>;
     type OptAcc = accumulate::OptSeq<I>;
-}
-
-impl Unfold for String {
-    type RawAcc = accumulate::Seq<u8>;
-    type OptAcc = accumulate::OptSeq<u8>;
 }
 
 /* ------------------------------------------------------------------- Unfolder Trait Definition */
@@ -1211,159 +1210,12 @@ where
 
 /* --------------------------------------------------------------- Unfolder Trait Implementation */
 
-impl Unfolder<bool> for Schema {
+impl<I> Unfolder<I> for Schema
+where
+    I: AsType,
+{
     fn unfold() -> Type {
-        Type::Bool
-    }
-}
-
-impl Unfolder<char> for Schema {
-    fn unfold() -> Type {
-        Type::Char
-    }
-}
-
-impl Unfolder<String> for Schema {
-    fn unfold() -> Type {
-        Type::String
-    }
-}
-
-impl Unfolder<&str> for Schema {
-    fn unfold() -> Type {
-        Type::String
-    }
-}
-
-impl Unfolder<u8> for Schema {
-    fn unfold() -> Type {
-        Type::U8
-    }
-}
-
-impl Unfolder<u16> for Schema {
-    fn unfold() -> Type {
-        Type::U16
-    }
-}
-
-impl Unfolder<u32> for Schema {
-    fn unfold() -> Type {
-        Type::U32
-    }
-}
-
-impl Unfolder<u64> for Schema {
-    fn unfold() -> Type {
-        Type::U64
-    }
-}
-
-impl Unfolder<u128> for Schema {
-    fn unfold() -> Type {
-        Type::U128
-    }
-}
-
-impl Unfolder<num::NonZeroU8> for Schema {
-    fn unfold() -> Type {
-        Type::NZU8
-    }
-}
-
-impl Unfolder<num::NonZeroU16> for Schema {
-    fn unfold() -> Type {
-        Type::NZU16
-    }
-}
-
-impl Unfolder<num::NonZeroU32> for Schema {
-    fn unfold() -> Type {
-        Type::NZU32
-    }
-}
-
-impl Unfolder<num::NonZeroU64> for Schema {
-    fn unfold() -> Type {
-        Type::NZU64
-    }
-}
-
-impl Unfolder<num::NonZeroU128> for Schema {
-    fn unfold() -> Type {
-        Type::NZU128
-    }
-}
-
-impl Unfolder<i8> for Schema {
-    fn unfold() -> Type {
-        Type::I8
-    }
-}
-
-impl Unfolder<i16> for Schema {
-    fn unfold() -> Type {
-        Type::I16
-    }
-}
-
-impl Unfolder<i32> for Schema {
-    fn unfold() -> Type {
-        Type::I32
-    }
-}
-
-impl Unfolder<i64> for Schema {
-    fn unfold() -> Type {
-        Type::I64
-    }
-}
-
-impl Unfolder<i128> for Schema {
-    fn unfold() -> Type {
-        Type::I128
-    }
-}
-
-impl Unfolder<num::NonZeroI8> for Schema {
-    fn unfold() -> Type {
-        Type::NZI8
-    }
-}
-
-impl Unfolder<num::NonZeroI16> for Schema {
-    fn unfold() -> Type {
-        Type::NZI16
-    }
-}
-
-impl Unfolder<num::NonZeroI32> for Schema {
-    fn unfold() -> Type {
-        Type::NZI32
-    }
-}
-
-impl Unfolder<num::NonZeroI64> for Schema {
-    fn unfold() -> Type {
-        Type::NZI64
-    }
-}
-
-impl Unfolder<num::NonZeroI128> for Schema {
-    fn unfold() -> Type {
-        Type::NZI128
-    }
-}
-
-impl Unfolder<f32> for Schema {
-    fn unfold() -> Type {
-        Type::F32
-    }
-}
-
-impl Unfolder<f64> for Schema {
-    fn unfold() -> Type {
-        Type::F64
+        I::TYPE
     }
 }
 
@@ -1391,6 +1243,8 @@ where
 
 #[cfg(test)]
 mod tests {
+    use static_assertions::{assert_impl_all, assert_not_impl_any};
+
     use super::*;
 
     /// Reusing a [`Column`] name with an incompatible type is rejected as a [`Error::Collision`].
@@ -1426,6 +1280,34 @@ mod tests {
             Type::sequence(Type::U8),
             Type::Sequence { subtype: Box::new(Type::U8) }
         );
+    }
+
+    /// Every supported type names its own [`Type`], and only those types do. `usize` and `isize`
+    /// are deliberately omitted – their width varies by platform – so neither can name a [`Type`],
+    /// reach a column, or render a file non-portable.
+    #[test]
+    fn as_type_excludes_platform_dependent_widths() {
+        assert_impl_all!(u8: AsType, BitMatch, Unfold);
+        assert_impl_all!(f64: AsType, BitMatch, Unfold);
+        assert_impl_all!(bool: AsType, BitMatch, Unfold);
+        assert_impl_all!(char: AsType, BitMatch, Unfold);
+        assert_impl_all!(String: AsType, BitMatch, Unfold);
+        assert_impl_all!(num::NonZeroU64: AsType, BitMatch, Unfold);
+        assert_not_impl_any!(usize: AsType, BitMatch, Unfold);
+        assert_not_impl_any!(isize: AsType, BitMatch, Unfold);
+    }
+
+    /// Every [`AsType`] constant agrees with the [`Type`] the [`Unfolder`] blanket reports, so the
+    /// on-disk descriptor is fixed by the Rust type alone.
+    #[test]
+    fn as_type_drives_the_unfolder() {
+        assert_eq!(<Schema as Unfolder<u8>>::unfold(), Type::U8);
+        assert_eq!(<Schema as Unfolder<bool>>::unfold(), Type::Bool);
+        assert_eq!(<Schema as Unfolder<String>>::unfold(), Type::String);
+        assert_eq!(<Schema as Unfolder<f64>>::unfold(), Type::F64);
+        assert_eq!(u32::TYPE, Type::U32); // usable in a const context
+        const TY: Type = f32::TYPE;
+        assert_eq!(TY, Type::F32);
     }
 
     /// [`BitMatch::eq`] compares floating point values by exact bit pattern: a repeated
