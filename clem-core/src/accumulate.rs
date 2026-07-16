@@ -692,7 +692,7 @@ where
 
 impl<I> Accumulate<Vec<I>> for Seq<I>
 where
-    I: Clone + Unfold + 'static,
+    I: Unfold + 'static,
 {
     fn push(&mut self, item: Vec<I>) {
         let size = item.len() as u64;
@@ -736,7 +736,7 @@ impl Accumulate<String> for Seq<u8> {
 
 impl<I> Accumulate<Option<Vec<I>>> for OptSeq<I>
 where
-    I: Unfold + 'static,
+    I: Unfold,
 {
     fn push(&mut self, item: Option<Vec<I>>) {
         if let Some(i) = item {
@@ -1079,7 +1079,7 @@ where
 impl<I> FromIterator<Option<I>> for OptInSitu<I>
 where
     Option<I>: Serialize,
-    I: Copy + PartialOrd + 'static,
+    I: BitMatch + Copy + PartialOrd + Unfold + 'static,
 {
     fn from_iter<S>(src: S) -> Self
     where
@@ -1093,7 +1093,7 @@ where
 
 impl<I> FromIterator<Option<Vec<I>>> for OptSeq<I>
 where
-    I: Unfold + 'static,
+    I: Unfold,
 {
     fn from_iter<S>(src: S) -> Self
     where
@@ -1140,7 +1140,7 @@ pub trait Serialize {
     ///
     /// Fixed-size types can specify an appropriate array to leverage stack allocation. Unsized
     /// types should specify a heap-allocated buffer to accommodate dynamic sizing at runtime.
-    type Buffer: Buffer;
+    type Buffer: io::Buffer;
 
     /// Returns the exact number of bytes required to encode `self`.
     fn size(&self) -> Result<NonZeroU64, Error>;
