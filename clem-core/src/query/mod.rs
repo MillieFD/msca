@@ -54,3 +54,28 @@ use crate::schema::{number, Schema, Type, Unfolder};
 
 pub mod column;
 pub mod stream;
+
+/* --------------------------------------------------------------------------------------- Query */
+
+/// A composable query interface to [read](Read) data from any [msca](crate) file; initialised from
+/// [`Dataset::query`][1] and executed lazily when [`read`](Self::read) is iterated.
+///
+/// [`Query`] also provides a [`Column`](column::Column) factory for the specified [`Schema`].
+///
+/// Refer to the [module-level documentation](self) for implementation details.
+///
+/// [1]: crate::Dataset::query
+#[derive(Clone, Debug)]
+pub struct Query {
+    /// Read-only [memory map](Mmap) backed by the immutable segment region.
+    ///
+    /// Refer to the [safety documentation](io::File::mmap) for details.
+    pub(crate) mmap: Arc<Mmap>,
+    /// [`Column`] descriptors keyed by name; cloned from the [manifest] at construction.
+    ///
+    /// [`BTreeMap`] guarantees a deterministic column order for consistent [serialisation][1] and
+    /// [`Schema`] comparison.
+    ///
+    /// [1]: crate::accumulate::Serialize
+    pub(crate) columns: BTreeMap<String, Column>,
+}
