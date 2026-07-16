@@ -21,7 +21,7 @@ use std::hash::Hash;
 use std::path::Path;
 use std::sync::Arc;
 
-use funty::{Fundamental, Unsigned};
+use funty::Unsigned;
 use memmap2::Mmap;
 
 use crate::io::File;
