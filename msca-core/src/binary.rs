@@ -299,4 +299,36 @@ mod tests {
             assert_eq!(&bytes[abs..abs + 5], &[1, 2, 3, 4, 5]);
         });
     }
+
+    /// [`Extend`] moves bytes into the accumulator from any [`IntoIterator`] that yields [`u8`],
+    /// covering both a bare iterator and an owned collection.
+    #[test]
+    fn extend_moves_bytes() {
+        let mut bin = Bin::new("b");
+        bin.extend(1u8..=3); // Bare iterator
+        bin.extend([4u8, 5, 6]); // Owned IntoIterator
+        assert_eq!(bin.data, [1, 2, 3, 4, 5, 6]);
+        assert_eq!(bin.count(), 6);
+    }
+
+    /// Every binary segment body begins on an absolute 64-bit boundary, even when a preceding
+    /// segment leaves an odd byte count that must be padded before the next header.
+    #[test]
+    fn body_starts_aligned() {
+        smol::block_on(async {
+            let path = scratch("bin-align");
+            let mut file = File::create(&path).await.expect("Create failed");
+            for (name, size) in [("a", 1usize), ("b", 3), ("c", 7), ("d", 8)] {
+                let mut bin = Bin::new(name);
+                bin.push(vec![u8::MAX; size].as_slice());
+                file.write(bin).await.expect("Write failed");
+            }
+            for name in ["a", "b", "c", "d"] {
+                let sect = file.manifest.bins.get(name).expect("Bin missing");
+                assert_eq!(sect.offset % 8, 0, "{name} body misaligned");
+            }
+            drop(file);
+            std::fs::remove_file(&path).ok();
+        });
+    }
 }
