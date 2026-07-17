@@ -270,6 +270,29 @@ impl Dataset {
             columns,
         })
     }
+
+    /// Read the on-disk [`Binary`] segment body for the requested [`name`](String).
+    ///
+    /// Returns an immutable zero-copy byte [slice][1] borrowed directly from the [`Mmap`].
+    ///
+    /// ### Errors
+    ///
+    /// - [`Error::Manifest`][2] wrapping [`NotFound`][3] if the manifest does not contain a binary
+    ///   segment registered under the specified name.
+    /// - [`Error::Truncated`][4] if the recorded sector extends beyond the mapped region.
+    ///
+    /// [1]: https://doc.rust-lang.org/std/primitive.slice.html
+    /// [2]: io::Error::Manifest
+    /// [3]: manifest::Error::NotFound
+    /// [4]: io::Error::Truncated
+    pub fn binary(&self, name: &str) -> Result<&[u8], io::Error> {
+        self.file
+            .manifest
+            .bins
+            .get(name)
+            .ok_or_else(|| manifest::Error::NotFound { name: name.into() })?
+            .slice(&self.mmap)
+    }
 }
 
 /* --------------------------------------------------------------------------------------- Tests */
