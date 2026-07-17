@@ -100,7 +100,7 @@ pub struct Binary {
 }
 
 impl Binary {
-    /// Initialises a new empty [`Binary`] accumulator with the specified `name`.
+    /// Initialise a new empty [`Binary`] accumulator with the specified [`name`](N).
     pub fn new<N>(name: N) -> Self
     where
         String: From<N>,
