@@ -560,76 +560,6 @@ where
     }
 }
 
-/* ------------------------------------------------------------------- Describe Trait Definition */
-
-/// A type-erasable **column accumulator** that can be walked for [`manifest::Buffer`] descriptors.
-///
-/// This trait is implemented by the top-level per-column [`Buffer`] state machine. Implementations
-/// are also generated for external [`Composite`][1] types. Bare [staging buffers](Unfold::RawAcc)
-/// cannot be walked for descriptors.
-///
-/// ### Descriptor
-///
-/// `Describe` **walks** an [accumulator](Accumulate) and registers one descriptor per [`Column`];
-/// the corresponding [`Descriptor`] trait **produces** per-buffer descriptors.
-///
-/// - Describe → one-to-many (walk)
-/// - Descriptor → one-to-one (production)
-///
-/// [`Buffer`] implements **both** traits; walking the **one** contained accumulator to register the
-/// **one** produced descriptor. Generated composite accumulators contain one independent
-/// sub-accumulator per field and implement `Describe` **only**, threading the walk through each
-/// field. The in-memory staging buffers implement `Descriptor` **only**.
-///
-/// [1]: crate::read::Composite
-pub trait Describe<I>: Accumulate<I> + Serialize {
-    /// Returns a new empty instance of [`Self`] boxed as a [`BoxAcc`] trait object.
-    // NOTE: Buffer must be a growable Vec; compiler cannot predict the number of accumulated items
-    fn boxed(&self) -> BoxAcc<I>;
-
-    /// Generates one [`Buffer`](manifest::Buffer) descriptor per [`Column`] describing the
-    /// [accumulated](Accumulate) data. Each descriptor is appended to the corresponding
-    /// [`Manifest`] column entry.
-    ///
-    /// Returns the next available offset for subsequent buffers.
-    ///
-    /// ### Errors
-    ///
-    /// - [`Error::NotFound`][1] if the walk exhausts before every column is described.
-    /// - [`Error::Number`][2] if an offset overflows `u64` or the item count is zero.
-    ///
-    /// [1]: schema::Error::NotFound
-    /// [2]: schema::Error::Number
-    fn buffers(&self, offset: u64, columns: &mut Columns) -> Result<u64, schema::Error>;
-}
-
-/* --------------------------------------------------------------- Describe Trait Implementation */
-
-impl<I> Describe<I> for Buffer<I>
-where
-    I: BitMatch + Clone + Unfold + 'static,
-{
-    fn boxed(&self) -> BoxAcc<I> {
-        let buf = Self::default();
-        Box::new(buf)
-    }
-
-    fn buffers(&self, offset: u64, columns: &mut Columns) -> Result<u64, schema::Error> {
-        if let Some(column) = columns.next() {
-            let sector = Sector {
-                offset: offset.checked_add(SizedBuf::<I>::PREFIX).ok_or(Error::Zero)?,
-                size: self.size()?,
-            };
-            let count = self.count().try_into().map_err(Error::from)?;
-            let buf = self.describe(sector, count)?;
-            column.buffers.push(buf);
-            sector.next().ok_or(Error::Zero)?.align().map_err(Into::into)
-        } else {
-            schema::Error::NotFound.into() // expected column is not present
-        }
-    }
-}
-
 /* ----------------------------------------------------------------- Accumulate Trait Definition */
 
 /// An in-memory **data accumulator** that ingests [items](I) of the specified [`Type`][1] and
@@ -650,22 +580,6 @@ pub trait Accumulate<I> {
 
     /// Returns the number of accumulated [`items`](I).
     fn count(&self) -> u64;
-}
-
-    /// Returns `true` if **any** accumulated [`item`](I) is **bit-identical** to the provided item.
-    fn contains(&self, item: &I) -> bool;
-
-    /// Returns the minimum accumulated value, or [`None`] if the [`Item`](I) is not meaningfully
-    /// [orderable](PartialOrd).
-    fn min(&self) -> Option<I> {
-        None
-    }
-
-    /// Returns the maximum accumulated value, or [`None`] if the [`Item`](I) is not meaningfully
-    /// [orderable](PartialOrd).
-    fn max(&self) -> Option<I> {
-        None
-    }
 }
 
 /* ------------------------------------------------------------- Accumulate Trait Implementation */
@@ -931,119 +845,111 @@ where
     }
 }
 
-/* ------------------------------------------------------------- Descriptor Trait Implementation */
+/* ------------------------------------------------------------------- Describe Trait Definition */
 
-impl<I> Descriptor for Vec<I>
-where
-    I: PartialOrd + Copy,
-{
-    fn describe(&self, buffer: Sector, count: NonZeroU64) -> Result<manifest::Buffer, Error> {
-        self.detail(buffer, count)
-    }
-}
+/// A type-erasable **column accumulator** that can be walked for [`manifest::Buffer`] descriptors.
+///
+/// This trait is implemented by the top-level per-column [`Buffer`] state machine. Implementations
+/// are also generated for external [`Composite`][1] types. Bare [staging buffers](Unfold::RawAcc)
+/// cannot be walked for descriptors.
+///
+/// ### Descriptor
+///
+/// `Describe` **walks** an [accumulator](Accumulate) and registers one descriptor per [`Column`];
+/// the corresponding [`Descriptor`] trait **produces** per-buffer descriptors.
+///
+/// - Describe → one-to-many (walk)
+/// - Descriptor → one-to-one (production)
+///
+/// [`Buffer`] implements **both** traits; walking the **one** contained accumulator to register the
+/// **one** produced descriptor. Generated composite accumulators contain one independent
+/// sub-accumulator per field and implement `Describe` **only**, threading the walk through each
+/// field. The in-memory staging buffers implement `Descriptor` **only**.
+///
+/// [1]: crate::read::Composite
+pub trait Describe<I>: Accumulate<I> + Serialize {
+    /// Returns a new empty instance of [`Self`] boxed as a [`BoxAcc`] trait object.
+    // NOTE: Buffer must be a growable Vec; compiler cannot predict the number of accumulated items
+    fn boxed(&self) -> BoxAcc<I>;
 
-impl Descriptor for BitVec {
-    /// [`Detailed`][1] descriptor statistics are meaningless for `bool`: [`Buffer::Basic`][2]
-    /// implies that both `true`/`max` and `false`/`min` items were accumulated.
+    /// Generates one [`Buffer`](manifest::Buffer) descriptor per [`Column`] describing the
+    /// [accumulated](Accumulate) data. Each descriptor is appended to the corresponding
+    /// [`Manifest`] column entry.
     ///
-    /// Refer to the [trait documentation](Descriptor::describe) for more information.
-    ///
-    /// [1]: manifest::Buffer::Detailed
-    /// [2]: manifest::Buffer::Basic
-    fn describe(&self, buffer: Sector, count: NonZeroU64) -> Result<manifest::Buffer, Error> {
-        Ok(manifest::Buffer::Basic { buffer, count })
-    }
-}
-
-impl<I> Descriptor for OptInSitu<I>
-where
-    I: PartialOrd + Copy,
-{
-    fn describe(&self, buffer: Sector, count: NonZeroU64) -> Result<manifest::Buffer, Error> {
-        self.detail(buffer, count)
-    }
-}
-
-impl<I> Descriptor for OptBitVec<I>
-where
-    I: Unfold,
-    I::RawAcc: Extreme,
-{
-    fn describe(&self, buffer: Sector, count: NonZeroU64) -> Result<manifest::Buffer, Error> {
-        self.detail(buffer, count)
-    }
-}
-
-impl Descriptor for OptBitVec<bool> {
-    /// [`Detailed`][1] descriptor statistics are meaningless for `bool`: [`Buffer::Basic`][2]
-    /// implies that both `true`/`max` and `false`/`min` items were accumulated.
-    ///
-    /// Refer to the [trait documentation](Descriptor::describe) for more information.
-    ///
-    /// [1]: manifest::Buffer::Detailed
-    /// [2]: manifest::Buffer::Basic
-    fn describe(&self, buffer: Sector, count: NonZeroU64) -> Result<manifest::Buffer, Error> {
-        Ok(manifest::Buffer::Basic { buffer, count })
-    }
-}
-
-impl<I> Descriptor for Seq<I>
-where
-    I: Unfold,
-{
-    /// [Unsized][1] items do not currently support [`Detailed`][2] descriptor statistics.
-    ///
-    /// Refer to the [trait documentation](Descriptor::describe) for more information.
-    ///
-    /// [1]: https://doc.rust-lang.org/reference/dynamically-sized-types.html
-    /// [2]: manifest::Buffer::Detailed
-    fn describe(&self, buffer: Sector, count: NonZeroU64) -> Result<manifest::Buffer, Error> {
-        Ok(manifest::Buffer::Basic { buffer, count })
-    }
-}
-
-impl<I> Descriptor for OptSeq<I>
-where
-    I: Unfold,
-{
-    /// [Unsized][1] items do not currently support [`Detailed`][2] descriptor statistics.
-    ///
-    /// Refer to the [trait documentation](Descriptor::describe) for more information.
-    ///
-    /// [1]: https://doc.rust-lang.org/reference/dynamically-sized-types.html
-    /// [2]: manifest::Buffer::Detailed
-    fn describe(&self, buffer: Sector, count: NonZeroU64) -> Result<manifest::Buffer, Error> {
-        Ok(manifest::Buffer::Basic { buffer, count })
-    }
-}
-
-impl<A> Descriptor for Flatten<A>
-where
-    A: Descriptor,
-{
-    fn describe(&self, buffer: Sector, count: NonZeroU64) -> Result<manifest::Buffer, Error> {
-        self.0.describe(buffer, count)
-    }
-}
-
-impl<I> Descriptor for Buffer<I>
-where
-    I: Unfold,
-{
-    /// Maps each state onto its descriptor variant.
-    ///
-    /// Refer to the [trait documentation](Descriptor::describe) for more information.
+    /// Returns the next available offset for subsequent buffers.
     ///
     /// ### Errors
     ///
-    /// Returns [`Error::Zero`] for an [`Empty`](Buffer::Empty) accumulator; empty buffers are never
-    /// written to disk and must be caught before registration.
-    fn describe(&self, buffer: Sector, count: NonZeroU64) -> Result<manifest::Buffer, Error> {
-        match self {
-            Buffer::Empty => Error::Zero.into(),
-            Buffer::Compact { .. } => Ok(manifest::Buffer::Compact { buffer, count }),
-            Buffer::Many(acc) => acc.describe(buffer, count),
+    /// - [`Error::NotFound`][1] if the walk exhausts before every column is described.
+    /// - [`Error::Number`][2] if an offset overflows `u64` or the item count is zero.
+    ///
+    /// [1]: schema::Error::NotFound
+    /// [2]: schema::Error::Number
+    fn buffers(&self, offset: u64, columns: &mut Columns) -> Result<u64, schema::Error>;
+}
+
+/* --------------------------------------------------------------- Describe Trait Implementation */
+
+impl<I> Describe<I> for Buffer<I>
+where
+    I: BitMatch + Clone + Unfold + 'static,
+{
+    fn boxed(&self) -> BoxAcc<I> {
+        let buf = Self::default();
+        Box::new(buf)
+    }
+
+    fn buffers(&self, offset: u64, columns: &mut Columns) -> Result<u64, schema::Error> {
+        if let Some(column) = columns.next() {
+            let sector = Sector {
+                offset: offset.checked_add(SizedBuf::<I>::PREFIX).ok_or(Error::Zero)?,
+                size: self.size()?,
+            };
+            let count = self.count().try_into().map_err(Error::from)?;
+            let buf = self.describe(sector, count)?;
+            column.buffers.push(buf);
+            sector.next().ok_or(Error::Zero)?.align().map_err(Into::into)
+        } else {
+            schema::Error::NotFound.into() // expected column is not present
         }
+    }
+}
+
+/* ----------------------------------------------------------------- Accumulate Trait Definition */
+
+/// An in-memory **data accumulator** that ingests [items](I) of the specified [`Type`][1] and
+/// [serializes](Serialize) into an optimised on-disk format.
+///
+/// [1]: schema::Type
+pub trait Accumulate<I> {
+    /// Append one [`Item`](I) to the [accumulator](Self)
+    fn push(&mut self, item: I);
+
+    /// Reinitialise the [accumulator](Self) without writing to disk. All data is permanently lost.
+    ///
+    /// Note that this method may not affect the allocated capacity of the underlying storage.
+    fn discard(&mut self);
+
+    /// Returns `true` if the [accumulator](Self) contains no data.
+    fn is_empty(&self) -> bool;
+
+    /// Returns the number of accumulated [`items`](I).
+    fn count(&self) -> u64;
+}
+
+    /// Returns `true` if **any** accumulated [`item`](I) is **bit-identical** to the provided item.
+    fn contains(&self, item: &I) -> bool;
+
+    /// Returns the minimum accumulated value, or [`None`] if the [`Item`](I) is not meaningfully
+    /// [orderable](PartialOrd).
+    fn min(&self) -> Option<I> {
+        None
+    }
+
+    /// Returns the maximum accumulated value, or [`None`] if the [`Item`](I) is not meaningfully
+    /// [orderable](PartialOrd).
+    fn max(&self) -> Option<I> {
+        None
     }
 }
 
