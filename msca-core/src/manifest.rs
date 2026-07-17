@@ -22,7 +22,7 @@ use memmap2::Mmap;
 use minicbor::{CborLen, Decode, Encode};
 use smol::io::{AsyncRead, AsyncReadExt, AsyncSeek};
 
-use crate::io::{Checksum, Deserializer};
+use crate::io::{Checksum, Deserializer, Register};
 use crate::schema::{number, Type};
 use crate::segment::{Header, Segment, Variant};
 use crate::{io, Deserialize, Sector, Serialize};
