@@ -35,8 +35,8 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //! ### Read Surface
 //!
 //! [`Dataset::binary`][3] returns the binary segment body as a **zero-copy** byte [slice][6]
-//! borrowed directly from the underlying [memory map](memmap2::Mmap). The [segment Header][7] is
-//! excluded from the [`Sector`] recorded in the manifest; the optimised random-access read path
+//! borrowed directly from the underlying [memory map](memmap2::Mmap). The [segment Header](Header)
+//! is excluded from the [`Sector`] recorded in the manifest; the optimised random-access read path
 //! routes fearlessly to the relevant segment body without boundary checks or variant verification.
 //!
 //! ```rust,ignore
@@ -61,8 +61,7 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //! [4]: crate::dataset::Dataset::write
 //! [5]: io::File::write
 //! [6]: https://doc.rust-lang.org/std/primitive.slice.html
-//! [7]: crate::segment::Header
-// [8]: TODO → link to on-disk-format.md
+// [7]: TODO → link to on-disk-format.md
 
 use std::collections::btree_map::{Entry, VacantEntry};
 use std::num::NonZeroU64;
@@ -72,7 +71,7 @@ use minicbor::{CborLen, Decode, Encode};
 use crate::io::{self, Buffer, Checksum, Register, HEADER};
 use crate::manifest::{self, Manifest};
 use crate::schema::number;
-use crate::segment::{Align, Header as Head, Segment, Variant};
+use crate::segment::{Align, Header, Segment, Variant};
 use crate::{Accumulate, Sector, Serialize};
 
 /* ------------------------------------------------------------------------------ Public Exports */
@@ -143,15 +142,17 @@ impl Binary {
         self.data.extend_from_slice(slice);
     }
 
-    /// Number of zero-filled **gap** bytes inserted after the segment [`Header`](Head) at the
-    /// specified segment `offset`, aligning the payload – written after the eight-byte size prefix
-    /// – to an absolute 64-bit boundary.
+    /// Number of **zero-filled bytes** inserted after the segment [`Header`](Head) to align the
+    /// segment body to an absolute 64-bit boundary relative to the page-aligned
+    /// [memory map](memmap2::Mmap).
+    ///
+    /// Guaranteed to return a number in the range `[0, 7]` inclusive.
     ///
     /// ### Errors
     ///
     /// Returns [`Error::Zero`](number::Error::Zero) on `u64` overflow.
-    fn gap(offset: u64) -> Result<usize, number::Error> {
-        offset.checked_add(Head::SIZE as u64).ok_or(number::Error::Zero)?.pad()
+    fn pad(offset: u64) -> Result<usize, number::Error> {
+        offset.checked_add(Header::SIZE as u64).ok_or(number::Error::Zero)?.pad()
     }
 }
 
@@ -188,10 +189,10 @@ impl Segment for Binary {
     const VARIANT: Variant = Variant::Binary;
 
     fn wrap(&self, offset: u64) -> Result<Vec<u8>, number::Error> {
-        const ADDS: u64 = { Head::SIZE + size_of::<u64>() } as u64;
+        const ADDS: u64 = { Header::SIZE + size_of::<u64>() } as u64;
         const LEAD: u64 = size_of::<NonZeroU64>() as u64;
         let plen = NonZeroU64::new(self.data.len() as u64).ok_or(number::Error::Zero)?;
-        let gap = Self::gap(offset)?;
+        let gap = Self::pad(offset)?;
         let size = { gap as u64 }
             .checked_add(LEAD)
             .ok_or(number::Error::Zero)?
@@ -224,7 +225,7 @@ impl Register for Binary {
     fn register<'a, 'm>(self, s: &'a Sector, e: Self::Entry<'m>) -> Result<&'a Sector, io::Error> {
         let start = s
             .offset
-            .checked_add(Head::SIZE as u64)
+            .checked_add(Header::SIZE as u64)
             .ok_or(number::Error::Zero)?
             .align()?
             .checked_add(size_of::<NonZeroU64>() as u64)
@@ -252,12 +253,12 @@ mod tests {
         path
     }
 
-    /// [`Binary::gap`] aligns the post-header position to the next 64-bit boundary.
+    /// [`Binary::pad`] aligns the post-header position to the next 64-bit boundary.
     #[test]
     fn gap_aligns_prefix() {
         for offset in 0..16u64 {
-            let gap = Binary::gap(offset).expect("Gap failed") as u64;
-            assert_eq!({ offset + Head::SIZE as u64 + gap } % 8, 0);
+            let gap = Binary::pad(offset).expect("Gap failed") as u64;
+            assert_eq!({ offset + Header::SIZE as u64 + gap } % 8, 0);
         }
     }
 
@@ -280,9 +281,9 @@ mod tests {
         let offset = 3; // Deliberately misaligned segment start
         let bytes = bin.wrap(offset).expect("Wrap failed");
         assert_eq!(bytes[0], Variant::Binary as u8);
-        let head = Head::SIZE;
+        let head = Header::SIZE;
         let size = u64::from_le_bytes(bytes[1..head].try_into().expect("Size is 8 bytes"));
-        let gap = Binary::gap(offset).expect("Gap failed");
+        let gap = Binary::pad(offset).expect("Gap failed");
         assert_eq!(size as usize, gap + size_of::<NonZeroU64>() + 3); // Dense: no trailing pad
         assert_eq!(bytes.len(), head + size as usize + size_of::<u64>());
         Binary::verify(&bytes).expect("Checksum failed");
