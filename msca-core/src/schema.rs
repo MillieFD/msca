@@ -68,7 +68,7 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //! each `msca` file requires at least **one** schema segment. Multimodality and schema evolution
 //! are achieved by appending additional schema segments.
 
-use std::collections::btree_map::{BTreeMap, Entry, OccupiedEntry};
+use std::collections::btree_map::{BTreeMap, Entry, OccupiedEntry, VacantEntry};
 use std::fmt::{self, Display};
 use std::num::NonZeroU64;
 use std::{iter, num};
@@ -164,14 +164,16 @@ impl Schema {
     ///
     /// Name conflicts are resolved by comparing the new and existing column layouts **before** file
     /// [`IO`](io); returning the existing [`Sector`] if both underlying definitions are identical
-    /// or [`Error::Collision`] if the underlying definitions differ. New schemas are written
+    /// or [`Error::Collision`][1] if the underlying definitions differ. New schemas are written
     /// eagerly to disk before being [registered](Register) to the [`Manifest`].
     ///
     /// ### Errors
     ///
-    /// - [`Error::Collision`] if a different schema is already registered with the same `name`.
+    /// - [`Error::Collision`][1] if a different schema is already registered with the same `name`.
     /// - [`io::Error::Io`] if the underlying [write-cycle](io) fails.
     /// - [`io::Error::Number`] if the [size](Serialize::size) overflows `u64`.
+    ///
+    /// [1]: manifest::Error::Collision
     pub(crate) async fn finish(self, dataset: &mut Dataset) -> Result<Sector, io::Error> {
         let name = self.name.clone();
         match dataset.file.manifest.schemas.entry(name) {
@@ -183,11 +185,11 @@ impl Schema {
     /// Compare `self` against the provided [`Occupied`] entry for deduplication.
     ///
     /// Returns the existing on-disk schema [`Sector`] if both underlying definitions are identical,
-    /// or [`Error::Collision`] if the underlying definitions differ.
+    /// or [`Error::Collision`](manifest::Error::Collision) if the underlying definitions differ.
     fn occupied(&self, entry: Occupied) -> Result<Sector, io::Error> {
         match entry.get().columns == self.columns.iter().map(Schema::map).collect() {
             true => Ok(entry.get().sector),
-            false => Error::Collision { name: entry.key().clone() }.into(),
+            false => manifest::Error::Collision { name: entry.key().clone() }.into(),
         }
     }
 
@@ -248,15 +250,18 @@ impl Checksum for Schema {}
 
 impl Register for Schema {
     type Error = io::Error;
+    type Entry<'m> = VacantEntry<'m, String, manifest::Schema>;
 
-    fn register<'a>(self, s: &'a Sector, m: &mut Manifest) -> Result<&'a Sector, io::Error> {
-        let name = self.name.clone();
+    fn entry<'m>(&self, m: &'m mut Manifest) -> Result<Self::Entry<'m>, io::Error> {
+        match m.schemas.entry(self.name.clone()) {
+            Entry::Occupied(e) => manifest::Error::Collision { name: e.key().clone() }.into(),
+            Entry::Vacant(e) => Ok(e),
+        }
+    }
+
+    fn register<'a, 'm>(self, s: &'a Sector, e: Self::Entry<'m>) -> Result<&'a Sector, io::Error> {
         let columns = self.columns.iter().map(Schema::map).collect();
-        // SAFETY: double-checks entry is vacant to prevent accidental overwrite
-        match m.schemas.entry(name) {
-            Entry::Occupied(e) => return Error::Collision { name: e.key().clone() }.into(),
-            Entry::Vacant(e) => e.insert(manifest::Schema { columns, sector: *s }),
-        };
+        e.insert(manifest::Schema { columns, sector: *s });
         Ok(s)
     }
 }
