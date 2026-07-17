@@ -1178,6 +1178,26 @@ impl<const N: usize> Serialize for [u8; N] {
     }
 }
 
+impl Serialize for [u8] {
+    type Buffer = Vec<u8>;
+
+    fn size(&self) -> Result<NonZeroU64, Error> {
+        { self.len() as u64 }.try_into().map_err(Error::from)
+    }
+
+    fn serialize_into<'a>(&self, buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
+        let size = self.len();
+        debug_assert!(buf.len() >= size, "actual size < buffer size");
+        buf[..size].copy_from_slice(self);
+        Ok(&mut buf[size..])
+    }
+
+    fn serialize(&self) -> Result<Self::Buffer, Error> {
+        let buf = self.to_vec();
+        Ok(buf)
+    }
+}
+
 impl Serialize for bool {
     type Buffer = [u8; size_of::<Self>()];
 
