@@ -40,8 +40,8 @@ The [on-disk-format.md](./doc/on-disk-format.md) document shows how each goal is
 ### When to use MSCA
 
 `MSCA` is a strong fit for any workload that writes once and queries many times. The rapid ingestion append-only design
-is ideally suited to high-throughput sensor streams, experimental runs, telemetry, and time-series data. Clem is **not**
-a transactional database and deliberately omits support for in-situ mutation, deletions, or ad-hoc SQL queries.
+is ideally suited to high-throughput sensor streams, experimental runs, telemetry, and time-series data. The MSCA format
+is **not** a transactional database and deliberately omits support for in-situ mutation or deletions.
 
 The table below compares `msca` against several widely used alternatives:
 
