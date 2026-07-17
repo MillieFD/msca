@@ -9,11 +9,11 @@
     - [x] Some filters can be applied before file IO:
         - [x] Column-level filters to remove whole columns from the query map.
         - [x] Buffer-level filters to remove buffers from the query map e.g. using min / max statistics.
-        - [ ] Columns are removed if their buffer count falls to zero.
-    - [x] Other filters must be applied during file IO:
-        - [x] `query::Filter` added to a collection owned by the `Query` instance.
-        - [x] Use a `HashSet` to ensure filter uniqueness; duplicate filters reduce efficiency.
-        - [x] Retain the most constrained conjunction if two filters conflict e.g. `> 20` should replace `> 10`.
+        - [x] Columns are removed if their buffer count falls to zero.
+    - [x] Other filters are applied during file IO by the adapter chain:
+        - [x] Each filter wraps the query in a typed adapter carrying its predicate as a concrete state.
+        - [x] The chain `test` evaluates predicates **inner-first** with lazy conjunction (earliest short-circuits).
+        - [x] Predicates deserialize the on-disk bytes into their operand type; operands are never serialized.
     - [x] Some filters can be used before file IO to remove buffers, but must also be evaluated during IO e.g. `range`
     - [x] Add `Read` trait:
         - [x] Implemented **by each storable type**; mirrors `Data` on the write side and subsumes the `Reader` trait.
