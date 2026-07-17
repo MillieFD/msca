@@ -24,11 +24,12 @@ use std::sync::Arc;
 use funty::Unsigned;
 use memmap2::Mmap;
 
-use crate::io::File;
+use crate::io::{File, Register};
 use crate::query::{self, Query};
 use crate::read::{Composite, Outcome, Read};
 use crate::schema::number;
-use crate::{io, Accumulate, Accumulator, Data, Error, Schema};
+use crate::segment::Segment;
+use crate::{io, manifest, Accumulate, Accumulator, Data, Error, Schema};
 
 /* ------------------------------------------------------------------------------ Public Exports */
 
@@ -123,25 +124,36 @@ impl Dataset {
         })
     }
 
-    /// [`Write`][1] the accumulated data and return the number of written items.
+    /// [`Write`](Segment::write) the accumulated data and return the number of written items.
     ///
-    /// Empty accumulators are ignored.
+    /// Empty accumulators are ignored. The [`Manifest`](manifest::Manifest) entry is reserved
+    /// before file [`IO`](File::write); a rejected [`Segment`] leaves the file untouched.
     ///
     /// ### Errors
     ///
-    /// Returns [`Error::Io`][2] if the underlying [write-cycle](io) fails, or [`Error::Number`][3]
-    /// if a `u64` overflow occurs while computing the on-disk [`Sector`][4].
+    /// - [`Error::Manifest`][1] wrapping [`Error::Collision`][2] if a name collision occurs.
+    /// - [`Error::Io`][3] if the underlying [write-cycle](io) fails.
+    /// - [`Error::Number`][4] if a `u64` overflow occurs while computing the on-disk [`Sector`][5].
     ///
-    /// [1]: crate::segment::Segment::write
-    /// [2]: io::Error::Io
-    /// [3]: io::Error::Number
-    /// [4]: io::Sector
-    pub async fn write<I>(&mut self, accumulator: Accumulator<I>) -> Result<u64, io::Error> {
-        let count = match accumulator.is_empty() {
+    /// [1]: io::Error::Manifest
+    /// [2]: manifest::Error::Collision
+    /// [3]: io::Error::Io
+    /// [4]: io::Error::Number
+    /// [5]: io::Sector
+    #[allow(
+        private_bounds,
+        reason = "segment and register are sealed implementation details"
+    )]
+    pub async fn write<I, S>(&mut self, acc: S) -> Result<u64, io::Error>
+    where
+        S: Accumulate<I> + Register + Segment,
+        io::Error: From<S::Error>,
+    {
+        let count = match acc.is_empty() {
             true => return Ok(0),
-            false => accumulator.count(),
+            false => acc.count(),
         };
-        self.file.write(accumulator).await?;
+        self.file.write(acc).await?;
         // SAFETY: Undefined behaviour if mapped region is modified (refer to mmap documentation)
         self.mmap = unsafe { self.file.mmap()? }.into();
         Ok(count)
