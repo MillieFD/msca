@@ -8,23 +8,20 @@ Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the conditions of the LICENSE are met.
 */
 
-//! Immutable named binary segments carrying free-form bytes in any user-defined format.
+//! Immutable named segments containing free-form bytes in any format.
 //!
 //! ---
 //!
-//! ### Opaque Payloads
-//!
-//! A binary segment stores one named sequence of bytes that can be read but never altered once
-//! written. The payload is opaque to [msca](crate): implementers choose the encoding – TOML, JSON,
-//! CBOR, packed numeric arrays, or anything else – and carry the full burden of parsing and
-//! validation. Typical uses include file-level metadata, configuration snapshots, provenance
-//! records, and genuinely constant items that would otherwise waste a schema column.
+//! Each binary segment is recorded in the [`Manifest`] under a unique [`name`](String). The
+//! [`Dataset`][1] provides a basic read and write surface, leaving implementers free to choose any
+//! interpretation strategy e.g. packed numeric arrays, [TOML][2] for human-readable configuration,
+//! or [CBOR][3] for schema-free object encoding.
 //!
 //! ### Write Surface
 //!
-//! [`Binary`] is a **byte accumulator** mirroring the [`Accumulator`](crate::Accumulator) design:
-//! bytes are pushed in one or more chunks and committed through [`Dataset::write`][1] as a single
-//! immutable segment. Binary segments are standalone; no prior schema registration is required.
+//! [`Binary`] is an in-memory [byte accumulator](Accumulate) that ingests raw bytes. Pass to
+//! [`Dataset::write`][4] to write the accumulated bytes to disk as a single immutable [`Segment`].
+//! Binary segments are standalone; no prior schema registration is required.
 //!
 //! ```rust,ignore
 //! let mut bin = msca::Binary::new("calibration");
@@ -32,49 +29,47 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //! dataset.write(bin).await?;
 //! ```
 //!
-//! An empty accumulator performs no file IO. The manifest entry is reserved **before** the
-//! write-cycle begins, so a name collision – reported as [`Error::Collision`][2] – never mutates
-//! the file.
+//! Empty accumulators are ignored. The [`Manifest`] entry is reserved before file [`IO`][5]; a
+//! rejected [`Segment`] leaves the file untouched.
 //!
 //! ### Read Surface
 //!
-//! [`Dataset::binary`][3] returns the payload as a **zero-copy** byte slice borrowed directly from
-//! the underlying memory map. The manifest sector points at exactly the payload bytes, so readers
-//! route fearlessly with no per-access framing or checksum work.
+//! [`Dataset::binary`][3] returns the binary segment body as a **zero-copy** byte [slice][6]
+//! borrowed directly from the underlying [memory map](memmap2::Mmap). The [segment Header][7] is
+//! excluded from the [`Sector`] recorded in the manifest; the optimised random-access read path
+//! routes fearlessly to the relevant segment body without boundary checks or variant verification.
 //!
 //! ```rust,ignore
 //! let data: &[u8] = dataset.binary("calibration")?;
 //! ```
 //!
+//! Segment immutability is structural; a mutable surface is deliberately omitted to enforce this
+//! invariant.
+//!
 //! ### Alignment
 //!
-//! The first payload byte is guaranteed to begin at an **absolute** 64-bit boundary, measured
-//! relative to the page-aligned memory map. Up to seven zero-filled gap bytes are inserted after
-//! the segment header to achieve this, allowing zero-copy reinterpretation of packed numeric data.
+//! The segment body is guaranteed to begin at an **absolute** 64-bit boundary relative to the
+//! page-aligned memory map. Up to seven zero-filled alignment bytes are inserted directly after the
+//! segment header. Maintaining interior alignment – if required – is the responsibility of the
+//! implementer.
 //!
-//! The payload is an opaque byte sequence, so **only** the first byte is aligned. Maintaining any
-//! interior alignment is the responsibility of the implementer who chose the encoding.
+//! Refer to the [on-disk format specification][8] for more details.
 //!
-//! ### Immutability
-//!
-//! Immutability is enforced structurally; no runtime mutability checks exist because no mutable
-//! surface exists:
-//!
-//! - The segment region is **append-only**; existing segments are never rewritten.
-//! - Registration only ever fills a **vacant** manifest entry; duplicate names are rejected before
-//!   any file IO occurs.
-//! - Reads borrow from a **read-only** memory map as shared `&[u8]` slices.
-//!
-//! Refer to the [on-disk format specification](crate::io) for the complete file anatomy.
-//!
-//! [1]: crate::Dataset::write
-//! [2]: manifest::Error::Collision
-//! [3]: crate::Dataset::binary
+//! [1]: crate::dataset::Dataset
+//! [2]: https://toml.io/en/
+//! [3]: https://cbor.io
+//! [4]: crate::dataset::Dataset::write
+//! [5]: io::File::write
+//! [6]: https://doc.rust-lang.org/std/primitive.slice.html
+//! [7]: crate::segment::Header
+// [8]: TODO → link to on-disk-format.md
 
 use std::collections::btree_map::{Entry, VacantEntry};
 use std::num::NonZeroU64;
 
-use crate::io::{self, Buffer, Checksum, HEADER, Register};
+use minicbor::{CborLen, Decode, Encode};
+
+use crate::io::{self, Buffer, Checksum, Register, HEADER};
 use crate::manifest::{self, Manifest};
 use crate::schema::number;
 use crate::segment::{Align, Header as Head, Segment, Variant};
@@ -82,25 +77,26 @@ use crate::{Accumulate, Sector, Serialize};
 
 /* ------------------------------------------------------------------------------ Public Exports */
 
-/// An in-memory **byte accumulator** for one named immutable binary segment.
+/// An in-memory **byte accumulator** for one named binary segment.
 ///
-/// Bytes are [pushed](Accumulate::push) in one or more chunks and committed through
-/// [`Dataset::write`](crate::Dataset::write) as a single immutable [`Binary`](Variant::Binary)
-/// segment. The payload is opaque to [msca](crate); implementers choose the encoding and carry the
-/// full burden of parsing and validation.
-///
-/// See the [module level documentation](self) for more details.
+/// Refer to the [module level documentation](self) for more details.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Hash, Ord, PartialOrd, Encode, Decode, CborLen)]
 pub struct Binary {
-    /// Name for retrieval via the [`Manifest`] `bins` map.
-    name: String,
-    /// Accumulated payload bytes.
-    data: Vec<u8>,
+    /// [Name](String) of the corresponding [`Sector`] registered in the [`Manifest`].
+    #[cbor(n(0), skip_if = "String::is_empty")]
+    pub name: String,
+    /// Contiguous growable array of heap-allocated accumulated bytes.
+    #[cbor(n(1), skip_if = "Vec::is_empty")]
+    pub data: Vec<u8>,
 }
 
 impl Binary {
     /// Initialise a new empty [`Binary`] accumulator with the specified [`name`](N).
+    ///
+    /// The [accumulator](Accumulate) will not allocate until bytes are [pushed](Accumulate::push).
+    /// Prefer [`Binary::with_capacity`] to pre-allocate capacity if the number of bytes is known
+    /// ahead of time.
     pub fn new<N>(name: N) -> Self
     where
         String: From<N>,
@@ -111,13 +107,20 @@ impl Binary {
         }
     }
 
-    /// Initialises a new empty [`Binary`] accumulator with the specified `name`, reserving space
-    /// for at least `size` payload bytes.
+    /// Initialise a new empty [`Binary`] accumulator with the specified [`name`](N) and capacity
+    /// for at least `size` bytes without reallocating.
     ///
     /// ### Guidance
     ///
-    /// Prefer this constructor when the payload size is known ahead of time; the accumulator then
-    /// grows without reallocating as chunks are [pushed](Accumulate::push).
+    /// Prefer `with_capacity` instead of [`new`](Self::new) when the number of bytes is known ahead
+    /// of time; the accumulator can grow without intermediate reallocation overhead as chunks are
+    /// [pushed](Accumulate::push).
+    ///
+    /// ### ⚠️ Panics
+    ///
+    /// Panics if the requested capacity exceeds [`isize::MAX`] bytes.
+    ///
+    /// Refer to the [`Vec::with_capacity`] documentation for more details.
     pub fn with_capacity<N>(name: N, size: usize) -> Self
     where
         String: From<N>,
