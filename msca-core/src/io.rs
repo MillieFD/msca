@@ -89,7 +89,7 @@ use smol::fs::{self, OpenOptions};
 use smol::io::{AsyncRead, AsyncReadExt, AsyncSeek, AsyncSeekExt, AsyncWriteExt};
 use xxhash_rust::xxh3::xxh3_64;
 
-use crate::manifest::Manifest;
+use crate::manifest::{self, Manifest};
 use crate::segment::{self, Align, Segment};
 use crate::{number, schema, Serialize};
 
@@ -626,25 +626,29 @@ impl File {
     ///
     /// ### Errors
     ///
-    /// - [`Error::Io`] if any underlying [seek][1] or [write][2] operations fail.
+    /// - [`Error::Manifest`] if an underlying manifest entry [collision][1] occurs.
+    /// - [`Error::Io`] if any underlying [seek][2] or [write][3] operations fail.
     /// - [`Error::Number`] if the segment `size` or `offset` overflow `u64`.
     ///
     /// Refer to the [write-cycle](self) documentation for more details.
     ///
-    /// [1]: Sector::seek_to_start
-    /// [2]: Segment::write
+    /// [1]: manifest::Error::Collision
+    /// [2]: Sector::seek_to_start
+    /// [3]: Segment::write
     pub(crate) async fn write<S>(&mut self, seg: S) -> Result<Sector, Error>
     where
         S: Register + Segment,
         Error: From<S::Error>,
     {
-        // Phase 1: Append the new segment, overwriting the on-disk manifest
+        // Phase 1: Reserve the manifest entry; collisions are eagerly rejected w/o file IO
+        let entry = self.manifest.entry(&seg)?;
+        // Phase 2: Append the new segment, overwriting the on-disk manifest
         let sec = seg.write(&mut self.file, self.header.manifest.offset).await?;
-        // Phase 2: Register the segment to the in-memory manifest
-        let next = seg.register(&sec, &mut self.manifest)?.next().ok_or(number::Error::Zero)?.get();
-        // Phase 3: Append the new manifest directly after the new segment
+        // Phase 3: Register the segment to the in-memory manifest
+        let next = seg.register(&sec, entry)?.next().ok_or(number::Error::Zero)?.get();
+        // Phase 4: Append the new manifest directly after the new segment
         self.header.manifest = self.manifest.write(&mut self.file, next).await?;
-        // Phase 4: Overwrite the file header manifest sector
+        // Phase 5: Overwrite the file header manifest sector
         Header::SECTOR.seek_to_start(&mut self.file).await?;
         self.file.write_all(&self.header.serialize()?).await?;
         self.file.flush().await?;
@@ -680,12 +684,14 @@ pub enum Error {
     Io(std::io::Error),
     /// File magic bytes did not match the expected [msca](MAGIC) signature.
     Magic,
-    /// Underlying [`Error`](number::Error) from a numerical operation or conversion.
+    /// Underlying [`manifest::Error`] from [`Segment`] registration or retrieval.
+    Manifest(manifest::Error),
+    /// Underlying [`number::Error`] from a numerical operation or conversion.
     Number(number::Error),
-    /// Underlying [`Error`](schema::Error) from schema registration or validation.
+    /// Underlying [`schema::Error`] from schema registration or validation.
     Schema(schema::Error),
-    /// Underlying [`Error`](segment::Error) from [`Segment`] operations such as
-    /// [serialisation](Serialize) or [deserialisation](Deserialize).
+    /// Underlying [`segment::Error`] from [`Segment`] operations such as [serialisation](Serialize)
+    /// or [deserialisation](Deserialize).
     Segment(segment::Error),
     /// Underlying [`TryFromSliceError`] while parsing a slice into a fixed-size array.
     Slice(TryFromSliceError),
@@ -711,6 +717,7 @@ impl fmt::Display for Error {
             Self::Decode(e) => write!(f, "CBOR decode error → {e}"),
             Self::Io(e) => write!(f, "File IO error → {e}"),
             Self::Magic => f.write_str("File is not a valid MSCA dataset"),
+            Self::Manifest(e) => write!(f, "Manifest error → {e}"),
             Self::Number(e) => write!(f, "Number error → {e}"),
             Self::Schema(e) => write!(f, "Schema error → {e}"),
             Self::Segment(e) => write!(f, "Segment error → {e}"),
@@ -758,6 +765,12 @@ impl From<minicbor::decode::Error> for Error {
 impl From<number::Error> for Error {
     fn from(e: number::Error) -> Self {
         Self::Number(e)
+    }
+}
+
+impl From<manifest::Error> for Error {
+    fn from(e: manifest::Error) -> Self {
+        Self::Manifest(e)
     }
 }
 
