@@ -174,6 +174,15 @@ impl<'d> Accumulate<&'d [u8]> for Bin {
     }
 }
 
+impl Extend<u8> for Bin {
+    fn extend<I>(&mut self, iter: I)
+    where
+        I: IntoIterator<Item = u8>,
+    {
+        Extend::extend(&mut self.data, iter);
+    }
+}
+
 impl Segment for Bin {
     const VARIANT: Variant = Variant::Binary;
 
