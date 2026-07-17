@@ -20,6 +20,7 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //!
 //! - [`Schema`] segments describe the structure of encoded data.
 //! - [`Data`] segments carry columnar buffers for a specified schema instance.
+//! - [`Binary`](crate::binary::Binary) segments carry free-form immutable bytes in any format.
 //!
 //! Multimodality and schema evolution are realised by appending additional schema segments. Data
 //! storage and file extensibility are realised by appending additional data segments. Format
@@ -131,6 +132,11 @@ mod variant {
         /// A [`Data`] segment encoding columnar buffers for a specified schema instance.
         #[n(2)]
         Data = 0x02, // DO NOT alter discriminant value (breaking change)
+        /// A free-form [`Binary`][1] segment containing immutable bytes in any user-defined format.
+        ///
+        /// [1]: crate::binary::Binary
+        #[n(3)]
+        Binary = 0x03, // DO NOT alter discriminant value (breaking change)
     }
 
     /* ------------------------------------------------------------------- Trait Implementations */
@@ -141,6 +147,7 @@ mod variant {
                 Self::Manifest => write!(f, "Manifest"),
                 Self::Schema => write!(f, "Schema"),
                 Self::Data => write!(f, "Data"),
+                Self::Binary => write!(f, "Binary"),
             }
         }
     }
@@ -153,6 +160,7 @@ mod variant {
                 x if x == Self::Manifest as u8 => Ok(Self::Manifest),
                 x if x == Self::Schema as u8 => Ok(Self::Schema),
                 x if x == Self::Data as u8 => Ok(Self::Data),
+                x if x == Self::Binary as u8 => Ok(Self::Binary),
                 other => Error::Unknown { found: other }.into(),
             }
         }
@@ -458,5 +466,11 @@ mod tests {
     #[test]
     fn variant_manifest_byte() {
         assert_eq!(Variant::try_from(0x00), Ok(Variant::Manifest));
+    }
+
+    /// [`Variant::try_from`] maps the binary discriminant `0x03`.
+    #[test]
+    fn variant_binary_byte() {
+        assert_eq!(Variant::try_from(0x03), Ok(Variant::Binary));
     }
 }
