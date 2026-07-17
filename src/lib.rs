@@ -1,6 +1,6 @@
 /*
-Project: clem
-GitHub: https://github.com/MillieFD/clem
+Project: msca
+GitHub: https://github.com/MillieFD/msca
 
 BSD 3-Clause License, Copyright (c) 2026, Amelia Fraser-Dale
 
@@ -12,12 +12,12 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //!
 //! ---
 //!
-//! `clem` maximises read and write performance by separating the data lifecycle into two phases:
+//! `msca` maximises read and write performance by separating the data lifecycle into two phases:
 //!
 //! 1. **In-memory** accumulator optimised for high-throughput ingestion.
 //! 2. **On-disk** columnar archive optimised for range-based querying across arbitrary dimensions.
 //!
-//! `clem` provides an extensible backend which can be adapted to suit a variety of scientific
+//! `msca` provides an extensible backend which can be adapted to suit a variety of scientific
 //! applications. Implementers benefit from a minimal high-performance core library which can be
 //! further enhanced via domain-specific optimisations.
 //!
@@ -36,13 +36,14 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //! starting [`offset`](Sector::offset) and [`length`](Sector::length) in bytes. A sector can
 //! describe any contiguous file region, from a single columnar buffer to an entire segment.
 
-// NOTE: Required to resolve clem::something in tests and doc code
-extern crate self as clem;
+// NOTE: Required to resolve msca::something in tests and doc code
+extern crate self as msca;
 
 /* ------------------------------------------------------------------------------ Public Exports */
 
-pub use clem_core::{
+pub use msca_core::{
     accumulate,
+    binary,
     io,
     manifest,
     query,
@@ -51,25 +52,34 @@ pub use clem_core::{
     Accumulate,
     Accumulator,
     Align,
+    Bin,
     BoxAcc,
     Column,
     Columns,
+    Composite,
     Data,
     Dataset,
+    Describe,
     Deserialize,
     Error,
+    Evaluate,
+    IsOption,
+    Join,
     Mmap,
     NonZeroUInt,
     Outcome,
     Query,
     Read,
+    Reader,
     Schema,
     Sector,
     Serialize,
+    SizedBuf,
     Stream,
+    SubSet,
 };
 
 /* ----------------------------------------------------------------------- Feature Gated Exports */
 
 #[cfg(feature = "derive")]
-pub use clem_derive::{Data, Read};
+pub use msca_derive::{Data, Read};
