@@ -560,6 +560,49 @@ where
     }
 }
 
+/* ------------------------------------------------------------------- Describe Trait Definition */
+
+/// A type-erasable **column accumulator** that produces [`manifest::Buffer`] descriptors.
+///
+/// This trait is implemented by the top-level per-column [`Buffer`] state machine. Implementations
+/// are also generated for external [`Composite`][1] types. Bare [staging buffers](Unfold::RawAcc)
+/// cannot be walked for descriptors.
+///
+/// ### Descriptor
+///
+/// `Describe` **walks** an [accumulator](Accumulate) and registers one descriptor per [`Column`];
+/// the corresponding [`Descriptor`] trait **produces** per-buffer descriptors.
+///
+/// - Describe → one-to-many (walk)
+/// - Descriptor → one-to-one (production)
+///
+/// [`Buffer`] implements **both** traits; walking the **one** contained accumulator to register the
+/// **one** produced descriptor. Generated composite accumulators contain one independent
+/// sub-accumulator per field and implement `Describe` **only**, threading the walk through each
+/// field. The in-memory staging buffers implement `Descriptor` **only**.
+///
+/// [1]: crate::read::Composite
+pub trait Describe<I>: Accumulate<I> + Serialize {
+    /// Returns a new empty instance of [`Self`] boxed as a [`BoxAcc`] trait object.
+    // NOTE: Buffer must be a growable Vec; compiler cannot predict the number of accumulated items
+    fn boxed(&self) -> BoxAcc<I>;
+
+    /// Generates one [`Buffer`](manifest::Buffer) descriptor per [`Column`] describing the
+    /// [accumulated](Accumulate) data. Each descriptor is appended to the corresponding
+    /// [`Manifest`] column entry.
+    ///
+    /// Returns the next available offset for subsequent buffers.
+    ///
+    /// ### Errors
+    ///
+    /// - [`Error::NotFound`][1] if the walk exhausts before every column is described.
+    /// - [`Error::Number`][2] if an offset overflows `u64` or the item count is zero.
+    ///
+    /// [1]: schema::Error::NotFound
+    /// [2]: schema::Error::Number
+    fn buffers(&self, offset: u64, columns: &mut Columns) -> Result<u64, schema::Error>;
+}
+
 /* ----------------------------------------------------------------- Accumulate Trait Definition */
 
 /// An in-memory **data accumulator** that ingests [items](I) of the specified [`Type`][1] and
