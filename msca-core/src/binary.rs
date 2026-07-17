@@ -140,16 +140,11 @@ impl Binary {
     }
 }
 
-/* ----------------------------------------------------------------------- Trait Implementations */
-
-impl From<&str> for Binary {
-    fn from(name: &str) -> Self {
-        Self::new(name)
-    }
-}
-
-impl From<String> for Binary {
-    fn from(name: String) -> Self {
+impl<N> From<N> for Binary
+where
+    String: From<N>,
+{
+    fn from(name: N) -> Self {
         Self::new(name)
     }
 }
