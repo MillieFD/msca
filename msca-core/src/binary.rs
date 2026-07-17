@@ -128,6 +128,18 @@ impl Binary {
         }
     }
 
+    /// [Iterate](Iterator) over the provided `&[u8]` slice, [copying](Copy) each byte and appending
+    /// to [`self`](Self).
+    ///
+    /// ### ⚠️ Panics
+    ///
+    /// Panics if the requested capacity exceeds [`isize::MAX`] bytes.
+    ///
+    /// Refer to the [`Vec::extend_from_slice`] documentation for more details.
+    pub fn extend_from_slice(&mut self, slice: &[u8]) {
+        self.data.extend_from_slice(slice);
+    }
+
     /// Number of zero-filled **gap** bytes inserted after the segment [`Header`](Head) at the
     /// specified segment `offset`, aligning the payload – written after the eight-byte size prefix
     /// – to an absolute 64-bit boundary.
