@@ -915,36 +915,126 @@ where
     }
 }
 
-/* ----------------------------------------------------------------- Accumulate Trait Definition */
+/* ----------------------------------------------------------------- Descriptor Trait Definition */
 
-/// An in-memory **data accumulator** that ingests [items](I) of the specified [`Type`][1] and
-/// [serializes](Serialize) into an optimised on-disk format.
+/// A type-erasable **column accumulator** that produces [`manifest::Buffer`] descriptors.
 ///
-/// [1]: schema::Type
-pub trait Accumulate<I> {
-    /// Append one [`Item`](I) to the [accumulator](Self)
-    fn push(&mut self, item: I);
-
-    /// Reinitialise the [accumulator](Self) without writing to disk. All data is permanently lost.
+/// This trait is implemented by the in-memory [staging buffers](Unfold::RawAcc) and the top-level
+/// per-column [`Buffer`] state machine. Generated [`Composite`][1] accumulators contain independent
+/// per-field sub-accumulators and cannot therefore be described by a single [`manifest::Buffer`]
+/// descriptor.
+///
+/// ### Describe
+///
+/// `Descriptor` **produces** per-buffer descriptors. The corresponding [`Describe`] trait **walks**
+/// an [accumulator](Accumulate) and registers one descriptor per [`Column`].
+///
+/// - Descriptor → one-to-one (production)
+/// - Describe → one-to-many (walk)
+///
+/// [`Buffer`] implements **both** traits; walking the **one** contained accumulator to register the
+/// **one** produced descriptor. Generated composite accumulators contain one independent
+/// sub-accumulator per field and implement `Describe` **only**, threading the walk through each
+/// field. The in-memory staging buffers implement `Descriptor` **only**.
+///
+/// [1]: crate::read::Composite
+#[doc(hidden)] // Reachable through the Unfold accumulator bounds; not intended as a stable API
+pub trait Descriptor {
+    /// Construct one [`manifest::Buffer`] descriptor recording the accumulated data.
     ///
-    /// Note that this method may not affect the allocated capacity of the underlying storage.
-    fn discard(&mut self);
-
-    /// Returns `true` if the [accumulator](Self) contains no data.
-    fn is_empty(&self) -> bool;
-
-    /// Returns the number of accumulated [`items`](I).
-    fn count(&self) -> u64;
+    /// A homogeneous [`Compact`](Buffer::Compact) buffer emits a corresponding [`Compact`][2]
+    /// descriptor and is never asked to self-describe.
+    ///
+    /// [1]: https://doc.rust-lang.org/reference/dynamically-sized-types.html
+    /// [2]: manifest::Buffer::Compact
+    fn describe(&self, buffer: Sector, count: NonZeroU64) -> Result<manifest::Buffer, Error>;
 }
 
-    /// Returns `true` if **any** accumulated [`item`](I) is **bit-identical** to the provided item.
-    fn contains(&self, item: &I) -> bool;
+/* ------------------------------------------------------------- Descriptor Trait Implementation */
 
-    /// Returns the minimum accumulated value, or [`None`] if the [`Item`](I) is not meaningfully
-    /// [orderable](PartialOrd).
-    fn min(&self) -> Option<I> {
-        None
+impl<I> Descriptor for Vec<I>
+where
+    I: PartialOrd + Copy,
+{
+    fn describe(&self, buffer: Sector, count: NonZeroU64) -> Result<manifest::Buffer, Error> {
+        self.detail(buffer, count)
     }
+}
+
+impl Descriptor for BitVec {
+    /// [`Detailed`][1] descriptor statistics are meaningless for `bool`: [`Buffer::Basic`][2]
+    /// implies that both `true`/`max` and `false`/`min` items were accumulated.
+    ///
+    /// Refer to the [trait documentation](Descriptor::describe) for more information.
+    ///
+    /// [1]: manifest::Buffer::Detailed
+    /// [2]: manifest::Buffer::Basic
+    fn describe(&self, buffer: Sector, count: NonZeroU64) -> Result<manifest::Buffer, Error> {
+        Ok(manifest::Buffer::Basic { buffer, count })
+    }
+}
+
+impl<I> Descriptor for OptInSitu<I>
+where
+    I: PartialOrd + Copy,
+{
+    fn describe(&self, buffer: Sector, count: NonZeroU64) -> Result<manifest::Buffer, Error> {
+        self.detail(buffer, count)
+    }
+}
+
+impl<I> Descriptor for OptBitVec<I>
+where
+    I: Unfold,
+    I::RawAcc: Extreme,
+{
+    fn describe(&self, buffer: Sector, count: NonZeroU64) -> Result<manifest::Buffer, Error> {
+        self.detail(buffer, count)
+    }
+}
+
+impl Descriptor for OptBitVec<bool> {
+    /// [`Detailed`][1] descriptor statistics are meaningless for `bool`: [`Buffer::Basic`][2]
+    /// implies that both `true`/`max` and `false`/`min` items were accumulated.
+    ///
+    /// Refer to the [trait documentation](Descriptor::describe) for more information.
+    ///
+    /// [1]: manifest::Buffer::Detailed
+    /// [2]: manifest::Buffer::Basic
+    fn describe(&self, buffer: Sector, count: NonZeroU64) -> Result<manifest::Buffer, Error> {
+        Ok(manifest::Buffer::Basic { buffer, count })
+    }
+}
+
+impl<I> Descriptor for Seq<I>
+where
+    I: Unfold,
+{
+    /// [Unsized][1] items do not currently support [`Detailed`][2] descriptor statistics.
+    ///
+    /// Refer to the [trait documentation](Descriptor::describe) for more information.
+    ///
+    /// [1]: https://doc.rust-lang.org/reference/dynamically-sized-types.html
+    /// [2]: manifest::Buffer::Detailed
+    fn describe(&self, buffer: Sector, count: NonZeroU64) -> Result<manifest::Buffer, Error> {
+        Ok(manifest::Buffer::Basic { buffer, count })
+    }
+}
+
+impl<I> Descriptor for OptSeq<I>
+where
+    I: Unfold,
+{
+    /// [Unsized][1] items do not currently support [`Detailed`][2] descriptor statistics.
+    ///
+    /// Refer to the [trait documentation](Descriptor::describe) for more information.
+    ///
+    /// [1]: https://doc.rust-lang.org/reference/dynamically-sized-types.html
+    /// [2]: manifest::Buffer::Detailed
+    fn describe(&self, buffer: Sector, count: NonZeroU64) -> Result<manifest::Buffer, Error> {
+        Ok(manifest::Buffer::Basic { buffer, count })
+    }
+}
 
     /// Returns the maximum accumulated value, or [`None`] if the [`Item`](I) is not meaningfully
     /// [orderable](PartialOrd).
