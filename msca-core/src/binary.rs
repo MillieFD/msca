@@ -19,7 +19,7 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //!
 //! ### Write Surface
 //!
-//! [`Binary`] is an in-memory [byte accumulator](Accumulate) that ingests raw bytes. Pass to
+//! [`Bin`] is an in-memory [byte accumulator](Accumulate) that ingests raw bytes. Pass to
 //! [`Dataset::write`][4] to write the accumulated bytes to disk as a single immutable [`Segment`].
 //! Binary segments are standalone; no prior schema registration is required.
 //!
@@ -81,7 +81,7 @@ use crate::{Accumulate, Sector, Serialize};
 /// Refer to the [module level documentation](self) for more details.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug, Default, Eq, PartialEq, Hash, Ord, PartialOrd, Encode, Decode, CborLen)]
-pub struct Binary {
+pub struct Bin {
     /// [Name](String) of the corresponding [`Sector`] registered in the [`Manifest`].
     #[cbor(n(0), skip_if = "String::is_empty")]
     pub name: String,
@@ -90,11 +90,11 @@ pub struct Binary {
     pub data: Vec<u8>,
 }
 
-impl Binary {
-    /// Initialise a new empty [`Binary`] accumulator with the specified [`name`](N).
+impl Bin {
+    /// Initialise a new empty [`Bin`] accumulator with the specified [`name`](N).
     ///
     /// The [accumulator](Accumulate) will not allocate until bytes are [pushed](Accumulate::push).
-    /// Prefer [`Binary::with_capacity`] to pre-allocate capacity if the number of bytes is known
+    /// Prefer [`Bin::with_capacity`] to pre-allocate capacity if the number of bytes is known
     /// ahead of time.
     pub fn new<N>(name: N) -> Self
     where
@@ -106,8 +106,8 @@ impl Binary {
         }
     }
 
-    /// Initialise a new empty [`Binary`] accumulator with the specified [`name`](N) and capacity
-    /// for at least `size` bytes without reallocating.
+    /// Initialise a new empty [`Bin`] accumulator with the specified [`name`](N) and capacity for
+    /// at least `size` bytes without reallocating.
     ///
     /// ### Guidance
     ///
@@ -143,7 +143,7 @@ impl Binary {
     }
 }
 
-impl<N> From<N> for Binary
+impl<N> From<N> for Bin
 where
     String: From<N>,
 {
@@ -152,8 +152,8 @@ where
     }
 }
 
-impl<'d> Accumulate<&'d [u8]> for Binary {
-    /// Append one byte [chunk][1] to the [accumulator](Binary).
+impl<'d> Accumulate<&'d [u8]> for Bin {
+    /// Append one byte [chunk][1] to the [accumulator](Bin).
     ///
     /// [1]: https://doc.rust-lang.org/std/primitive.slice.html
     fn push(&mut self, item: &'d [u8]) {
@@ -174,7 +174,7 @@ impl<'d> Accumulate<&'d [u8]> for Binary {
     }
 }
 
-impl Segment for Binary {
+impl Segment for Bin {
     const VARIANT: Variant = Variant::Binary;
 
     fn wrap(&self, offset: u64) -> Result<Vec<u8>, Error> {
@@ -195,9 +195,9 @@ impl Segment for Binary {
     }
 }
 
-impl Checksum for Binary {}
+impl Checksum for Bin {}
 
-impl Register for Binary {
+impl Register for Bin {
     type Error = io::Error;
     type Entry<'m> = VacantEntry<'m, String, Sector>;
 
@@ -239,10 +239,10 @@ mod tests {
         path
     }
 
-    /// [`Binary::with_capacity`] reserves payload space without accumulating any bytes.
+    /// [`Bin::with_capacity`] reserves payload space without accumulating any bytes.
     #[test]
     fn with_capacity_reserves() {
-        let bin = Binary::with_capacity("b", 64);
+        let bin = Bin::with_capacity("b", 64);
         assert!(bin.is_empty());
         assert_eq!(bin.count(), 0);
         assert!(bin.data.capacity() >= 64);
@@ -255,10 +255,10 @@ mod tests {
         smol::block_on(async {
             let path = scratch("bin-entry");
             let mut file = File::create(&path).await.expect("Create failed");
-            let mut bin = Binary::new("cal");
+            let mut bin = Bin::new("cal");
             bin.push([9u8; 4].as_slice());
             file.write(bin).await.expect("Write failed");
-            let mut twin = Binary::new("cal");
+            let mut twin = Bin::new("cal");
             twin.push([7u8; 2].as_slice());
             let err = file.write(twin).await.expect_err("Duplicate accepted");
             assert!(matches!(
@@ -278,7 +278,7 @@ mod tests {
         smol::block_on(async {
             let path = scratch("bin-sector");
             let mut file = File::create(&path).await.expect("Create failed");
-            let mut bin = Binary::new("cal");
+            let mut bin = Bin::new("cal");
             bin.push([1u8, 2, 3, 4, 5].as_slice());
             file.write(bin).await.expect("Write failed");
             let sect = *file.manifest.bins.get("cal").expect("Bin missing");

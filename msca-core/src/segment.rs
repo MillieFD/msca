@@ -20,7 +20,7 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 //!
 //! - [`Schema`] segments describe the structure of encoded data.
 //! - [`Data`] segments carry columnar buffers for a specified schema instance.
-//! - [`Binary`](crate::binary::Binary) segments carry free-form immutable bytes in any format.
+//! - [`Binary`](crate::binary::Bin) segments carry free-form immutable bytes in any format.
 //!
 //! Multimodality and schema evolution are realised by appending additional schema segments. Data
 //! storage and file extensibility are realised by appending additional data segments. Format
@@ -134,7 +134,7 @@ mod variant {
         Data = 0x02, // DO NOT alter discriminant value (breaking change)
         /// A free-form [`Binary`][1] segment containing immutable bytes in any user-defined format.
         ///
-        /// [1]: crate::binary::Binary
+        /// [1]: crate::binary::Bin
         #[n(3)]
         Binary = 0x03, // DO NOT alter discriminant value (breaking change)
     }
