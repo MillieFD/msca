@@ -12,6 +12,7 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, Bound};
+use std::fmt::{Display, Formatter};
 use std::hash::{Hash, Hasher};
 use std::num::NonZeroU64;
 use std::ops::RangeBounds;
@@ -22,8 +23,7 @@ use minicbor::{CborLen, Decode, Encode};
 use smol::io::{AsyncRead, AsyncReadExt, AsyncSeek};
 
 use crate::io::{Checksum, Deserializer};
-use crate::schema::number::Error;
-use crate::schema::Type;
+use crate::schema::{number, Type};
 use crate::segment::{Header, Segment, Variant};
 use crate::{io, Deserialize, Sector, Serialize};
 
@@ -116,11 +116,11 @@ impl Segment for Manifest {
     const VARIANT: Variant = Variant::Manifest;
 
     #[allow(unused_variables, reason = "manifest segment is not aligned")]
-    fn wrap(&self, offset: u64) -> Result<Vec<u8>, Error> {
+    fn wrap(&self, offset: u64) -> Result<Vec<u8>, number::Error> {
         use crate::io::Buffer;
         const PREFIX: usize = Header::SIZE + size_of::<u64>(); // Σ bytes before the segment body
         let size = self.size()?.get();
-        let full = size.as_usize().checked_add(PREFIX).ok_or(Error::Zero)?;
+        let full = size.as_usize().checked_add(PREFIX).ok_or(number::Error::Zero)?;
         let mut buf = vec![u8::MIN; full];
         buf.as_mut_slice()
             .serialize_push(&{ Self::VARIANT as u8 })?
@@ -136,18 +136,18 @@ impl Checksum for Manifest {}
 impl Serialize for Manifest {
     type Buffer = Vec<u8>;
 
-    fn size(&self) -> Result<NonZeroU64, Error> {
+    fn size(&self) -> Result<NonZeroU64, number::Error> {
         let size: u64 = minicbor::len(self).try_into()?;
-        size.try_into().map_err(Error::Convert)
+        size.try_into().map_err(number::Error::Convert)
     }
 
-    fn serialize_into<'a>(&self, mut buf: &'a mut [u8]) -> Result<&'a mut [u8], Error> {
+    fn serialize_into<'a>(&self, mut buf: &'a mut [u8]) -> Result<&'a mut [u8], number::Error> {
         // SAFETY: minicbor::encode is infallible when writing to &mut [u8]
         minicbor::encode(self, &mut buf).expect("Infallible manifest CBOR encode failed");
         Ok(buf)
     }
 
-    fn serialize(&self) -> Result<Self::Buffer, Error> {
+    fn serialize(&self) -> Result<Self::Buffer, number::Error> {
         // NOTE: Scoped trait import avoids namespace conflict with Buffer struct (below)
         use crate::io::Buffer;
         let size = self.size()?.get().try_into()?;
