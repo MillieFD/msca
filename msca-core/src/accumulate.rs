@@ -603,6 +603,33 @@ pub trait Describe<I>: Accumulate<I> + Serialize {
     fn buffers(&self, offset: u64, columns: &mut Columns) -> Result<u64, schema::Error>;
 }
 
+/* --------------------------------------------------------------- Describe Trait Implementation */
+
+impl<I> Describe<I> for Buffer<I>
+where
+    I: BitMatch + Clone + Unfold + 'static,
+{
+    fn boxed(&self) -> BoxAcc<I> {
+        let buf = Self::default();
+        Box::new(buf)
+    }
+
+    fn buffers(&self, offset: u64, columns: &mut Columns) -> Result<u64, schema::Error> {
+        if let Some(column) = columns.next() {
+            let sector = Sector {
+                offset: offset.checked_add(SizedBuf::<I>::PREFIX).ok_or(Error::Zero)?,
+                size: self.size()?,
+            };
+            let count = self.count().try_into().map_err(Error::from)?;
+            let buf = self.describe(sector, count)?;
+            column.buffers.push(buf);
+            sector.next().ok_or(Error::Zero)?.align().map_err(Into::into)
+        } else {
+            schema::Error::NotFound.into() // expected column is not present
+        }
+    }
+}
+
 /* ----------------------------------------------------------------- Accumulate Trait Definition */
 
 /// An in-memory **data accumulator** that ingests [items](I) of the specified [`Type`][1] and
@@ -1016,33 +1043,6 @@ where
             Buffer::Empty => Error::Zero.into(),
             Buffer::Compact { .. } => Ok(manifest::Buffer::Compact { buffer, count }),
             Buffer::Many(acc) => acc.describe(buffer, count),
-        }
-    }
-}
-
-/* --------------------------------------------------------------- Describe Trait Implementation */
-
-impl<I> Describe<I> for Buffer<I>
-where
-    I: BitMatch + Clone + Unfold + 'static,
-{
-    fn boxed(&self) -> BoxAcc<I> {
-        let buf = Self::default();
-        Box::new(buf)
-    }
-
-    fn buffers(&self, offset: u64, columns: &mut Columns) -> Result<u64, schema::Error> {
-        if let Some(column) = columns.next() {
-            let sector = Sector {
-                offset: offset.checked_add(SizedBuf::<I>::PREFIX).ok_or(Error::Zero)?,
-                size: self.size()?,
-            };
-            let count = self.count().try_into().map_err(Error::from)?;
-            let buf = self.describe(sector, count)?;
-            column.buffers.push(buf);
-            sector.next().ok_or(Error::Zero)?.align().map_err(Into::into)
-        } else {
-            schema::Error::NotFound.into() // expected column is not present
         }
     }
 }
