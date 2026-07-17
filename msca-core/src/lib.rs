@@ -15,6 +15,7 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 // TODO → can any submodules be made private to simplify public surface?
 
 pub mod accumulate;
+pub mod binary;
 pub mod dataset;
 pub mod error;
 pub mod io;
@@ -30,6 +31,7 @@ pub mod schema;
 pub use memmap2::Mmap;
 
 pub use self::accumulate::{Accumulate, Accumulator, BoxAcc, Columns, Describe, Serialize};
+pub use self::binary::Binary;
 pub use self::dataset::Dataset;
 pub use self::error::Error;
 pub use self::io::{Deserialize, Sector, SizedBuf};
