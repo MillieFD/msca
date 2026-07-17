@@ -42,7 +42,7 @@ pub(crate) struct Manifest {
         serde(default, skip_serializing_if = "BTreeMap::is_empty")
     )]
     pub schemas: BTreeMap<String, Schema>,
-    /// Implementers can use the optional free-form `metadata.toml` to attach file-level
+    /// Implementers can use the optional free-form metadata sector to attach file-level
     /// domain-specific information such as:
     ///
     /// - Date and time
@@ -50,7 +50,7 @@ pub(crate) struct Manifest {
     /// - Provenance
     ///
     /// If a metadata section is included in the file, a corresponding `length` and `offset` are
-    /// described in the `manifest`. The core library includes a read and write surface, but
+    /// described in the `manifest`. The core library includes a basic read and write surface, but
     /// implementers must include their own metadata parsing and validation logic.
     #[cfg(feature = "metadata")]
     #[cbor(n(1), skip_if = "Option::is_none")]
