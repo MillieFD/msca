@@ -562,7 +562,7 @@ where
 
 /* ------------------------------------------------------------------- Describe Trait Definition */
 
-/// A type-erasable **column accumulator** that produces [`manifest::Buffer`] descriptors.
+/// A type-erasable **column accumulator** that can be walked for [`manifest::Buffer`] descriptors.
 ///
 /// This trait is implemented by the top-level per-column [`Buffer`] state machine. Implementations
 /// are also generated for external [`Composite`][1] types. Bare [staging buffers](Unfold::RawAcc)
