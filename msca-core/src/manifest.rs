@@ -417,7 +417,7 @@ impl Buffer {
 
 /* ------------------------------------------------------------------------------ Specific Error */
 
-/// Errors returned by [`Manifest`] operations such as segment registration and retrieval.
+/// Errors returned by [`Manifest`] operations such as segment registration or retrieval.
 ///
 /// Enum variants cover various granular error cases that may arise when working with the file
 /// manifest. Users should consider handling errors explicitly wherever possible to provide
