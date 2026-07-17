@@ -1,6 +1,6 @@
 /*
-Project: clem
-GitHub: https://github.com/MillieFD/clem
+Project: msca
+GitHub: https://github.com/MillieFD/msca
 
 BSD 3-Clause License, Copyright (c) 2026, Amelia Fraser-Dale
 
