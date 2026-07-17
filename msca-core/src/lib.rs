@@ -31,7 +31,7 @@ pub mod schema;
 pub use memmap2::Mmap;
 
 pub use self::accumulate::{Accumulate, Accumulator, BoxAcc, Columns, Describe, Serialize};
-pub use self::binary::Binary;
+pub use self::binary::Bin;
 pub use self::dataset::Dataset;
 pub use self::error::Error;
 pub use self::io::{Deserialize, Sector, SizedBuf};
