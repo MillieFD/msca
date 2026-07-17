@@ -163,7 +163,7 @@ impl<'d> Accumulate<&'d [u8]> for Binary {
         self.data.is_empty()
     }
 
-    /// Returns the number of accumulated payload **bytes**.
+    /// Returns the number of accumulated **bytes**.
     fn count(&self) -> u64 {
         self.data.len() as u64
     }
