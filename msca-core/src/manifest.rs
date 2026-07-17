@@ -415,6 +415,65 @@ impl Buffer {
     }
 }
 
+/* ------------------------------------------------------------------------------ Specific Error */
+
+/// Errors returned by [`Manifest`] operations such as segment registration and retrieval.
+///
+/// Enum variants cover various granular error cases that may arise when working with the file
+/// manifest. Users should consider handling errors explicitly wherever possible to provide
+/// meaningful error messages and recovery actions.
+///
+/// ### Implementation
+///
+/// This enum is `#[non_exhaustive]` meaning additional variants may be added in future versions.
+/// Implementers are advised to include a wildcard arm `_` to account for potential additions.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Clone, Debug, Eq, PartialEq, Hash, Ord, PartialOrd, Encode, Decode, CborLen)]
+#[non_exhaustive] // To accommodate potential future error cases.
+pub enum Error {
+    /// No entry is recorded in the [`Manifest`] under the requested [`name`](String).
+    #[n(0)]
+    NotFound {
+        /// Requested [`name`](String) with no corresponding [`Manifest`] entry.
+        #[n(0)]
+        name: String,
+    },
+    /// An entry is already recorded in the [`Manifest`] under the requested [`name`](String).
+    ///
+    /// Segments are immutable once written. Registration can only fill [vacant entries][1].
+    /// Collisions are detected **before** file [`IO`][2] occurs.
+    ///
+    /// [1]: std::collections::btree_map::VacantEntry
+    /// [2]: io::File::write
+    #[n(1)]
+    Collision {
+        /// Requested [`name`](String) shared by the new and existing [`Manifest`] entries.
+        #[n(0)]
+        name: String,
+    },
+}
+
+impl Display for Error {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NotFound { name } => write!(f, "Manifest entry not found → {name}"),
+            Self::Collision { name } => write!(f, "Manifest entry collision → {name}"),
+        }
+    }
+}
+
+impl std::error::Error for Error {}
+
+//noinspection DuplicatedCode → Conversion is implemented for error types in different modules.
+impl<T, E> From<Error> for Result<T, E>
+where
+    E: From<Error>,
+{
+    fn from(error: Error) -> Self {
+        Err(E::from(error))
+    }
+}
+
 /* --------------------------------------------------------------------------------------- Tests */
 
 #[cfg(test)]
