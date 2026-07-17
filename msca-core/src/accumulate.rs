@@ -1036,10 +1036,12 @@ where
     }
 }
 
-    /// Returns the maximum accumulated value, or [`None`] if the [`Item`](I) is not meaningfully
-    /// [orderable](PartialOrd).
-    fn max(&self) -> Option<I> {
-        None
+impl<A> Descriptor for Flatten<A>
+where
+    A: Descriptor,
+{
+    fn describe(&self, buffer: Sector, count: NonZeroU64) -> Result<manifest::Buffer, Error> {
+        self.0.describe(buffer, count)
     }
 }
 
