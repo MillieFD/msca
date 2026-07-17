@@ -1392,16 +1392,34 @@ pub(crate) trait Checksum {
 
 /// An on-disk **data structure** that can be recorded to the file [`Manifest`].
 pub(crate) trait Register {
-    /// The [`Error`][1] type returned by [`register`](Self::register) on failure.
-    ///
-    /// [1]: std::error::Error
+    /// The [`Error`](std::error::Error) type returned by fallible [`Manifest`] operations.
     type Error: Into<Error>;
 
-    /// Consume `self` and generate a corresponding **descriptor** that is appended to the file
-    /// [`Manifest`] after being [written](Segment::write) to disk.
+    /// The **reserved** entry type returned by [`entry`][1] and populated by [`register`][2].
     ///
-    /// Returns the [`Sector`] for subsequent function chaining.
-    fn register<'a>(self, s: &'a Sector, m: &mut Manifest) -> Result<&'a Sector, Self::Error>;
+    /// [1]: Register::entry
+    /// [2]: Register::register
+    type Entry<'m>;
+
+    /// Reserve a vacant [`entry`](Self::Entry) in the [`Manifest`] before file [`IO`][1] occurs.
+    ///
+    /// The reserved entry is consumed by [`register`](Register::register); meaning manifest lookup
+    /// is performed exactly once.
+    ///
+    /// ### Errors
+    ///
+    /// Returns [`Self::Error`] if the entry cannot be reserved. Refer to each implementation for
+    /// specific error cases.
+    ///
+    /// [1]: File::write
+    fn entry<'m>(&self, m: &'m mut Manifest) -> Result<Self::Entry<'m>, Self::Error>;
+
+    /// Consume `self` and populate the reserved [`entry`](Self::entry) with a **descriptor**
+    /// generated from the authoritive written [`Sector`], enforcing the [reserve](Self::entry) →
+    /// [write](File::write) → [populate](Self::register) data flow.
+    ///
+    /// Returns the provided [`Sector`] for subsequent function chaining.
+    fn register<'s, 'm>(self, s: &'s Sector, e: Self::Entry<'m>) -> Result<&'s Sector, Self::Error>;
 }
 
 /* --------------------------------------------------------------------------------------- Tests */
