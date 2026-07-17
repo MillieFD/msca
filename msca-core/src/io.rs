@@ -192,7 +192,7 @@ impl Sector {
     /// buffer is retained rather than pruned.
     ///
     /// [1]: crate::manifest::Buffer::disjoint
-    pub(crate) fn locate<I, S, O>(items: S, width: usize, better: O) -> Option<Self>
+    pub(crate) fn locate<I, S, O>(items: S, width: usize, cmp: O) -> Option<Self>
     where
         S: IntoIterator<Item = Option<I>>,
         O: Fn(&I, &I) -> bool,
@@ -201,7 +201,7 @@ impl Sector {
             .into_iter()
             .enumerate()
             .filter_map(|(index, item)| Some((index, item?))) // Absent items carry no operand
-            .reduce(|best, next| match better(&next.1, &best.1) {
+            .reduce(|best, next| match cmp(&next.1, &best.1) {
                 true => next,
                 false => best,
             })?;
