@@ -70,7 +70,7 @@ use minicbor::{CborLen, Decode, Encode};
 
 use crate::io::{self, Buffer, Checksum, Register, HEADER};
 use crate::manifest::{self, Manifest};
-use crate::schema::number;
+use crate::schema::number::Error;
 use crate::segment::{Align, Header, Segment, Variant};
 use crate::{Accumulate, Sector, Serialize};
 
@@ -141,19 +141,6 @@ impl Binary {
     pub fn extend_from_slice(&mut self, slice: &[u8]) {
         self.data.extend_from_slice(slice);
     }
-
-    /// Number of **zero-filled bytes** inserted after the segment [`Header`](Head) to align the
-    /// segment body to an absolute 64-bit boundary relative to the page-aligned
-    /// [memory map](memmap2::Mmap).
-    ///
-    /// Guaranteed to return a number in the range `[0, 7]` inclusive.
-    ///
-    /// ### Errors
-    ///
-    /// Returns [`Error::Zero`](number::Error::Zero) on `u64` overflow.
-    fn pad(offset: u64) -> Result<usize, number::Error> {
-        offset.checked_add(Header::SIZE as u64).ok_or(number::Error::Zero)?.pad()
-    }
 }
 
 impl<N> From<N> for Binary
@@ -166,7 +153,9 @@ where
 }
 
 impl<'d> Accumulate<&'d [u8]> for Binary {
-    /// Append one chunk of payload bytes to the [accumulator](Binary).
+    /// Append one byte [chunk][1] to the [accumulator](Binary).
+    ///
+    /// [1]: https://doc.rust-lang.org/std/primitive.slice.html
     fn push(&mut self, item: &'d [u8]) {
         self.data.extend_from_slice(item);
     }
@@ -188,22 +177,19 @@ impl<'d> Accumulate<&'d [u8]> for Binary {
 impl Segment for Binary {
     const VARIANT: Variant = Variant::Binary;
 
-    fn wrap(&self, offset: u64) -> Result<Vec<u8>, number::Error> {
-        const ADDS: u64 = { Header::SIZE + size_of::<u64>() } as u64;
-        const LEAD: u64 = size_of::<NonZeroU64>() as u64;
-        let plen = NonZeroU64::new(self.data.len() as u64).ok_or(number::Error::Zero)?;
-        let gap = Self::pad(offset)?;
-        let size = { gap as u64 }
-            .checked_add(LEAD)
-            .ok_or(number::Error::Zero)?
-            .checked_add(plen.get())
-            .ok_or(number::Error::Zero)?;
-        let full = size.checked_add(ADDS).ok_or(number::Error::Zero)?.try_into()?;
+    fn wrap(&self, offset: u64) -> Result<Vec<u8>, Error> {
+        const PREFIX: u64 = { Header::SIZE + size_of::<u64>() } as u64;
+        let pad = offset.checked_add(Header::SIZE as u64).ok_or(Error::Zero)?.pad()?;
+        let size = self.data.size()?.get().checked_add(pad as u64).ok_or(Error::Zero)?;
+        let full = size.checked_add(PREFIX).ok_or(Error::Zero)?.try_into()?;
         let mut buf = vec![u8::MIN; full];
-        let rem =
-            buf.as_mut_slice().serialize_push(&{ Self::VARIANT as u8 })?.serialize_push(&size)?;
-        rem[..gap].fill(u8::MIN);
-        self.data.serialize_into(plen.serialize_into(&mut rem[gap..])?)?;
+        let rem = buf
+            .as_mut_slice()
+            .serialize_push(&{ Self::VARIANT as u8 })?
+            .serialize_push(&size)?
+            .serialize_push(&self.data.count())?;
+        rem[..pad].fill(u8::MIN);
+        self.data.serialize_into(&mut rem[pad..])?;
         Self::checksum(&mut buf)?;
         Ok(buf)
     }
@@ -226,12 +212,12 @@ impl Register for Binary {
         let start = s
             .offset
             .checked_add(Header::SIZE as u64)
-            .ok_or(number::Error::Zero)?
+            .ok_or(Error::Zero)?
             .align()?
             .checked_add(size_of::<NonZeroU64>() as u64)
-            .ok_or(number::Error::Zero)?
+            .ok_or(Error::Zero)?
             .checked_sub(HEADER as u64)
-            .ok_or(number::Error::Zero)?;
+            .ok_or(Error::Zero)?;
         e.insert(Sector::new(start, self.data.len() as u64)?);
         Ok(s)
     }
