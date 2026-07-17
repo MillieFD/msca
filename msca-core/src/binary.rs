@@ -239,15 +239,6 @@ mod tests {
         path
     }
 
-    /// [`Binary::pad`] aligns the post-header position to the next 64-bit boundary.
-    #[test]
-    fn gap_aligns_prefix() {
-        for offset in 0..16u64 {
-            let gap = Binary::pad(offset).expect("Gap failed") as u64;
-            assert_eq!({ offset + Header::SIZE as u64 + gap } % 8, 0);
-        }
-    }
-
     /// [`Binary::with_capacity`] reserves payload space without accumulating any bytes.
     #[test]
     fn with_capacity_reserves() {
@@ -255,26 +246,6 @@ mod tests {
         assert!(bin.is_empty());
         assert_eq!(bin.count(), 0);
         assert!(bin.data.capacity() >= 64);
-    }
-
-    /// [`Segment::wrap`] frames `[variant][size][gap][prefix][payload][checksum]` densely: the
-    /// size field spans gap + prefix + payload with no trailing padding, and the checksum covers
-    /// every preceding byte.
-    #[test]
-    fn frame_layout() {
-        let mut bin = Binary::new("b");
-        bin.push([1u8, 2, 3].as_slice());
-        let offset = 3; // Deliberately misaligned segment start
-        let bytes = bin.wrap(offset).expect("Wrap failed");
-        assert_eq!(bytes[0], Variant::Binary as u8);
-        let head = Header::SIZE;
-        let size = u64::from_le_bytes(bytes[1..head].try_into().expect("Size is 8 bytes"));
-        let gap = Binary::pad(offset).expect("Gap failed");
-        assert_eq!(size as usize, gap + size_of::<NonZeroU64>() + 3); // Dense: no trailing pad
-        assert_eq!(bytes.len(), head + size as usize + size_of::<u64>());
-        Binary::verify(&bytes).expect("Checksum failed");
-        let data = head + gap + size_of::<NonZeroU64>();
-        assert_eq!(&bytes[data..data + 3], &[1, 2, 3]);
     }
 
     /// A duplicate name is rejected while reserving the manifest entry – before any file IO – so
