@@ -11,7 +11,7 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 use std::fmt;
 
 use crate::schema::number;
-use crate::{io, query, schema, segment};
+use crate::{io, manifest, query, schema, segment};
 
 /* ------------------------------------------------------------------------------ Public Exports */
 
@@ -31,6 +31,8 @@ use crate::{io, query, schema, segment};
 pub enum Error {
     /// Underlying [`io::Error`] from the [msca](crate) [file](io::File).
     Io(io::Error),
+    /// Underlying [`manifest::Error`] from [`Segment`](segment::Segment) registration or retrieval.
+    Manifest(manifest::Error),
     /// Underlying [`number::Error`] from a numerical operation or conversion.
     Number(number::Error),
     /// Underlying [`query::Error`] from [querying](query) the [`Dataset`](crate::Dataset).
@@ -53,6 +55,7 @@ impl fmt::Display for Error {
         match self {
             Self::Io(io::Error::Io(e)) => write!(f, "File IO error → {e}"),
             Self::Io(e) => write!(f, "File IO error → {e}"),
+            Self::Manifest(e) => write!(f, "Manifest error → {e}"),
             Self::Number(e) => write!(f, "Number error → {e}"),
             Self::Query(e) => write!(f, "Query error → {e}"),
             Self::Schema(e) => write!(f, "Schema error → {e}"),
@@ -67,6 +70,7 @@ impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             Self::Io(e) => Some(e),
+            Self::Manifest(e) => Some(e),
             Self::Number(e) => Some(e),
             Self::Query(e) => Some(e),
             Self::Schema(e) => Some(e),
@@ -117,11 +121,18 @@ impl From<minicbor::decode::Error> for Error {
 impl From<io::Error> for Error {
     fn from(error: io::Error) -> Self {
         match error {
+            io::Error::Manifest(e) => Self::Manifest(e),
             io::Error::Number(e) => Self::Number(e),
             io::Error::Slice(e) => Self::Slice(e),
             io::Error::Schema(e) => Self::Schema(e),
             other => Self::Io(other),
         }
+    }
+}
+
+impl From<manifest::Error> for Error {
+    fn from(error: manifest::Error) -> Self {
+        Self::Manifest(error)
     }
 }
 
