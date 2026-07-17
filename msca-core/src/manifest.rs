@@ -115,7 +115,7 @@ impl Manifest {
     ///
     /// Refer to the [trait documentation](Register) for more details.
     //noinspection RsNeedlessLifetimes → explicit 'm lifetime improves readability
-    pub fn entry<'m, S>(&'m mut self, seg: S) -> Result<S::Entry<'m>, S::Error>
+    pub fn entry<'m, S>(&'m mut self, seg: &S) -> Result<S::Entry<'m>, S::Error>
     where
         S: Register,
     {
