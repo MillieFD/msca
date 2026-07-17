@@ -42,6 +42,13 @@ pub(crate) struct Manifest {
         serde(default, skip_serializing_if = "BTreeMap::is_empty")
     )]
     pub schemas: BTreeMap<String, Schema>,
+    /// [`Binary`](crate::binary::Binary) segments keyed by [`name`](String).
+    #[cbor(n(1), skip_if = "BTreeMap::is_empty")]
+    #[cfg_attr(
+        feature = "serde",
+        serde(default, skip_serializing_if = "BTreeMap::is_empty")
+    )]
+    pub bins: BTreeMap<String, Sector>,
     /// Implementers can use the optional free-form metadata sector to attach file-level
     /// domain-specific information such as:
     ///
