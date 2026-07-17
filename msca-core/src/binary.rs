@@ -64,7 +64,6 @@ modification, are permitted provided that the conditions of the LICENSE are met.
 // [7]: TODO → link to on-disk-format.md
 
 use std::collections::btree_map::{Entry, VacantEntry};
-use std::num::NonZeroU64;
 
 use minicbor::{CborLen, Decode, Encode};
 
@@ -189,16 +188,21 @@ impl Segment for Bin {
     fn wrap(&self, offset: u64) -> Result<Vec<u8>, Error> {
         const PREFIX: u64 = { Header::SIZE + size_of::<u64>() } as u64;
         let pad = offset.checked_add(Header::SIZE as u64).ok_or(Error::Zero)?.pad()?;
-        let size = self.data.size()?.get().checked_add(pad as u64).ok_or(Error::Zero)?;
-        let full = size.checked_add(PREFIX).ok_or(Error::Zero)?.try_into()?;
+        let size = self.data.size()?.get();
+        let full = size
+            .checked_add(PREFIX)
+            .ok_or(Error::Zero)?
+            .checked_add(pad as u64)
+            .ok_or(Error::Zero)?
+            .try_into()?;
         let mut buf = vec![u8::MIN; full];
         let rem = buf
             .as_mut_slice()
             .serialize_push(&{ Self::VARIANT as u8 })?
             .serialize_push(&size)?
-            .serialize_push(&self.data.count())?;
-        rem[..pad].fill(u8::MIN);
-        self.data.serialize_into(&mut rem[pad..])?;
+            .split_at_mut(pad);
+        rem.0.fill(u8::MIN);
+        self.data.serialize_into(rem.1)?;
         Self::checksum(&mut buf)?;
         Ok(buf)
     }
@@ -223,8 +227,6 @@ impl Register for Bin {
             .checked_add(Header::SIZE as u64)
             .ok_or(Error::Zero)?
             .align()?
-            .checked_add(size_of::<NonZeroU64>() as u64)
-            .ok_or(Error::Zero)?
             .checked_sub(HEADER as u64)
             .ok_or(Error::Zero)?;
         e.insert(Sector::new(start, self.data.len() as u64)?);
@@ -298,6 +300,25 @@ mod tests {
             let abs = sect.offset as usize + HEADER;
             assert_eq!(&bytes[abs..abs + 5], &[1, 2, 3, 4, 5]);
         });
+    }
+
+    /// [`Segment::wrap`] frames a binary segment as `[variant][size][pad][payload][checksum]`: the
+    /// size field spans exactly the payload with no length prefix, up to seven pad bytes align the
+    /// payload to the next absolute 64-bit boundary, and the trailing [checksum](Checksum::verify)
+    /// covers every preceding byte.
+    #[test]
+    fn frame_layout() {
+        let mut bin = Bin::new("cal");
+        bin.push([1u8, 2, 3, 4, 5].as_slice());
+        let bytes = bin.wrap(0).expect("Frame failed");
+        assert_eq!(bytes[0], Variant::Binary as u8);
+        let size = u64::from_le_bytes(bytes[1..Header::SIZE].try_into().expect("Size is 8 bytes"));
+        assert_eq!(size, bin.data.len() as u64); // Size spans the payload alone
+        let start = Header::SIZE.next_multiple_of(8); // Payload begins at the next 64-bit boundary
+        assert_eq!(&bytes[start..start + 5], &[1, 2, 3, 4, 5]);
+        assert_eq!(bytes.len(), start + 5 + size_of::<u64>()); // header + pad + payload + checksum
+        let body = Bin::verify(&bytes).expect("Checksum failed"); // Trailing checksum verifies
+        assert_eq!(body, &bytes[..bytes.len() - size_of::<u64>()]);
     }
 
     /// [`Extend`] moves bytes into the accumulator from any [`IntoIterator`] that yields [`u8`],
