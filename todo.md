@@ -58,6 +58,7 @@
         - [x] One `Seq` reader serves sized and optional unsized columns; the `u64::MAX` sentinel encodes `None`.
         - [x] Manifest buffer sectors include the whole composite buffer body; exclude buffer header (length prefix).
         - [x] Fix `OptSeq::push` to keep cumulative offsets monotonic across a trailing `None` row.
+        - [x] Fix `Seq::deserialize` to accept an omitted data sub-buffer; an exhausted source yields an empty cursor.
         - [x] `Deserialize::deserialize` advances a `&mut &[u8]` cursor so leaf readers stream sequentially.
         - [x] `Seq`/`OptSeq` offsets are zero-based cumulative ends (`u64`); `None` uses the `u64::MAX` sentinel.
         - [x] Unsized readers collect each row lazily via the built-in `Iterator::collect` (no handwritten collect).
@@ -65,12 +66,30 @@
             - Read decodes each row via `str::from_utf8` into a borrowed `&str` or owned `String`.
         - [ ] Nested type support via `Flatten` reader; serialization collapses nested types into one on-disk layer.
         - [ ] Automatically bit-pack `Vec<bool>` during serialization; schema records the column type as `BitVec`.
-    - [x] Embed query filters into `Reader` construction for composability:
-        - [x] State machines hold sub-readers; each sub-stream is built lazily inside `with_filters`.
-        - [x] `OptBitVec` inspects the `Outcome::Exclude` wrapped item to ensure mask & data streams stay in lockstep.
-        - [x] Value filters on an optional column test `Some` only; `None` rows are retained (use `is_some` to remove).
+    - [x] Redesign the query around **deserialize-once typed column chains**; every predicate is a static test:
+        - [x] Concrete `Query` struct; extraction is selection via `Query::column::<I>`; `Query::select` removed.
+        - [x] `mod column`: `Column` + hidden `Adapter`/`Sync`, blanket impl, `Root`, one named adapter per filter.
+        - [x] `mod stream`: Result engine + one stream twin per filter; both modules live under `query/`.
+        - [x] `Read`/`Reader` stay pure; `Evaluate` hooks the typed tests.
+        - [x] Result engine yields `Result<I, Error>`; `Outcome` enters at the column boundary via `From`.
+        - [x] `Exclude` originates only in the filter adapters.
+        - [x] `eq`/`ne`/`one_of`/`none_of` use bit-pattern equality via `BitMatch`; each runs an eager buffer prune.
+        - [x] `join` consumes both handles → `Join`; `Join::unpack` recovers them (tuple return waived once).
+        - [x] Hidden `Sync` intersects segment-tagged buffer lists by ordinal; cross-query joins raise `Error::Join`.
+        - [x] Positional windows via `RangeBounds<u64>`: `Query::get`/`Column::get` return a `SubSet`.
+        - [x] `SubSet` truncates whole buffers + `skip`/`take` residuals; `item` deserializes exactly one slot.
+        - [x] `SubSet<Query>` forwards `column` / `read` / `collect` / `item` / `get` / `count`.
+        - [x] `#[derive(Read)]` emits two `Source` impls: over `Query` (via `Query::flow`) and a left-nested `Join`.
+        - [ ] String predicates: relax the `Deserialize` gate and add statistic pruning for `String`/`&str` columns.
+        - [ ] Option-flattening QoL: yield the inner `I` directly; semantics equal `column::<Option<I>>()?.is_some()`.
+        - [ ] Optional `Option<&str>` reader (zero-copy borrowed optional strings; currently only owned `String`).
+        - [ ] Cross-schema `join` matching (join columns from compatible-but-distinct schemas).
+        - Note: `Evaluate` is concrete per plain type plus blankets over `Option<I>` and `Vec<I>`.
+        - Note: a GAT-discriminated blanket cannot coexist with the generic coverage; coherence forbids it.
     - [ ] Expand `#[derive(Data)]` to support enums by encoding the discriminant.
     - [ ] Add remaining query filters: `mask` + `limit` + `offset`
+        - `limit`/`offset` are the standard `Iterator::take`/`skip` on `Query::read`; no builder methods added.
+        - `mask` intentionally omitted: it duplicates `.eq(col, true)`/`.is_some(col)` without new capability.
     - [x] `Query::read` and `Query::collect` are no longer async; update documentation.
         - [x] Remove async references from [read-cycle.md](./doc/read-cycle.md).
         - [x] Remove async references from [query-filters.md](./doc/query-filters.md).
@@ -78,20 +97,48 @@
         - Write path remains async e.g. `Dataset::write` and `Dataset::schema` because they perform file IO.
 - [x] SIMD alignment on all critical data fields.
     - [x] Remove static `align` fn in favour of `Align` trait; blanket impl over `TryInto<u64>`.
-    - [x] Enhance `Serialize` trait with new `serialize_into_aligned` function.
-    - [x] Enhance `Buffer` trait with new `serialize_push_aligned` function.
     - [x] Update constants for file header and segment header lengths.
-    - [x] Extend procedural macro to generated and use the new trait alignment functions.
+    - [x] Extend procedural macro to frame each column field using `SizedBuf` (see below).
     - [x] Length prefixes record exact sizes; the read path is unaffected (no phantom rows).
+- [x] Route all length-prefixed serialisation and deserialisation through `SizedBuf`:
+    - [x] `Serialize` impls describe only themselves: `size` returns exactly the bytes `serialize_into` writes.
+    - [x] `payload`, `framed`, `serialize_into_aligned`, `serialize_push_aligned` removed from the traits.
+    - [x] `Serialize for SizedBuf` is the single framing point: `NonZeroU64` prefix + payload + 64-bit padding.
+    - [x] `SizedBuf::size` returns the framed footprint; a blanket `Serialize for &I` borrows without copies.
+    - [x] Zero-length regions never reach disk: empty sub-regions are omitted; `SizedBuf` raises `Error::Zero`.
+    - [x] `SizedBuf::deserialize` rejects a zero prefix and consumes trailing padding; omissions exhaust the source.
+    - [x] `Deserializer<'de>` binds the source lifetime so `SizedBuf` acts as both target and source.
+    - [x] `OptBitVec`/`Seq::deserialize` chain `deserialize_into::<SizedBuf<&[u8]>>` to cut each sub-buffer.
+    - [x] `SizedBuf` is `pub` + `#[doc(hidden)]` (re-exported as `::msca::SizedBuf`) for `#[derive(Data)]` output.
+    - Segment header `length` fields are **not** routed: they are header fields, not `[len][payload]` regions.
+- [x] Remove trailing segment padding; pack segments densely and self-align data-segment buffers:
+    - [x] `Segment::wrap` frames `[variant][size][payload][checksum]` from the absolute offset; no default body.
+    - [x] Schema and manifest segments share the dense `segment::compact` helper and carry **no** padding.
+    - [x] Data segments self-align: `Accumulator::wrap` writes metadata, an offset-derived gap, then the buffers.
+    - [x] The first buffer lands on an **absolute** 64-bit boundary; each buffer is a 64-bit multiple so rest follow.
+    - [x] Checksums route through a `Checksum: Segment` trait (`checksum` seals, `verify` strips) with shared bodies.
+    - [x] `Header::checksum`/`Deserialize::unframe` removed; `Manifest::from_file` verifies then decodes the payload.
 - [ ] Standardise buffer sector offset is relative to the immutable segment region excluding the file header:
-    - [x] Update `Serialize::sector` and `Header::tail` documentation.
+    - [x] Update `Serialize::sector` documentation.
     - [ ] Refactor all buffer offset calculations to reflect this change.
         - [x] `Push for Accumulator` records buffer offsets relative to the mmap (excludes the file header).
-        - [ ] `Header::tail`, segment sectors, and manifest sectors still use absolute file offsets.
+        - [ ] Segment sectors and manifest sectors still use absolute file offsets.
         - [ ] Search for other buffer offset uses and calculations that require refactoring.
+- [x] Simplify the write-cycle to four phases and add segment + manifest checksums for durability.
+    - [x] Add a XXH3-64 `checksum: u64` suffix to every segment: `[variant][size][payload][checksum]`.
+        - `Serialize::size`/`serialize_into` now describe only the unframed payload (`xxhash-rust` dependency).
+        - `size` is the exact payload byte count; the reader stride is `next = offset + size + 8`.
+    - [x] Add `Variant::Manifest = 0x00`; the manifest is written as an ordinary checksummed segment.
+    - [x] Phase two routes through the consuming `Register` trait:
+        - [x] `Write` trait removed; its provided `write` body merged verbatim into `Segment::write`.
+        - [x] `manifest::Buffer` construction centralised in `accumulate::Buffer`; `Empty` raises `Error::Zero`.
+        - [x] `Accumulate` slimmed; dyn-compatible `Describe` carries `boxed` + `buffers` (`BoxAcc`).
+    - [x] Update [write-cycle.md](./doc/write-cycle.md) and [on-disk-format.md](./doc/on-disk-format.md).
+    - [x] Update [file-header.md](./doc/file-header.md) and [manifest.md](./doc/manifest.md).
 - [ ] Manifest rebuild function
-    - [ ] Triggered automatically during `File::open` if corruption is detected.
-    - [ ] Ensure the on-disk layout is sufficiently self-describing to support rebuild.
+    - [ ] Triggered automatically during `File::open` if corruption is detected (now detectable via checksum).
+    - [x] On-disk layout is self-describing: checksums + `size` stride + schema back-pointer make it walkable.
+    - [ ] Walk the segment region in `Manifest::rebuild`, verifying each segment checksum.
     - [ ] Identify any redundant on-disk fields not required for the layout to self-describe.
     - [ ] Remove redundant fields to optimise on-disk size.
 - [x] Ensure schema / type verification is performed exactly once; not per-read.
@@ -105,14 +152,26 @@
     - [x] Add `Dataset::schema` to register a schema and return an empty `Accumulator`.
     - [x] Add `Dataset::write` to commit one data segment.
     - [x] Implement `Clone` for `Accumulator` to bypass schema and type revalidation.
-- [ ] Finish `clem-core` root module (lib) to re-export public API. Check all visibility modifiers.
-- [x] Finalise `clem-derive` procedural macro design.
+    - [x] Add `Dataset::get_or_insert` replacing `Dataset::index`; one stable index per item, in request order.
+        - Dedup via a transient `HashMap<I, u64>` keyed on the **item itself** (`I: Eq + Hash`), `xxh3` hashing.
+        - Caller-chosen index type: any unsigned integer or `usize`, in memory only, never on disk.
+        - Fails fast if the schema + accumulated count overflows `N`.
+        - Items accepted from any `IntoIterator`; an empty iterator performs no file IO.
+        - Pre-existing duplicates (`Dataset::write` never dedups): earliest committed occurrence wins.
+        - No `Clone` bound: items are **moved** into the map → unseen items drained into accumulator in order.
+        - On-disk order matches the returned indices; verified by mutation (reversing the drain order fails).
+    - [x] Assess a `u64`/`u128` digest map (no key allocation, flat entries): **rejected** for exactness.
+        - A digest collision silently aliases two distinct items to one permanent index; revisit with profiling.
+    - [ ] Per-column `unique` reader on `query::Column` to produce a deduplicated collection e.g. `HashSet`.
+    - [ ] Per-column `unique_with_index` reader on `query::Column` to produce a deduped item → index `HashMap`.
+- [ ] Finish `msca-core` root module (lib) to re-export public API. Check all visibility modifiers.
+- [x] Finalise `msca-derive` procedural macro design.
 - [x] Add `README.md` including:
-    - [x] What is clem; high-level overview with a link to [on-disk-format.md](./doc/on-disk-format.md) for details.
-    - [x] Cite clem in academic work; link to `CITATION.cff` file and instructions for citing the crate.
-    - [x] Why use clem; motivation and design goals.
-    - [x] When to use clem; ideal use-cases and comparison to Parquet + Arrow IPC + HDF5 + SQLite
-    - [x] How to use clem; installation instructions and link to [user-guide.md](./doc/user-guide.md) for details.
+    - [x] What is msca; high-level overview with a link to [on-disk-format.md](./doc/on-disk-format.md) for details.
+    - [x] Cite msca in academic work; link to `CITATION.cff` file and instructions for citing the crate.
+    - [x] Why use msca; motivation and design goals.
+    - [x] When to use msca; ideal use-cases and comparison to Parquet + Arrow IPC + HDF5 + SQLite
+    - [x] How to use msca; installation instructions and link to [user-guide.md](./doc/user-guide.md) for details.
     - [x] Describe the optional crate features; when should each feature be enabled / disabled and why.
 - [x] Add a `CITATION.cff` file (CFF 1.2.0; author Amelia Fraser-Dale, ORCID 0009-0005-1160-1367, BSD-3-Clause).
 - [ ] Add [user-guide.md](./doc/user-guide.md) with basic usage examples:
@@ -120,7 +179,6 @@
     - [ ] Register a schema for external composite types; explains `#[derive(Data)]` and `Dataset::schema`.
     - [ ] Write a data segment; explains `Accumulator` and `Dataset::write` with subheadings for advanced use cases:
         - [ ] Multithreaded accumulation via `Clone`.
-        - [ ] When + why + how to use the `map` feature with example code.
         - [ ] When + why + how to use the `set` feature with example code.
         - [ ] When + why + how to use the `index` feature with example code.
     - [ ] Query data; explains `Dataset::query` and the `Query` API with filters and iterators.
@@ -130,77 +188,25 @@
     - [ ] Add comprehensive unit tests for core functionalities in each module; cover edge cases.
     - [ ] White-box accumulation and write tests for every supported type; check on-disk layout matches the spec.
     - [x] External user perspective round-trip tests for `#[derive(Data)]` and `#[derive(Read)]` in "tests" directory.
-    - [x] No round-trip tests in `clem-core` and `clem-derive` crates; move to "tests" directory (external perspective).
+    - [x] No round-trip tests in `msca-core` and `msca-derive` crates; move to "tests" directory (external perspective).
 - [x] Remove all references to concurrency model `RwLock<Manifest>` in documentation; concurrency is deferred.
 - [x] Alignment functions should use `core::num::next_multiple_of` for compiler optimisation.
 
 ### Extend Functionality (Priority III)
 
-- [ ] Implement common process abstractions without adding new segment types:
-    - [ ] Add feature-gated `Set` abstraction to guarantee item uniqueness across all data segments:
-        - [ ] New `set` feature in `Cargo.toml` (OFF by default).
-        - [ ] Shape described by `schema` segment, items stored in `data` segments.
-        - [ ] Composite types are supported; uniqueness is determined by the type's `PartialEq` implementation.
-        - [ ] Abstraction coordinated via the `Set` struct wrapping an `Accumulator`; initialised via `Dataset::set`
-        - [ ] API inspired by `BTreeSet` in the standard library:
-            - [ ] `Set::insert` adds a new item; returns an error if the item already exists.
-            - [ ] `Set::get` retrieves an item; returns `None` if the item does not exist.
-            - [ ] `Set::get_or_insert` retrieves an item; inserts a provided item if it does not exist.
-            - [ ] `Set::get_or_insert_with` retrieves an item or inserts a value generated by a provided closure.
-            - [ ] `Set::contains` returns `true` if an item exists in the set.
-            - [ ] `Set::iter` returns an iterator over all items in the set; use on-disk order (unguaranteed).
-        - [ ] Data segments are immutable; set entry removal and in-situ mutation are not supported (append-only)
-        - [ ] All lookup and insertion operations use existing `query` and `write` machinery; no new segment types.
-        - [ ] Add feature-gated `sets` field to the manifest:
-            - [ ] Sets are not duplicated in the manifest `schemas` field.
-            - [ ] CBOR decoding ignores on-disk `sets` field if present when the feature is disabled.
-            - [ ] CBOR encoding adds on-disk `sets` field if absent when the feature is enabled.
-        - [ ] Order is not guaranteed; sorting would require mutation of existing segments (explicitly disallowed).
-    - [ ] Add feature-gated `Map` abstraction to amortise the cost of large repetitive values:
-        - [ ] Replaces current prototype `dictionary` feature with `map` feature in `Cargo.toml` (OFF by default).
-        - [ ] Shape described by `schema` segment, entries (keys + items) stored in `data` segments.
-        - [ ] Key uniqueness guaranteed across all data segments.
-        - [ ] Abstraction coordinated via the `Map` struct:
-            - [ ] Contains an `Accumulator` to store new entries and an `Arc<Mmap>` to read existing entries.
-            - [ ] Initialised via `Dataset::map`.
-        - [ ] API inspired by `BTreeMap` in the standard library:
-            - [ ] `Map::insert` adds a new entry; returns an error if the key already exists.
-            - [ ] `Map::get` retrieves an item by key; returns `None` if the key does not exist.
-            - [ ] `Map::get_or_insert` retrieves an item by key; inserts a provided item if the key does not exist.
-            - [ ] `Map::get_or_insert_with` retrieves an item by key or inserts a value generated by a provided closure.
-            - [ ] `Map::contains_key` returns `true` if a key exists in the map.
-            - [ ] `Map::iter` returns an iterator over all key-value pairs in the map.
-            - [ ] `Map::keys` returns an iterator over all keys in the map.
-            - [ ] `Map::values` returns an iterator over all values in the map.
-        - [ ] Data segments are immutable; map entry removal and in-situ mutation are not supported (append-only)
-        - [ ] All lookup and insertion operations use existing `query` and `write` machinery; no new segment types.
-        - [ ] Add feature-gated `maps` field to the manifest:
-            - [ ] Maps are not duplicated in the manifest `schemas` field.
-            - [ ] CBOR decoding ignores on-disk `maps` field if present when the feature is disabled.
-            - [ ] CBOR encoding adds on-disk `maps` field if absent when the feature is enabled.
-        - [ ] Order is not guaranteed; sorting would require mutation of existing segments (explicitly disallowed).
-    - [ ] Add feature-gated index abstraction for items sorted by insertion order:
-        - [x] New `index` feature in `Cargo.toml` (OFF by default).
-        - [ ] Insertion index is calculated across all data segments corresponding to the specified schema.
-        - [ ] Shape described by `schema` segment, items stored in `data` segments.
-        - [ ] Abstraction adds functionality to the existing `Accumulator` struct:
-            - [ ] Add `next: u64` field to track the next available index for insertion.
-            - [ ] Add `next` initialisation summing all on-disk buffer item counts.
-            - [ ] Add `next` incrementation in `Accumulate::push` to keep track of insertion index.
-            - [ ] Add `Accumulator::<I>::insert(&self, item: I) -> u64` function:
-                - Delegates to `Accumulate::push` internally.
-                - Returns the inserted index.
-        - [ ] Duplicate items are allowed; uniqueness is not guaranteed.
-        - [ ] Stored using the manifest `schemas` field; no new manifest machinery or segment types.
-- [ ] Support compact encoding for buffers with a single repeated value e.g. all `true` or all `None`.
-    - [ ] Compact buffers contain exactly one serialized value regardless of the segment header `count`.
-    - [ ] Detected when the buffer header `next` offset is reached after deserialising a single value.
+- [x] Support compact encoding for buffers with a single repeated value e.g. all `true` or all `None`.
+    - [x] Compact buffers contain exactly one serialized value regardless of the segment header `count`.
+        - The on-disk body is byte-identical to a one-row buffer; the segment layout is unchanged.
+    - [x] Detected when the buffer header `next` offset is reached after deserialising a single value.
     - Breaks the current assumption that all buffers in a data segment contain the same number of items.
-    - [ ] Refactor `manifest::Buffer` struct into enum:
-        - [ ] Current buffer becomes `Buffer::Full` variant with fields.
-        - [ ] Add `Buffer::Lite` variant with a single `item: [u8; B]` field containing the single serialized value.
-    - [ ] Query readers can deserialize directly from `Buffer::Lite` without file IO.
-    - [ ] Accumulator begins with all `Buffer::Lite`; switches to `Buffer::Full` when a different value is pushed.
+    - [x] Refactor `manifest::Buffer` struct into enum:
+        - [x] Current buffer becomes `Buffer::Full` variant with fields.
+        - [x] Add `Buffer::Lite` with `sector` (spans ONE row) + `count`; the repeated item stays on disk.
+    - [x] Query readers decode the single item once at stream construction and repeat the outcome `count` times.
+    - [x] Accumulator begins with all `Buffer::Lite`; switches to `Buffer::Full` when a different value is pushed.
+        - `accumulate::Buffer<A, I>` wraps every top-level column accumulator via `Schema::column`.
+        - The first differing push replays the repeated item into the inner accumulator; one-off `O(count)` time.
+        - Uniformity compares via `BitMatch::ne`: floats use the exact bit pattern (matching `NaN` stays compact).
 - [ ] Fix `serde` crate feature; requires `bitvec` dependency to activate the `serde` feature.
 - [ ] Add an optional feature-gated free-form metadata binary blob written after the manifest.
     - [ ] CBOR decoding ignores on-disk `metadata: Sector` field if present when the feature is disabled.
@@ -211,10 +217,10 @@
 
 ### Crate Features (Priority IV)
 
-- [x] Add `derive` feature (ON by default) to enable `clem-derive` sub-crate.
+- [x] Add `derive` feature (ON by default) to enable `msca-derive` sub-crate.
 - [ ] Add `no-std` feature (OFF by default).
 - [ ] Add `async` feature (ON by default) to use `smol::fs` instead of `std::fs`.
 
 ### Ecosystem & Tooling (Priority V)
 
-- [ ] Produce a CLI tool for inspecting `clem` files. Write to `clem-cli` subcrate.
+- [ ] Produce a CLI tool for inspecting `msca` files. Write to `msca-cli` subcrate.
