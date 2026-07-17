@@ -110,6 +110,17 @@ impl Manifest {
     pub fn rebuild(data: &[u8], tail: NonZeroU64) -> Self {
         unimplemented!("Manifest::rebuild is not yet implemented")
     }
+
+    /// Returns the corresponding [entry](S::Entry) in [`self`](Self) for the provided [`Segment`].
+    ///
+    /// Refer to the [trait documentation](Register) for more details.
+    //noinspection RsNeedlessLifetimes → explicit 'm lifetime improves readability
+    pub fn entry<'m, S>(&'m mut self, seg: S) -> Result<S::Entry<'m>, S::Error>
+    where
+        S: Register,
+    {
+        seg.entry(self)
+    }
 }
 
 impl Segment for Manifest {
