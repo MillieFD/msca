@@ -2,12 +2,12 @@
 
 The file header begins with a magic byte sequence used to identify the file type. The file IO mechanisms defined in this
 module will reject incorrect magic byte sequences. Implementers may prepend their own file header – e.g. to indicate a
-specific file type built atop `clem` with a canonical schema – but must remove the prepended data before passing to the
+specific file type built atop `msca` with a canonical schema – but must remove the prepended data before passing to the
 underlying reader.
 
 ```text
 Header
-├─ magic: [u8; 4]      // b"clem"
+├─ magic: [u8; 4]      // b"msca"
 ├─ version: u8
 ├─ manifest: Sector    // size & offset of the manifest segment
 └─ alignment padding   // zero-filled to the next 64-bit boundary
