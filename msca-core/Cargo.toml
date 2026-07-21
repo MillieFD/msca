@@ -44,3 +44,7 @@ default = []
 log = ["dep:log"] # TODO Implement logging.
 metadata = []
 serde = ["dep:serde"]
+
+[dev-dependencies]
+macro_rules_attribute = "0.2.2"
+smol-macros = "0.1.1"
