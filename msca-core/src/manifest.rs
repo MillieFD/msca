@@ -493,13 +493,24 @@ mod tests {
 
     use super::*;
 
+    /* ---------------------------------------------------------------------------- Shared State */
+
+    /// Build a read-only anonymous [`Mmap`] over `bytes`, backing the statistic resolution tests.
+    fn map(bytes: &[u8]) -> Mmap {
+        let mut mmap = MmapMut::map_anon(bytes.len().max(1)).expect("Anonymous map failed");
+        mmap[..bytes.len()].copy_from_slice(bytes);
+        mmap.make_read_only().expect("Read-only conversion failed")
+    }
+
+    /* ------------------------------------------------------------------------------ Unit Tests */
+
     /// A manifest segment round-trips: [`frame`](Segment::wrap) then [`verify`](Checksum::verify)
     /// the checksum and [`deserialize`](Deserialize::deserialize) the payload to recover the
     /// original [`Manifest`].
     #[test]
     fn manifest_segment_round_trips() {
         let manifest = Manifest::default();
-        let bytes = manifest.wrap(0).expect("Frame failed");
+        let bytes = manifest.wrap(0).expect("Wrap failed");
         let region = Manifest::verify(&bytes).expect("Checksum failed");
         let out = Manifest::deserialize(&mut &region[Header::SIZE..]).expect("Deserialize failed");
         assert_eq!(out, manifest);
@@ -510,7 +521,7 @@ mod tests {
     #[test]
     fn manifest_checksum_detects_corruption() {
         let mut bytes = Manifest::default().wrap(0).expect("Frame failed");
-        bytes[Header::SIZE] ^= u8::MAX; // Flip the first payload byte
+        bytes[Header::SIZE] ^= u8::MAX; // flip the first payload byte
         let err = Manifest::verify(&bytes).expect_err("Corruption undetected");
         assert!(matches!(err, io::Error::Checksum));
     }
@@ -549,11 +560,9 @@ mod tests {
     /// deserializes each as exactly one item: `[10, 30]` is disjoint from `100..200` but overlaps
     /// `20..40`.
     #[test]
-    fn detailed_disjoint_by_statistics() {
+    fn detailed_buffer_disjoint_by_statistics() {
         let bytes = [10u32.to_le_bytes(), 30u32.to_le_bytes()].concat();
-        let mut mmap = MmapMut::map_anon(bytes.len()).expect("Anonymous map failed");
-        mmap[..bytes.len()].copy_from_slice(&bytes);
-        let mmap = mmap.make_read_only().expect("Read-only conversion failed");
+        let mmap = map(&bytes);
         let width = size_of::<u32>() as u64;
         let detailed = Buffer::Detailed {
             buffer: Sector::new(0u64, bytes.len() as u64).expect("Sector::new failed"),
@@ -561,20 +570,17 @@ mod tests {
             min: Sector::new(0u64, width).expect("Sector::new failed"),
             max: Sector::new(width, width).expect("Sector::new failed"),
         };
-        // SAFETY: the statistic sectors span serialized `u32` items matching the requested type
-        let away = unsafe { detailed.disjoint(&(100u32..200), &mmap) }.expect("Disjoint failed");
-        assert!(away);
-        // SAFETY: as above
-        let over = unsafe { detailed.disjoint(&(20u32..40), &mmap) }.expect("Disjoint failed");
-        assert!(!over);
+        // 100..200 is entirely above [10, 30] → buffer is removed
+        assert!(unsafe { detailed.disjoint(&(100u32..200), &mmap) }.expect("Disjoint failed"));
+        // 20..40 straddles [10, 30] → buffer is retained
+        assert!(!unsafe { detailed.disjoint(&(20u32..40), &mmap) }.expect("Disjoint failed"))
     }
 
-    /// [`Compact`](Buffer::Compact) and [`Basic`](Buffer::Basic) descriptors carry no statistics and
-    /// are never provably disjoint; a compact item is instead evaluated exactly by a value filter.
+    /// [`Compact`](Buffer::Compact) and [`Basic`](Buffer::Basic) descriptors carry no statistics
+    /// and are never provably disjoint; a compact item is instead evaluated exactly by a filter.
     #[test]
-    fn compact_and_basic_never_disjoint() {
-        let mmap = MmapMut::map_anon(1).expect("Anonymous map failed");
-        let mmap = mmap.make_read_only().expect("Read-only conversion failed");
+    fn compact_and_basic_are_never_disjoint() {
+        let mmap = map(&[u8::MIN]);
         let buffer = Sector::new(8u64, 16u64).expect("Sector::new failed");
         let count = NonZeroU64::new(3).expect("Count is zero");
         for buf in [
@@ -590,7 +596,7 @@ mod tests {
     /// [`Schema::count`] sums the item counts across every buffer of the first column, spanning all
     /// three descriptor variants.
     #[test]
-    fn schema_count_sums_buffers() {
+    fn schema_count_sums_every_buffer() {
         let sector = Sector::new(8u64, 16u64).expect("Sector::new failed");
         let detailed = Buffer::Detailed {
             buffer: sector,

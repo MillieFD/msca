@@ -1295,7 +1295,7 @@ mod tests {
     #[test]
     fn column_reuse_with_same_type_deduplicates() {
         let mut schema = schema();
-        assert!(schema.column::<u32>("a").is_ok());
+        schema.column::<u32>("a").expect("Identical column rejected");
         assert_eq!(schema.columns.len(), 1);
     }
 

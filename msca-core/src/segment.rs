@@ -466,8 +466,10 @@ mod tests {
         let mut corrupt = bytes.clone();
         let at = corrupt.len() - size_of::<u64>();
         corrupt[at - 1] ^= u8::MAX; // flip a payload byte
-        assert!(Schema::verify(&bytes).is_ok()); // the intact frame verifies
-        assert!(matches!(Schema::verify(&corrupt), Err(io::Error::Checksum)));
+        let intact = Schema::verify(&bytes).expect("Intact frame rejected");
+        let error = Schema::verify(&corrupt).expect_err("Corruption undetected");
+        assert_eq!(intact, &bytes[..bytes.len() - size_of::<u64>()]);
+        assert!(matches!(error, io::Error::Checksum));
     }
 
     /// [`Variant::try_from`] maps the manifest discriminant `0x00`.
