@@ -282,6 +282,12 @@ impl From<TryFromIntError> for Error {
     }
 }
 
+impl From<std::io::Error> for Error {
+    fn from(e: std::io::Error) -> Self {
+        io::Error::from(e).into()
+    }
+}
+
 //noinspection DuplicatedCode → Conversion is implemented for error types in different modules.
 impl<T, E> From<Error> for Result<T, E>
 where
