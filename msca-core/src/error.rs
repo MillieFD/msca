@@ -170,21 +170,26 @@ impl From<segment::Error> for Error {
 
 #[cfg(test)]
 mod tests {
+    use std::io::{self, ErrorKind};
+    use std::str;
+
     use super::*;
 
+    /* ------------------------------------------------------------------------------ Unit Tests */
+
+    /// A [`io::Error`] converts into a msca [`Error`] carrying the source message.
     #[test]
-    fn from_io_error() {
-        use std::io::{self, ErrorKind};
+    fn std_io_error_converts_with_message() {
         let source = io::Error::new(ErrorKind::Other, "Test IO error");
         let error: Error = source.into();
         assert_eq!(error.to_string(), "File IO error → Test IO error");
     }
 
+    /// A [`Utf8Error`](str::Utf8Error) from invalid bytes converts into a msca [`Error`].
     #[test]
     #[allow(invalid_from_utf8)]
-    fn from_utf8_error() {
-        use std::str;
-        let source = str::from_utf8(b"\xFF").unwrap_err();
+    fn utf8_error_converts_with_prefix() {
+        let source = str::from_utf8(b"\xFF").expect_err("invalid UTF-8 accepted");
         let error: Error = source.into();
         assert!(error.to_string().starts_with("UTF8 from bytes error →"));
     }
