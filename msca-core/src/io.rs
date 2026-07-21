@@ -1420,7 +1420,8 @@ pub(crate) trait Register {
     /// [write](File::write) → [populate](Self::register) data flow.
     ///
     /// Returns the provided [`Sector`] for subsequent function chaining.
-    fn register<'s, 'm>(self, s: &'s Sector, e: Self::Entry<'m>) -> Result<&'s Sector, Self::Error>;
+    fn register<'s, 'm>(self, s: &'s Sector, e: Self::Entry<'m>)
+    -> Result<&'s Sector, Self::Error>;
 }
 
 /* --------------------------------------------------------------------------------------- Tests */
@@ -1429,23 +1430,28 @@ pub(crate) trait Register {
 mod tests {
     use super::*;
 
+    /* ------------------------------------------------------------------------------ Unit Tests */
+
+    /// [`Sector`] orders by offset, so a later sector compares greater than an earlier one.
     #[test]
-    fn sector_ord() {
+    fn sector_orders_by_offset() {
         let hi = Sector::new(200, 16).expect("Sector::new failed for hi");
         let lo = Sector::new(100, 16).expect("Sector::new failed for lo");
         assert!(hi > lo);
         assert!(lo < hi);
     }
 
+    /// Two sectors at one offset are unequal when their sizes differ.
     #[test]
-    fn sector_eq() {
+    fn sector_distinguishes_size() {
         let short = Sector::new(100, 16).expect("Sector::new failed for short");
         let long = Sector::new(100, 32).expect("Sector::new failed for long");
         assert_ne!(short, long);
     }
 
+    /// [`Sector`] is [`Copy`], so a bind duplicates rather than moves.
     #[test]
-    fn sector_copy() {
+    fn sector_is_copy() {
         let a = Sector::new(10, 5).expect("Sector::new failed");
         let b = a;
         assert_eq!(a, b);
@@ -1453,20 +1459,20 @@ mod tests {
 
     /// [`Sector::new`] rejects a zero `length`; every sector must describe at least one byte.
     #[test]
-    fn sector_zero_length_errors() {
-        assert!(Sector::new(100, 0).is_err());
+    fn sector_rejects_zero_length() {
+        Sector::new(100, 0).expect_err("Zero-length sector accepted");
     }
 
     /// [`Sector::next`] returns [`None`] when the trailing offset overflows `u64`.
     #[test]
-    fn sector_next_overflow() {
+    fn sector_next_reports_overflow() {
         let sector = Sector::new(u64::MAX, 1u64).expect("Sector::new failed");
         assert!(sector.next().is_none());
     }
 
     /// File [`HEADER`] is rounded up ↑ to the next 64-bit alignment boundary.
     #[test]
-    fn header_aligned() {
+    fn header_aligns_to_boundary() {
         assert_eq!(HEADER % 8, 0);
         assert!(ALIGN < 8);
     }
@@ -1502,13 +1508,11 @@ mod tests {
     /// fully consumes the source.
     #[test]
     fn sized_buf_round_trips() {
+        let expect = [3, 0, 0, 0, 0, 0, 0, 0, b'a', b'b', b'c', 0, 0, 0, 0, 0];
         let bytes = SizedBuf::new(*b"abc").serialize().expect("Serialize failed");
-        assert_eq!(
-            bytes,
-            [3, 0, 0, 0, 0, 0, 0, 0, b'a', b'b', b'c', 0, 0, 0, 0, 0]
-        );
         let mut src = bytes.as_slice();
         let region = SizedBuf::deserialize(&mut src).expect("Deserialize failed");
+        assert_eq!(bytes, expect); // prefix + payload + alignment
         assert_eq!(region.0, b"abc");
         assert!(src.is_empty());
     }
@@ -1531,9 +1535,9 @@ mod tests {
     fn sized_buf_deserialize_skips_padding() {
         let mut buf = Vec::new();
         buf.extend_from_slice(&3u64.to_le_bytes());
-        buf.extend_from_slice(b"abc\0\0\0\0\0"); // Payload padded to the next boundary
+        buf.extend_from_slice(b"abc\0\0\0\0\0"); // payload padded to the next boundary
         buf.extend_from_slice(&1u64.to_le_bytes());
-        buf.extend_from_slice(b"z\0\0\0\0\0\0\0"); // Writers pad every region, including the last
+        buf.extend_from_slice(b"z\0\0\0\0\0\0\0"); // writers pad every region, including the last
         let mut src = buf.as_slice();
         let first = SizedBuf::deserialize(&mut src).expect("First deserialize failed");
         let second = SizedBuf::deserialize(&mut src).expect("Second deserialize failed");
@@ -1545,32 +1549,32 @@ mod tests {
     /// [`SizedBuf`] rejects an empty payload; zero-length regions are never written because
     /// writers omit empty regions entirely.
     #[test]
-    fn sized_buf_empty_errors() {
-        assert!(SizedBuf::new(Vec::<u8>::new()).serialize().is_err());
-        assert!(SizedBuf::new(Vec::<u8>::new()).size().is_err());
+    fn sized_buf_rejects_empty_payload() {
+        SizedBuf::new(Vec::<u8>::new()).serialize().expect_err("Empty payload serialized");
+        SizedBuf::new(Vec::<u8>::new()).size().expect_err("Empty payload sized");
     }
 
     /// [`SizedBuf::deserialize`] rejects a zero length prefix; empty regions are omitted by
     /// writers so a zero prefix indicates corruption.
     #[test]
-    fn sized_buf_zero_prefix_errors() {
+    fn sized_buf_rejects_zero_prefix() {
         let bytes = u64::MIN.to_le_bytes();
-        assert!(SizedBuf::deserialize(&mut bytes.as_slice()).is_err());
+        SizedBuf::deserialize(&mut bytes.as_slice()).expect_err("Zero prefix accepted");
     }
 
     /// [`SizedBuf::deserialize`] rejects a source shorter than its recorded length prefix.
     #[test]
-    fn sized_buf_truncated_errors() {
+    fn sized_buf_rejects_truncated_source() {
         let mut buf = Vec::new();
         buf.extend_from_slice(&10u64.to_le_bytes());
-        buf.extend_from_slice(b"abc"); // Three payload bytes; prefix records ten
-        assert!(SizedBuf::deserialize(&mut buf.as_slice()).is_err());
+        buf.extend_from_slice(b"abc"); // three payload bytes; the prefix records ten
+        SizedBuf::deserialize(&mut buf.as_slice()).expect_err("Truncated source accepted");
     }
 
     /// The blanket [`Serialize`] implementation for references delegates to the referenced item;
     /// a borrowed payload frames identically to its owned counterpart.
     #[test]
-    fn sized_buf_ref_delegates() {
+    fn sized_buf_reference_delegates_to_owned() {
         let owned = SizedBuf::new(*b"abc").serialize().expect("Owned serialize failed");
         let borrowed = SizedBuf::new(&*b"abc").serialize().expect("Borrowed serialize failed");
         assert_eq!(owned, borrowed);
