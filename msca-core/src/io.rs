@@ -282,6 +282,7 @@ impl Serialize for Sector {
 /// [2]: crate::manifest::Buffer
 /// [3]: https://doc.rust-lang.org/std/primitive.slice.html
 #[doc(hidden)] // Reachable through the #[derive(Data)] macro; not part of the stable public API.
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct SizedBuf<I>(I);
 
 impl<I> SizedBuf<I> {
