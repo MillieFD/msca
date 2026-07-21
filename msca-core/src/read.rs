@@ -802,6 +802,8 @@ pub trait Composite<'q, S>: Sized {
 mod tests {
     use super::*;
 
+    /* ---------------------------------------------------------------------------- Shared State */
+
     /// Append a length-prefixed, 64-bit-aligned sized region to `out`, mirroring the on-disk
     /// [`SizedBuf`](crate::io) layout independently of the production serializer.
     fn sized(payload: &[u8], out: &mut Vec<u8>) {
@@ -810,6 +812,8 @@ mod tests {
         let pad = (8 - (payload.len() & 7)) & 7;
         out.resize(out.len() + pad, 0);
     }
+
+    /* ------------------------------------------------------------------------------ Unit Tests */
 
     /// [`Seq::deserialize`] splits the composite body into its raw `ends` and `data` sub-buffers.
     #[test]
@@ -840,7 +844,7 @@ mod tests {
     /// [`OptBitVec::deserialize`] accepts the omitted value sub-buffer written by an all-[`None`]
     /// column; the exhausted source yields an empty data cursor.
     #[test]
-    fn opt_bit_vec_deserialize_omitted_data() {
+    fn opt_bit_vec_deserialize_accepts_omitted_data() {
         let mut buf = Vec::new();
         sized(&[0b0000_0000], &mut buf);
         let mut src = buf.as_slice();
@@ -852,7 +856,7 @@ mod tests {
     /// [`Seq::deserialize`] accepts the omitted data sub-buffer written by an all-empty-row column;
     /// the exhausted source yields an empty data cursor.
     #[test]
-    fn seq_deserialize_omitted_data() {
+    fn seq_deserialize_accepts_omitted_data() {
         let mut buf = Vec::new();
         sized(&0u64.to_le_bytes(), &mut buf); // one zero-length row end offset
         let mut src = buf.as_slice();
@@ -863,40 +867,32 @@ mod tests {
 
     /// [`From`] lifts a decode result onto an [`Outcome`] at the column boundary.
     #[test]
-    fn outcome_from_result() {
-        assert!(matches!(
-            Outcome::from(Ok::<u32, Error>(7)),
-            Outcome::Include(7)
-        ));
-        assert!(matches!(
-            Outcome::from(Err::<u32, Error>(Error::Utf8)),
-            Outcome::Error(..)
-        ));
+    fn outcome_lifts_a_decode_result() {
+        let include = Outcome::from(Ok::<u32, Error>(7));
+        let error = Outcome::from(Err::<u32, Error>(Error::Utf8));
+        assert!(matches!(include, Outcome::Include(7)));
+        assert!(matches!(error, Outcome::Error(..)));
     }
 
     /// [`Evaluate`] tests a plain item against its own operand; an [`Option`] defers to its inner
     /// operand and excludes an absent [`None`], which carries no operand to test.
     #[test]
-    fn evaluate_projects_operand() {
-        assert!(matches!(7u32.evaluate(|op| *op == 7), Outcome::Include(7)));
-        assert!(matches!(7u32.evaluate(|op| *op == 8), Outcome::Exclude(7)));
-        assert!(matches!(
-            Some(7u32).evaluate(|op| *op == 7),
-            Outcome::Include(Some(7))
-        ));
-        assert!(matches!(
-            Some(7u32).evaluate(|op| *op == 8),
-            Outcome::Exclude(Some(7))
-        ));
-        assert!(matches!(
-            None::<u32>.evaluate(|op| *op == 7),
-            Outcome::Exclude(None)
-        ));
+    fn evaluate_projects_the_operand() {
+        let plain_in = 7u32.evaluate(|op| *op == 7);
+        let plain_out = 7u32.evaluate(|op| *op == 8);
+        let some_in = Some(7u32).evaluate(|op| *op == 7);
+        let some_out = Some(7u32).evaluate(|op| *op == 8);
+        let absent = None::<u32>.evaluate(|op| *op == 7);
+        assert!(matches!(plain_in, Outcome::Include(7)));
+        assert!(matches!(plain_out, Outcome::Exclude(7)));
+        assert!(matches!(some_in, Outcome::Include(Some(7))));
+        assert!(matches!(some_out, Outcome::Exclude(Some(7))));
+        assert!(matches!(absent, Outcome::Exclude(None)));
     }
 
     /// [`IsOption`] reports structural presence for the `is_some` / `is_none` gate.
     #[test]
-    fn is_option_presence() {
+    fn is_option_reports_presence() {
         assert!(Some(7u32).is_some());
         assert!(!None::<u32>.is_some());
     }
