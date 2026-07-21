@@ -26,7 +26,8 @@ optional = true
 path = "msca-core"
 
 [dev-dependencies]
-smol = "2.0"
+macro_rules_attribute = "0.2.2"
+smol-macros = "0.1.1"
 
 [features]
 default = ["derive"]
