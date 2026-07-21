@@ -347,6 +347,25 @@ where
     }
 }
 
+
+pub mod column {
+    use std::collections::{HashMap, HashSet};
+    use std::hash::Hash;
+    use std::marker::PhantomData;
+    use std::ops::{Not, RangeBounds, RangeInclusive};
+    use std::sync::Arc;
+    use std::{iter, slice};
+
+    use funty::Unsigned;
+    use xxhash_rust::xxh3::Xxh3Builder;
+
+    use super::{stream, Buffer, Error, Query};
+    use crate::io::{self, Deserialize};
+    use crate::manifest;
+    use crate::read::{Composite, Evaluate, IsOption, Outcome, Read, Reader};
+    use crate::schema::BitMatch;
+
+}
 /* --------------------------------------------------------------------------------------- Tests */
 
 #[cfg(test)]
