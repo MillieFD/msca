@@ -143,7 +143,7 @@ impl Schema {
     #[doc(hidden)]
     pub fn column<I>(&mut self, name: impl Into<String>) -> Result<BoxAcc<I>, Error>
     where
-        I: BitMatch + Clone + Unfold + 'static,
+        I: BitMatch + Clone + Unfold + Send + Sync + 'static,
         Schema: Unfolder<I>,
     {
         let name = name.into();
@@ -1010,6 +1010,8 @@ pub trait Unfold: Sized {
         + Serialize<Buffer = Vec<u8>>
         + FromIterator<Self>
         + Default
+        + Send
+        + Sync
         + 'static;
 
     /// The [accumulator](Accumulate) type used to ingest [optional](Option) values of [`Self`].
@@ -1019,6 +1021,8 @@ pub trait Unfold: Sized {
         + Serialize<Buffer = Vec<u8>>
         + FromIterator<Option<Self>>
         + Default
+        + Send
+        + Sync
         + 'static;
 
     /// Delegates to [`unfold`](Unfolder::unfold) on the provided [`Unfolder`].
@@ -1268,27 +1272,36 @@ mod tests {
 
     use super::*;
 
-    /// Reusing a [`Column`] name with an incompatible type is rejected as a [`Error::Collision`].
-    #[test]
-    fn column_collision() {
+    /* ---------------------------------------------------------------------------- Shared State */
+
+    /// A [`Schema`] named `test` carrying one `u32` column `a`, shared by the column tests.
+    fn schema() -> Schema {
         let mut schema = Schema::new("test");
         schema.column::<u32>("a").expect("failed to initialise test column a");
-        let matches = matches!(schema.column::<u64>("a"), Err(Error::Collision { .. }));
-        assert!(matches);
+        schema
+    }
+
+    /* ------------------------------------------------------------------------------ Unit Tests */
+
+    /// Reusing a [`Column`] name with an incompatible type is rejected as an [`Error::Collision`].
+    #[test]
+    fn column_reuse_with_new_type_collides() {
+        let mut schema = schema();
+        let clash = matches!(schema.column::<u64>("a"), Err(Error::Collision { .. }));
+        assert!(clash);
     }
 
     /// Adding a [`Column`] with an identical type is deduplicated rather than rejected.
     #[test]
-    fn column_dedup() {
-        let mut schema = Schema::new("test");
-        schema.column::<u32>("a").expect("failed to initialise test column a");
+    fn column_reuse_with_same_type_deduplicates() {
+        let mut schema = schema();
         assert!(schema.column::<u32>("a").is_ok());
         assert_eq!(schema.columns.len(), 1);
     }
 
     /// [`Type::option`] collapses a nested [`Option`] into a single validity layer.
     #[test]
-    fn option_flattens_nested() {
+    fn option_flattens_when_nested() {
         let once = Type::option(Type::U32);
         let twice = Type::option(once.clone());
         assert_eq!(once, twice);
@@ -1296,11 +1309,9 @@ mod tests {
 
     /// [`Type::sequence`] wraps the provided subtype in a [`Type::Sequence`] descriptor.
     #[test]
-    fn sequence_wraps() {
-        assert_eq!(
-            Type::sequence(Type::U8),
-            Type::Sequence { subtype: Box::new(Type::U8) }
-        );
+    fn sequence_wraps_its_subtype() {
+        let expect = Type::Sequence { subtype: Box::new(Type::U8) };
+        assert_eq!(Type::sequence(Type::U8), expect);
     }
 
     /// Every supported type names its own [`Type`], and only those types do. `usize` and `isize`
@@ -1313,7 +1324,7 @@ mod tests {
         assert_impl_all!(bool: AsType, BitMatch, Unfold);
         assert_impl_all!(char: AsType, BitMatch, Unfold);
         assert_impl_all!(String: AsType, BitMatch, Unfold);
-        assert_impl_all!(num::NonZeroU64: AsType, BitMatch, Unfold);
+        assert_impl_all!(NonZeroU64: AsType, BitMatch, Unfold);
         assert_not_impl_any!(usize: AsType, BitMatch, Unfold);
         assert_not_impl_any!(isize: AsType, BitMatch, Unfold);
     }
@@ -1322,12 +1333,12 @@ mod tests {
     /// on-disk descriptor is fixed by the Rust type alone.
     #[test]
     fn as_type_drives_the_unfolder() {
+        const TY: Type = f32::TYPE;
         assert_eq!(<Schema as Unfolder<u8>>::unfold(), Type::U8);
         assert_eq!(<Schema as Unfolder<bool>>::unfold(), Type::Bool);
         assert_eq!(<Schema as Unfolder<String>>::unfold(), Type::String);
         assert_eq!(<Schema as Unfolder<f64>>::unfold(), Type::F64);
         assert_eq!(u32::TYPE, Type::U32); // usable in a const context
-        const TY: Type = f32::TYPE;
         assert_eq!(TY, Type::F32);
     }
 
@@ -1336,20 +1347,18 @@ mod tests {
     /// [`PartialEq`].
     #[test]
     fn bit_match_compares_float_bits() {
+        let quiet = f32::from_bits(f32::NAN.to_bits() | 1);
         assert!(BitMatch::eq(&f64::NAN, &f64::NAN));
         assert!(BitMatch::eq(&f64::INFINITY, &f64::INFINITY));
         assert!(BitMatch::ne(&f64::INFINITY, &f64::NEG_INFINITY));
         assert!(BitMatch::ne(&1.0f64, &2.0));
-        assert!(BitMatch::ne(
-            &f32::NAN,
-            &f32::from_bits(f32::NAN.to_bits() | 1)
-        ));
+        assert!(BitMatch::ne(&f32::NAN, &quiet));
     }
 
     /// [`BitMatch::eq`] recurses through [`Option`] and [`Vec`] layers so bit-pattern semantics
     /// propagate into optional and unsized columns.
     #[test]
-    fn bit_match_recurses_layers() {
+    fn bit_match_recurses_through_layers() {
         assert!(BitMatch::eq(&Some(f64::NAN), &Some(f64::NAN)));
         assert!(BitMatch::eq(&None::<f64>, &None));
         assert!(BitMatch::ne(&Some(f64::NAN), &None));
