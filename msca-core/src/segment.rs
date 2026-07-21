@@ -401,33 +401,44 @@ mod tests {
     use crate::io::{self, Checksum};
     use crate::schema::Schema;
 
+    /* ---------------------------------------------------------------------------- Shared State */
+
+    /// A single-column `u32` [`Schema`] named `t`, shared by the framing tests.
+    fn schema() -> Schema {
+        let mut schema = Schema::new("t");
+        schema.column::<u32>("v").expect("Column failed");
+        schema
+    }
+
+    /* ------------------------------------------------------------------------------ Unit Tests */
+
     /// [`Align::align`] rounds up ↑ to the next multiple of **eight**; idempotent at boundaries.
     #[test]
-    fn align_rounds_up() {
-        assert_eq!(0u64.align().expect("Align failed"), 0);
-        assert_eq!(1u64.align().expect("Align failed"), 8);
-        assert_eq!(7u64.align().expect("Align failed"), 8);
-        assert_eq!(8u64.align().expect("Align failed"), 8);
-        assert_eq!(9u64.align().expect("Align failed"), 16);
-        assert_eq!(64u64.align().expect("Align failed"), 64);
+    fn align_rounds_up_to_eight() {
+        assert_eq!(0u64.align().expect("Align 0 → 0 failed"), 0);
+        assert_eq!(1u64.align().expect("Align 1 → 8 failed"), 8);
+        assert_eq!(7u64.align().expect("Align 7 → 8 failed"), 8);
+        assert_eq!(8u64.align().expect("Align 8 → 8 failed"), 8);
+        assert_eq!(9u64.align().expect("Align 9 → 16 failed"), 16);
+        assert_eq!(64u64.align().expect("Align 64 → 64 failed"), 64);
     }
 
     /// [`Align::pad`] counts the number of bytes required to reach the next alignment boundary.
     #[test]
-    fn pad_counts_bytes() {
-        assert_eq!(0u64.pad().expect("Pad failed"), 0);
-        assert_eq!(1u64.pad().expect("Pad failed"), 7);
-        assert_eq!(8u64.pad().expect("Pad failed"), 0);
-        assert_eq!(14u64.pad().expect("Pad failed"), 2);
+    fn pad_counts_bytes_to_boundary() {
+        assert_eq!(0u64.pad().expect("Pad 0 → 0 failed"), 0);
+        assert_eq!(1u64.pad().expect("Pad 1 → 7 failed"), 7);
+        assert_eq!(8u64.pad().expect("Pad 8 → 0 failed"), 0);
+        assert_eq!(14u64.pad().expect("Pad 14 → 2 failed"), 2);
     }
 
-    /// [`Align`] is implemented for types that convert into [`u64`].
+    /// [`Align`] is implemented for every type that converts into [`u64`].
     #[test]
-    fn align_converts() {
-        assert_eq!(7u8.align().expect("Align failed"), 8);
-        assert_eq!(9u32.align().expect("Align failed"), 16);
-        assert_eq!(33usize.align().expect("Align failed"), 40);
-        assert_eq!(NonZeroU64::MIN.align().expect("Align failed"), 8);
+    fn align_accepts_any_into_u64() {
+        assert_eq!(7u8.align().expect("Align u8 failed"), 8);
+        assert_eq!(9u32.align().expect("Align u32 failed"), 16);
+        assert_eq!(33usize.align().expect("Align usize failed"), 40);
+        assert_eq!(NonZeroU64::MIN.align().expect("Align NonZeroU64 failed"), 8);
     }
 
     /// [`Segment::wrap`] lays out `[variant][size][payload][checksum]` densely for an off-hot-path
@@ -435,42 +446,39 @@ mod tests {
     /// framed footprint is the header plus payload plus checksum, and the trailing
     /// [checksum](Checksum::verify) covers every preceding byte.
     #[test]
-    fn frame_layout() {
-        let mut schema = Schema::new("t");
-        schema.column::<u32>("v").expect("Column failed");
-        let bytes = schema.wrap(0).expect("Frame failed");
+    fn schema_frame_is_dense() {
+        let schema = schema();
+        let bytes = schema.wrap(0).expect("Wrap failed");
         let head = Header::SIZE;
-        assert_eq!(bytes[0], Variant::Schema as u8);
         let size = u64::from_le_bytes(bytes[1..head].try_into().expect("Size is 8 bytes")) as usize;
-        assert_eq!(size, schema.size().expect("Size failed").get() as usize); // Dense: no padding
+        let body = Schema::verify(&bytes).expect("Checksum failed");
+        assert_eq!(bytes[0], Variant::Schema as u8);
+        assert_eq!(size, schema.size().expect("Size failed").get() as usize); // densely packed
         assert_eq!(bytes.len(), head + size + size_of::<u64>());
-        let body = Schema::verify(&bytes).expect("Checksum failed"); // Trailing checksum verifies
-        assert_eq!(body, &bytes[..bytes.len() - size_of::<u64>()]);
+        assert_eq!(body, &bytes[..bytes.len() - size_of::<u64>()]); // checksum suffix verifies
     }
 
     /// A single-byte mutation anywhere in the framed payload changes the computed checksum, so
     /// [`Checksum::verify`] rejects the corrupt frame while accepting the intact one.
     #[test]
     fn frame_checksum_detects_mutation() {
-        let mut schema = Schema::new("t");
-        schema.column::<u32>("v").expect("Column failed");
-        let bytes = schema.wrap(0).expect("Frame failed");
+        let bytes = schema().wrap(0).expect("Wrap failed");
         let mut corrupt = bytes.clone();
         let at = corrupt.len() - size_of::<u64>();
-        corrupt[at - 1] ^= u8::MAX; // Flip a payload byte
-        assert!(Schema::verify(&bytes).is_ok()); // Intact frame verifies
+        corrupt[at - 1] ^= u8::MAX; // flip a payload byte
+        assert!(Schema::verify(&bytes).is_ok()); // the intact frame verifies
         assert!(matches!(Schema::verify(&corrupt), Err(io::Error::Checksum)));
     }
 
     /// [`Variant::try_from`] maps the manifest discriminant `0x00`.
     #[test]
-    fn variant_manifest_byte() {
+    fn variant_maps_manifest_discriminant() {
         assert_eq!(Variant::try_from(0x00), Ok(Variant::Manifest));
     }
 
     /// [`Variant::try_from`] maps the binary discriminant `0x03`.
     #[test]
-    fn variant_binary_byte() {
+    fn variant_maps_binary_discriminant() {
         assert_eq!(Variant::try_from(0x03), Ok(Variant::Binary));
     }
 }
