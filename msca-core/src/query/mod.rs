@@ -158,6 +158,12 @@ impl Query {
         buffers.map(manifest::Buffer::count).sum()
     }
 }
+#[derive(Clone, Debug)]
+pub struct Buffer {
+    pub(crate) segment: u64,
+    pub(crate) buffer: manifest::Buffer,
+}
+
 /* --------------------------------------------------------------------------- Column Descriptor */
 
 /// A minimal column **descriptor** for [`Query`] planning and execution.
