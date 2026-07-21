@@ -81,7 +81,7 @@ pub struct Query {
 }
 
 impl Query {
-    /// Generate a [`HashMap`] containing the position [index](N) for each unique on-disk [item](I).
+    /// Map each **distinct** [item](I) to the corresponding on-disk [index](N).
     ///
     /// The [`Dataset`][1] is read in ascending insertion order; items record their first index and
     /// subsequent duplicate items are discarded.
@@ -98,9 +98,19 @@ impl Query {
         I: Read + Eq + Hash + 'static,
         for<'q> I::Src<'q>: Composite<'q, Query> + Iterator<Item = Outcome<I>> + 'q,
     {
+        let iter = self.read::<I>()?;
+        Self::intern(iter)
+    }
+
+    fn intern<I, N, S>(items: S) -> Result<HashMap<I, N, Xxh3Builder>, Error>
+    where
+        N: Unsigned,
+        I: Eq + Hash,
+        S: Iterator<Item = Result<I, io::Error>>,
+    {
         let mut map = HashMap::with_hasher(Xxh3Builder::new());
         let mut next = Some(N::MIN);
-        for item in self.read::<I>()? {
+        for item in items {
             let i = next.ok_or(number::Error::Zero)?;
             if let Entry::Vacant(entry) = map.entry(item?) {
                 entry.insert(i);
@@ -110,6 +120,44 @@ impl Query {
         Ok(map)
     }
 
+    pub fn column<'q, I>(&'q self, name: &str) -> Result<impl column::Column<Item = I> + 'q, Error>
+    where
+        I: Read + Clone + 'q,
+        I::Src<'q>: Deserialize<'q, Ok = I::Src<'q>> + Reader<'q, I>,
+        Schema: Unfolder<I>,
+    {
+        if let Some(entry) = self.columns.get_key_value(name) {
+            let buffers = entry.1.exact::<I>()?.tagged();
+            let column = column::Root::new(self, entry.0, buffers);
+            Ok(column)
+        } else {
+            Error::Column { name: name.into() }.into()
+        }
+    }
+
+    pub fn stream<'q, I>(&'q self, name: &str) -> Result<impl Iterator<Item = Outcome<I>>, Error>
+    where
+        I: Read + Clone + 'q,
+        I::Src<'q>: Deserialize<'q, Ok = I::Src<'q>> + Reader<'q, I>,
+        Schema: Unfolder<I>,
+    {
+        let buffers = self
+            .columns
+            .get(name)
+            .ok_or_else(|| Error::Column { name: name.into() })?
+            .exact::<I>()?
+            .buffers
+            .iter();
+        let src = stream::Root::new(buffers, &self.mmap);
+        let items = src.stream()?.map(Outcome::from);
+        Ok(items)
+    }
+    pub fn count(&self) -> u64 {
+        let first = self.columns.values().next();
+        let buffers = first.into_iter().flat_map(|column| column.buffers.iter());
+        buffers.map(manifest::Buffer::count).sum()
+    }
+}
 /* --------------------------------------------------------------------------- Column Descriptor */
 
 /// A minimal column **descriptor** for [`Query`] planning and execution.
