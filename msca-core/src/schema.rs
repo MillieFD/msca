@@ -78,7 +78,7 @@ use minicbor::{CborLen, Decode, Encode};
 use static_assertions::{assert_eq_size, const_assert_ne};
 
 use self::number::Number;
-use crate::accumulate::{self, Accumulate, BoxAcc, Describe, Descriptor, OptBitVec, OptInSitu};
+use crate::accumulate::{self, Accumulate, Descriptor, OptBitVec, OptInSitu};
 use crate::io::{Buffer, Checksum, Register};
 use crate::manifest::{self, Manifest};
 use crate::segment::{Header, Segment, Variant};
@@ -141,7 +141,7 @@ impl Schema {
     /// Returns an empty [accumulator](accumulate::Buffer) for **in-memory** data ingestion. This
     /// design ensures schema verification is performed exactly once.
     #[doc(hidden)]
-    pub fn column<I>(&mut self, name: impl Into<String>) -> Result<BoxAcc<I>, Error>
+    pub fn column<I>(&mut self, name: impl Into<String>) -> Result<accumulate::Buffer<I>, Error>
     where
         I: BitMatch + Clone + Unfold + Send + Sync + 'static,
         Schema: Unfolder<I>,
@@ -153,7 +153,7 @@ impl Schema {
             Entry::Occupied(entry) if entry.get() == &column => entry.into_mut(),
             Entry::Occupied(entry) => return Error::Collision { name: entry.key().clone() }.into(),
         };
-        let acc = accumulate::Buffer::<I>::default().boxed();
+        let acc = accumulate::Buffer::<I>::default();
         Ok(acc)
     }
 
