@@ -35,8 +35,8 @@ pub use self::binary::Bin;
 pub use self::dataset::Dataset;
 pub use self::error::Error;
 pub use self::io::{Deserialize, Sector, SizedBuf};
-pub use self::query::column::{Column, Join};
-pub use self::query::{Query, SubSet};
+pub use self::query::column::{Column, Join, Joiner, Joint};
+pub use self::query::Query;
 pub use self::read::{Composite, Evaluate, IsOption, Outcome, Read, Reader, Stream};
 pub use self::schema::Schema;
 pub use self::segment::Align;
@@ -46,8 +46,6 @@ pub use self::segment::Align;
 mod segment;
 
 /* ----------------------------------------------------------------------------- Private Imports */
-
-use std::num::{NonZeroU128, NonZeroU16, NonZeroU32, NonZeroU64, NonZeroU8};
 
 use self::schema::number;
 
@@ -66,80 +64,4 @@ pub trait Data: Sized {
     ///
     /// [1]: Serialize::Buffer
     fn accumulator(schema: &mut Schema) -> Result<BoxAcc<Self>, schema::Error>;
-}
-
-/* ---------------------------------------------------------------- NonZeroUInt Trait Definition */
-
-/// Marker trait for unsigned [`non-zero`](core::num::nonzero::NonZero) integer types.
-pub trait NonZeroUInt: Copy + Ord + Sized {
-    /// A constant representing the multiplicative identity element for the implementing type.
-    ///
-    /// Multiplication by this constant should leave any compatible instance of the type unchanged.
-    ///
-    /// ### Example
-    ///
-    /// ```rust,ignore
-    /// fn noop<T: NonZeroUInt>(value: T) {
-    ///     assert_eq!(T::ONE * value, value);
-    ///     assert_eq!(value * T::ONE, value);
-    /// }
-    /// ```
-    ///
-    /// [`Self::ONE`] represents the minimum permissible value of the implementing type.
-    const ONE: Self;
-}
-
-/* ------------------------------------------------------------ NonZeroUInt Trait Implementation */
-
-impl NonZeroUInt for NonZeroU8 {
-    const ONE: Self = Self::MIN;
-}
-
-impl NonZeroUInt for NonZeroU16 {
-    const ONE: Self = Self::MIN;
-}
-
-impl NonZeroUInt for NonZeroU32 {
-    const ONE: Self = Self::MIN;
-}
-
-impl NonZeroUInt for NonZeroU64 {
-    const ONE: Self = Self::MIN;
-}
-
-impl NonZeroUInt for NonZeroU128 {
-    const ONE: Self = Self::MIN;
-}
-
-/* --------------------------------------------------------------------------------------- Tests */
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn non_zero_uint_ord() {
-        assert!(NonZeroU8::MIN < NonZeroU8::MAX);
-        assert!(NonZeroU16::MIN < NonZeroU16::MAX);
-        assert!(NonZeroU32::MIN < NonZeroU32::MAX);
-        assert!(NonZeroU64::MIN < NonZeroU64::MAX);
-        assert!(NonZeroU128::MIN < NonZeroU128::MAX);
-    }
-
-    #[test]
-    fn non_zero_uint_one() {
-        assert_eq!(NonZeroU8::ONE.get() * NonZeroU8::new(2).unwrap().get(), 2);
-        assert_eq!(NonZeroU16::ONE.get() * NonZeroU16::new(2).unwrap().get(), 2);
-        assert_eq!(NonZeroU32::ONE.get() * NonZeroU32::new(2).unwrap().get(), 2);
-        assert_eq!(NonZeroU64::ONE.get() * NonZeroU64::new(2).unwrap().get(), 2);
-    }
-
-    #[test]
-    fn niche_optimisation() {
-        assert_eq!(size_of::<Option<NonZeroU8>>(), size_of::<NonZeroU8>());
-        assert_eq!(size_of::<Option<NonZeroU16>>(), size_of::<NonZeroU16>());
-        assert_eq!(size_of::<Option<NonZeroU32>>(), size_of::<NonZeroU32>());
-        assert_eq!(size_of::<Option<NonZeroU64>>(), size_of::<NonZeroU64>());
-        assert_eq!(size_of::<Option<NonZeroU128>>(), size_of::<NonZeroU128>());
-    }
 }
