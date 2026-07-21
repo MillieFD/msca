@@ -42,9 +42,7 @@ use std::collections::hash_map::Entry;
 use std::collections::{BTreeMap, HashMap};
 use std::fmt::{self, Display};
 use std::hash::Hash;
-use std::iter;
-use std::num::{self, TryFromIntError};
-use std::ops::{Bound, RangeBounds};
+use std::num::TryFromIntError;
 use std::sync::Arc;
 
 use funty::Unsigned;
@@ -56,9 +54,6 @@ use crate::io::{self, Deserialize};
 use crate::manifest;
 use crate::read::{Composite, Outcome, Read, Reader};
 use crate::schema::{number, Schema, Type, Unfolder};
-
-pub mod column;
-pub mod stream;
 
 /* --------------------------------------------------------------------------------------- Query */
 
