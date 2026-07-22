@@ -894,6 +894,33 @@ mod tests {
         assert!(matches!(error, Outcome::Error(..)));
     }
 
+    /// [`resolve`](Resolve::resolve) drops every [`Exclude`](Outcome::Exclude) and surfaces every
+    /// [`Error`](Outcome::Error) as [`Err`], preserving the order of the surviving items.
+    #[test]
+    fn resolve_reduces_an_outcome_stream() {
+        let stream = [
+            Outcome::Exclude(1u32), // leading exclusions never reach the caller
+            Outcome::Include(2),
+            Outcome::Exclude(3), // consecutive exclusions are skipped in one pull
+            Outcome::Exclude(4),
+            Outcome::Error(Error::Utf8),
+            Outcome::Include(5),
+            Outcome::Exclude(6), // a trailing exclusion exhausts the stream
+        ];
+        let items: Vec<Result<u32, Error>> = stream.into_iter().resolve().collect();
+        assert_eq!(items.len(), 3); // four of the seven slots were excluded
+        assert!(matches!(items[0], Ok(2)));
+        assert!(matches!(items[1], Err(Error::Utf8)));
+        assert!(matches!(items[2], Ok(5)));
+    }
+
+    /// A stream of nothing but [`Exclude`](Outcome::Exclude) yields no items rather than looping.
+    #[test]
+    fn resolve_drains_a_wholly_excluded_stream() {
+        let stream = [Outcome::Exclude(1u32), Outcome::Exclude(2)];
+        assert_eq!(stream.into_iter().resolve().count(), usize::MIN);
+    }
+
     /// [`Evaluate`] tests a plain item against its own operand; an [`Option`] defers to its inner
     /// operand and excludes an absent [`None`], which carries no operand to test.
     #[test]
