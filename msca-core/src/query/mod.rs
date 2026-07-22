@@ -55,7 +55,7 @@ use crate::manifest;
 use crate::read::{Composite, Outcome, Read, Reader, Resolve};
 use crate::schema::{number, Schema, Type, Unfolder};
 
-/* --------------------------------------------------------------------------------------- Query */
+/* ------------------------------------------------------------------------------ Public Exports */
 
 /// A composable query interface to [read](Read) data from any [msca](crate) file; initialised from
 /// [`Dataset::query`][1] and executed lazily when [`read`](Self::read) is iterated.
@@ -332,7 +332,7 @@ impl From<manifest::Column> for Column {
     }
 }
 
-/* --------------------------------------------------------------------------------- Query Error */
+/* ------------------------------------------------------------------------------ Specific Error */
 
 /// Errors returned from [`Query`] construction and execution.
 ///
