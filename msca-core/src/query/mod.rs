@@ -102,6 +102,17 @@ impl Query {
         Self::intern(iter)
     }
 
+    /// Intern each **distinct** [item](I) from the provided [set](S) and map to the corresponding
+    /// [index](N) of the earliest on-disk occurrence.
+    ///
+    /// The index increments for each on-disk item. Repeated items intern to the index of their
+    /// earlier occurrence while the counter advances `+1` for each duplicate. The maximum index is
+    /// therefore greater than or equal to `≥` the number of [`HashMap`] entries.
+    ///
+    /// ### Errors
+    ///
+    /// - [`Error::Number`] if an index overflows [`N`].
+    /// - [`Error::Io`] if a deserialization failure occurs.
     fn intern<I, N, S>(items: S) -> Result<HashMap<I, N, Xxh3Builder>, Error>
     where
         N: Unsigned,
