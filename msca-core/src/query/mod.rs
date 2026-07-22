@@ -821,6 +821,8 @@ pub mod column {
             Self::Item: Eq + Hash,
             N: Unsigned,
         {
+            let iter = self.read()?;
+            Query::intern(iter)
         }
     }
 
