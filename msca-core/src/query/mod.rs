@@ -227,6 +227,13 @@ impl Query {
         buffers.map(manifest::Buffer::count).sum()
     }
 }
+
+/// The result of **combining** two data sources.
+///
+/// `Join` is itself a data source over the two inner sources, enabling the construction of nested
+/// join-trees over an arbitrary number of underlying [columns](column::Column).
+///
+/// Refer to the [join trait documentation](column::Join) for more details.
 #[derive(Clone, Debug)]
 #[non_exhaustive] // rejects external struct literal construction
 pub struct Join<A, B>
