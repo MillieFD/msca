@@ -358,6 +358,22 @@ impl Column {
         Ok(self)
     }
 
+    fn skip(buffers: &mut Vec<Buffer>, n: u64) -> u64 {
+        use std::ops::{Add, AddAssign};
+        let i = buffers
+            .iter()
+            .scan(u64::MIN, |total, buf| {
+                let count = buf.count();
+                total.add_assign(count);
+                Some(*total)
+            })
+            .take_while(|&total| total <= n)
+            .enumerate()
+            .last()
+            .unwrap_or_default();
+        buffers.drain(..=i.0);
+        n.add(i.1)
+    }
     /// Map the provided [`Key`](String) to a new empty [`Column`].
     pub(crate) fn map(entry: (&String, &manifest::Column)) -> (String, Self) {
         (entry.0.clone(), entry.1.clone().into())
