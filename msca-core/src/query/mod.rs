@@ -51,7 +51,7 @@ use minicbor::{CborLen, Decode, Encode};
 use xxhash_rust::xxh3::Xxh3Builder;
 
 use crate::io::{self, Deserialize};
-use crate::manifest;
+use crate::manifest::{self, Buffer};
 use crate::read::{Composite, Outcome, Read, Reader, Resolve};
 use crate::schema::{number, Schema, Type, Unfolder};
 
@@ -217,14 +217,13 @@ impl Query {
     }
 
     /// Returns the total number of on-disk items for this [`Schema`] across all [segments][1]; the
-    /// sum of [`Buffer`][2] `count` fields for one [`Column`].
+    /// sum of [`Buffer`] `count` fields for one [`Column`].
     ///
     /// [1]: crate::segment::Segment
-    /// [2]: manifest::Buffer
     pub fn count(&self) -> u64 {
         let first = self.columns.values().next();
         let buffers = first.into_iter().flat_map(|column| column.buffers.iter());
-        buffers.map(manifest::Buffer::count).sum()
+        buffers.map(Buffer::count).sum()
     }
 }
 
@@ -288,13 +287,13 @@ pub struct Column {
     /// The [`Type`] of items contained within this [`Column`].
     #[n(0)]
     pub ty: Type,
-    /// [`Buffer`](manifest::Buffer) descriptors for the [`Column`] across all data segments.
+    /// [`Buffer`] descriptors for the [`Column`] across all data segments.
     #[cbor(n(1), skip_if = "Vec::is_empty")]
     #[cfg_attr(
         feature = "serde",
         serde(default, skip_serializing_if = "Vec::is_empty")
     )]
-    pub(crate) buffers: Vec<manifest::Buffer>,
+    pub(crate) buffers: Vec<Buffer>,
 }
 
 impl Column {
