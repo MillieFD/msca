@@ -421,6 +421,30 @@ pub mod column {
     }
 }
 
+/* --------------------------------------------------------------------------- Stream Sub-Module */
+
+pub mod stream {
+    use std::iter;
+
+    use memmap2::Mmap;
+
+    use crate::io::{Deserialize, Error};
+    use crate::manifest::Buffer;
+    use crate::read::{Read, Reader};
+
+    /* -------------------------------------------------------------------------- Public Exports */
+
+    pub(crate) struct Root<'a, B> {
+        buffers: B,
+        mmap: &'a Mmap,
+    }
+    impl<'m, B> Root<'m, B> {
+        pub(crate) const fn new(buffers: B, mmap: &'m Mmap) -> Self {
+            Self { buffers, mmap }
+        }
+    }
+}
+
 /* --------------------------------------------------------------------------------------- Tests */
 
 #[cfg(test)]
