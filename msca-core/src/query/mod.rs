@@ -449,6 +449,47 @@ pub mod column {
             Self { query, name, buffers, item: PhantomData }
         }
     }
+    pub(crate) struct Filter<S, F> {
+        source: S,
+        filter: F,
+    }
+
+    impl<S, F> Filter<S, F> {
+        const fn new(source: S, filter: F) -> Self {
+            Self { source, filter }
+        }
+        fn test<I>(source: S, test: F) -> Filter<S, impl Fn(S::Item) -> Outcome<S::Item>>
+        where
+            S: Adapter,
+            S::Item: Evaluate<I>,
+            F: Fn(&I) -> bool,
+        {
+            Filter::new(source, move |item: S::Item| item.evaluate(&test))
+        }
+    }
+
+    impl<S, F, E> Iterator for Filter<S, F>
+    where
+        S: Iterator<Item = Outcome<E>>,
+        F: Fn(E) -> Outcome<E>,
+    {
+        type Item = Outcome<E>;
+
+        fn next(&mut self) -> Option<Outcome<E>> {
+            match self.source.next()? {
+            }
+        }
+    }
+
+    pub(crate) struct Skip<S> {
+        inner: S,
+        skip: u64,
+    }
+
+    pub(crate) struct Take<S> {
+        inner: S,
+        take: u64,
+    }
 }
 
 /* --------------------------------------------------------------------------- Stream Sub-Module */
