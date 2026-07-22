@@ -824,6 +824,66 @@ pub mod column {
 
     impl<C> Column for C where C: Adapter + Join {}
 
+    /* -------------------------------------------------------------- Reconcile Trait Definition */
+
+    pub(crate) trait Reconcile {
+        fn and<O>(&mut self, other: &mut O) -> Result<&mut Self, Error>
+        where
+            O: Adapter;
+    }
+
+    /* ---------------------------------------------------------- Reconcile Trait Implementation */
+
+    impl<'q, I> Reconcile for Root<'q, I> {
+        fn and<O>(&mut self, other: &mut O) -> Result<&mut Self, Error>
+        where
+            O: Adapter,
+        {
+        }
+    }
+
+    impl<S, F> Reconcile for Filter<S, F>
+    where
+        S: Reconcile,
+    {
+        fn and<O>(&mut self, other: &mut O) -> Result<&mut Self, Error>
+        where
+            O: Adapter,
+        {
+        }
+    }
+
+    impl<S> Reconcile for Skip<S>
+    where
+        S: Reconcile,
+    {
+        fn and<O>(&mut self, other: &mut O) -> Result<&mut Self, Error>
+        where
+            O: Adapter,
+        {
+        }
+    }
+
+    impl<S> Reconcile for Take<S>
+    where
+        S: Reconcile,
+    {
+        fn and<O>(&mut self, other: &mut O) -> Result<&mut Self, Error>
+        where
+            O: Adapter,
+        {
+        }
+    }
+
+    impl<A, B> Reconcile for super::Join<A, B>
+    where
+        A: Join,
+        B: Column,
+    {
+        fn and<O>(&mut self, other: &mut O) -> Result<&mut Self, Error>
+        where
+            O: Adapter,
+        {
         }
     }
 
