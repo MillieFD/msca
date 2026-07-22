@@ -76,12 +76,6 @@ use crate::{query, Accumulate};
 
 /* ------------------------------------------------------------------------------ Public Exports */
 
-/// Shorthand type-erased stack-allocated [pointer](Box) to a lazy [`Iterator`] yielding one
-/// [`Outcome`] per [`Item`](I), or [`None`] once every candidate [`Buffer`][1] is consumed.
-///
-/// [1]: crate::manifest::Buffer
-pub type Stream<'a, I> = Box<dyn Iterator<Item = Outcome<I>> + 'a>;
-
 /// A **stateful cursor** over paired validity and value sub-buffers for a single [`Column`]; used
 /// to [`Deserialize`] optional non-niche items.
 #[doc(hidden)] // Reachable via Read::Src for optional non-niche readers
@@ -175,7 +169,7 @@ impl<'de> Deserialize<'de> for OptInSitu<'de> {
 
 /* ------------------------------------------------------------------------- Read Stream Outcome */
 
-/// The result of [deserializing](Deserialize) one [`Item`](I) from a [`Read`](Read) [`Stream`].
+/// The result of [deserializing](Deserialize) one [`Item`](I) from a [`Read`] stream.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug)]
 pub enum Outcome<I> {
@@ -435,12 +429,12 @@ where
 
 /* ----------------------------------------------------------------------- Read Trait Definition */
 
-/// A **data type** that can be lazily [streamed](Stream) from a [`Dataset`](crate::Dataset).
+/// A **data type** that can be lazily streamed from a [`Dataset`](crate::Dataset).
 ///
 /// ### Guidance
 ///
 /// Default implementations are provided for all supported primitive types. Implementors are advised
-/// to [`derive`][1] this trait for composite types, which zips one [sub-stream](Stream) per field.
+/// to [`derive`][1] this trait for composite types, which zips one sub-stream per field.
 // [1]: TODO → add link to msca-derive crate or feature
 pub trait Read {
     /// The [stateful data source](Reader) from which to [`Deserialize`] values of [`Self`].
