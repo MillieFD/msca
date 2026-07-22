@@ -185,6 +185,12 @@ impl Query {
         let items = src.stream()?.map(Outcome::from);
         Ok(items)
     }
+
+    /// Returns the total number of on-disk items for this [`Schema`] across all [segments][1]; the
+    /// sum of [`Buffer`][2] `count` fields for one [`Column`].
+    ///
+    /// [1]: crate::segment::Segment
+    /// [2]: manifest::Buffer
     pub fn count(&self) -> u64 {
         let first = self.columns.values().next();
         let buffers = first.into_iter().flat_map(|column| column.buffers.iter());
