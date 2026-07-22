@@ -386,6 +386,7 @@ where
     }
 }
 
+/* --------------------------------------------------------------------------- Column Sub-Module */
 
 pub mod column {
     use std::collections::{HashMap, HashSet};
