@@ -702,6 +702,128 @@ pub mod column {
             G: Fn(&I) -> bool,
             I: for<'de> Deserialize<'de, Ok = I> + PartialOrd,
         {
+
+    /* ----------------------------------------------------------------- Column Trait Definition */
+
+    pub trait Column: Adapter + Join + Sized {
+        fn range<B, I>(mut self, bounds: B) -> Result<impl Column<Item = Self::Item>, Error>
+        where
+            B: RangeBounds<I>,
+            Self::Item: Evaluate<I>,
+            I: for<'de> Deserialize<'de, Ok = I> + PartialOrd,
+        {
+        }
+
+        fn eq<I>(mut self, item: I) -> Result<impl Column<Item = Self::Item>, Error>
+        where
+            Self::Item: Evaluate<I>,
+            I: for<'de> Deserialize<'de, Ok = I> + PartialOrd + BitMatch,
+        {
+        }
+
+        fn ne<I>(self, item: I) -> Result<impl Column<Item = Self::Item>, Error>
+        where
+            Self::Item: Evaluate<I>,
+            I: for<'de> Deserialize<'de, Ok = I> + PartialOrd + BitMatch,
+        {
+            self.filter(move |op: &I| BitMatch::ne(op, &item))
+        }
+
+        fn one_of<I, S>(mut self, items: S) -> Result<impl Column<Item = Self::Item>, Error>
+        where
+            S: IntoIterator<Item = I>,
+            Self::Item: Evaluate<I>,
+            I: for<'de> Deserialize<'de, Ok = I> + PartialOrd + BitMatch,
+        {
+        }
+
+        fn one_of_set<I, S>(mut self, items: S) -> Result<impl Column<Item = Self::Item>, Error>
+        where
+            S: IntoIterator<Item = I>,
+            Self::Item: Evaluate<I>,
+            I: for<'de> Deserialize<'de, Ok = I> + PartialOrd + Eq + Hash,
+        {
+        }
+
+        fn none_of<I, S>(self, items: S) -> Result<impl Column<Item = Self::Item>, Error>
+        where
+            S: IntoIterator<Item = I>,
+            Self::Item: Evaluate<I>,
+            I: for<'de> Deserialize<'de, Ok = I> + PartialOrd + BitMatch,
+        {
+        }
+
+        fn none_of_set<I, S>(self, items: S) -> Result<impl Column<Item = Self::Item>, Error>
+        where
+            S: IntoIterator<Item = I>,
+            Self::Item: Evaluate<I>,
+            I: for<'de> Deserialize<'de, Ok = I> + PartialOrd + Eq + Hash,
+        {
+        }
+
+        fn filter<F, I>(mut self, test: F) -> Result<impl Column<Item = Self::Item>, Error>
+        where
+            Self::Item: Evaluate<I>,
+            F: Fn(&I) -> bool,
+            I: for<'de> Deserialize<'de, Ok = I> + PartialOrd,
+        {
+        }
+
+        fn is_some(self) -> impl Column<Item = Self::Item>
+        where
+            Self::Item: IsOption,
+        {
+            Filter::new(self, |item: Self::Item| match item.is_some() {
+                true => Outcome::Include(item),
+                false => Outcome::Exclude(item),
+            })
+        }
+
+        #[allow(clippy::wrong_self_convention, reason = "consumes self to wrap")]
+        fn is_none(self) -> impl Column<Item = Self::Item>
+        where
+            Self::Item: IsOption,
+        {
+            Filter::new(self, |item: Self::Item| match item.is_none() {
+                true => Outcome::Include(item),
+                false => Outcome::Exclude(item),
+            })
+        }
+
+        fn skip(mut self, count: u64) -> impl Column<Item = Self::Item> {
+            let skip = super::Column::skip(self.buffers(), count);
+            Skip { inner: self, skip }
+        }
+
+        fn take(mut self, count: u64) -> impl Column<Item = Self::Item> {
+            super::Column::take(self.buffers(), count);
+            Take { inner: self, take: count }
+        }
+
+        fn item(self, index: u64) -> Result<Option<Self::Item>, Error> {
+        }
+
+        fn read(&self) -> Result<impl Iterator<Item = Result<Self::Item, io::Error>>, Error> {
+        }
+
+        fn unique(&self) -> Result<HashSet<Self::Item, Xxh3Builder>, Error>
+        where
+            Self::Item: Eq + Hash,
+        {
+        }
+
+        fn index<N>(&self) -> Result<HashMap<Self::Item, N, Xxh3Builder>, Error>
+        where
+            Self::Item: Eq + Hash,
+            N: Unsigned,
+        {
+        }
+    }
+
+    /* ------------------------------------------------------------- Column Trait Implementation */
+
+    impl<C> Column for C where C: Adapter + Join {}
+
         }
     }
 
