@@ -228,10 +228,30 @@ impl Query {
     }
 }
 #[derive(Clone, Debug)]
-pub struct Buffer {
-    pub(crate) segment: u64,
-    pub(crate) buffer: manifest::Buffer,
+#[non_exhaustive] // rejects external struct literal construction
+pub struct Join<A, B>
+where
+    A: column::Join,
+    B: column::Column,
+{
+    /// A single [`Column`](column::Column) or nested [`Join`] instance.
+    pub a: A,
+    /// A single [`Column`](column::Column) instance.
+    pub b: B,
 }
+
+impl<A, B> Join<A, B>
+where
+    A: column::Join,
+    B: column::Column,
+{
+    /// Consume `self` and return `a` and `b` which are guaranteed to contain **only**
+    /// [buffers](Buffer) from corresponding [segments][1].
+    ///
+    /// [1]: crate::segment::Segment
+    pub fn unpack(self) -> (A, B) {
+        (self.a, self.b)
+    }
 
 /* --------------------------------------------------------------------------- Column Descriptor */
 
