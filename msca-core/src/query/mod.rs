@@ -402,10 +402,25 @@ pub mod column {
     use super::{stream, Buffer, Error, Query};
     use crate::io::{self, Deserialize};
     use crate::manifest;
-    use crate::read::{Composite, Evaluate, IsOption, Outcome, Read, Reader};
+    use crate::read::{Evaluate, IsOption, Keep, Outcome, Read, Reader};
     use crate::schema::BitMatch;
 
+    /* -------------------------------------------------------------------------- Public Exports */
+
+    pub(crate) struct Root<'q, I> {
+        query: &'q Query,
+        name: &'q str,
+        buffers: Vec<Buffer>,
+        item: PhantomData<I>,
+    }
+
+    impl<'q, I> Root<'q, I> {
+        pub(crate) const fn new(query: &'q Query, name: &'q str, buffers: Vec<Buffer>) -> Self {
+            Self { query, name, buffers, item: PhantomData }
+        }
+    }
 }
+
 /* --------------------------------------------------------------------------------------- Tests */
 
 #[cfg(test)]
