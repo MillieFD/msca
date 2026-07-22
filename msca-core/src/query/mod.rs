@@ -138,9 +138,16 @@ impl Query {
         Schema: Unfolder<I>,
     {
         if let Some(entry) = self.columns.get_key_value(name) {
-            let buffers = entry.1.exact::<I>()?.tagged();
-            let column = column::Root::new(self, entry.0, buffers);
-            Ok(column)
+            let buffers = entry
+                .1
+                .exact::<I>()?
+                .buffers
+                .iter()
+                .enumerate()
+                .map(|x| Buffer { segment: x.0 as u64, buffer: x.1.clone() })
+                .collect();
+            let src = column::Root::new(self, entry.0, buffers);
+            Ok(src)
         } else {
             Error::Column { name: name.into() }.into()
         }
