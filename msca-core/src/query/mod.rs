@@ -362,20 +362,23 @@ impl Column {
     ///
     /// Eagerly removes [buffers](Buffer) from the [`Query`] according to their `count` statistic;
     /// returning the residual offset to the requested position within the first retained buffer.
-    fn skip(buffers: &mut Vec<Buffer>, n: u64) -> u64 {
-        let i = buffers
+    fn skip<N>(buffers: &mut Vec<Buffer>, n: N) -> N
+    where
+        N: Unsigned,
+    {
+        let (skip, count) = buffers
             .iter()
-            .scan(u64::MIN, |total, buf| {
-                let count = buf.count();
-                total.add_assign(count);
+            .scan(N::MIN, |total, buf| {
+                let count: N = buf.count().try_into().ok()?;
+                *total = total.checked_add(count)?;
                 Some(*total)
             })
             .take_while(|total| *total <= n)
             .zip(1..)
             .last()
             .unwrap_or_default();
-        buffers.drain(..i.1);
-        n - i.0
+        buffers.drain(..count);
+        n - skip
     }
     fn take(buffers: &mut Vec<Buffer>, n: u64) {
         use std::ops::AddAssign;
