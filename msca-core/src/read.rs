@@ -234,6 +234,32 @@ where
     }
 }
 
+/* -------------------------------------------------------------------- Resolve Trait Definition */
+
+/// Resolve any [`Outcome`] stream into a simplified [`Result`] stream that polls the underlying
+/// [`Iterator`] until the next [included](Outcome::Include) item is found.
+///
+/// Surfaces [`IO`](io) and [deserialisation](Deserialize) errors lazily and discards
+/// [excluded](Outcome::Exclude) items.
+pub(crate) trait Resolve<I>: Iterator<Item = Outcome<I>> + Sized {
+    /// Returns a lazy [`Iterator`] over the [included](Outcome::Include) items **only**.
+    fn resolve(mut self) -> impl Iterator<Item = Result<I, Error>> {
+        iter::from_fn(move || {
+            loop {
+                match self.next()? {
+                    Outcome::Include(item) => return Ok(item).into(),
+                    Outcome::Error(error) => return Err(error).into(),
+                    Outcome::Exclude(..) => continue, // retry the underlying iterator
+                }
+            }
+        })
+    }
+}
+
+/* ---------------------------------------------------------------- Resolve Trait Implementation */
+
+impl<S, I> Resolve<I> for S where S: Iterator<Item = Outcome<I>> {}
+
 /* --------------------------------------------------------------------- Reader Trait Definition */
 
 /// A **stateful data source** used to construct a lazy deserializing [`Iterator`].
