@@ -367,12 +367,25 @@ impl Column {
                 total.add_assign(count);
                 Some(*total)
             })
-            .take_while(|&total| total <= n)
+            .take_while(|total| *total <= n)
             .enumerate()
             .last()
             .unwrap_or_default();
         buffers.drain(..=i.0);
         n.add(i.1)
+    }
+    fn take(buffers: &mut Vec<Buffer>, n: u64) {
+        use std::ops::AddAssign;
+        let count = buffers
+            .iter()
+            .scan(u64::MIN, |total, buf| {
+                let count = buf.count();
+                total.add_assign(count);
+                Some(*total)
+            })
+            .take_while(|start| *start < n)
+            .count();
+        buffers.truncate(count);
     }
     /// Map the provided [`Key`](String) to a new empty [`Column`].
     pub(crate) fn map(entry: (&String, &manifest::Column)) -> (String, Self) {
