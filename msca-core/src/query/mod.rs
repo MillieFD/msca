@@ -544,6 +544,8 @@ pub mod column {
 
         fn next(&mut self) -> Option<Outcome<E>> {
             match self.source.next()? {
+                Outcome::Include(item) => (self.filter)(item).into(),
+                other => other.into(),
             }
         }
     }
