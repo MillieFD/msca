@@ -559,6 +559,152 @@ pub mod column {
         inner: S,
         take: u64,
     }
+    #[doc(hidden)] // reachable through the blanket Column implementation
+    pub trait Adapter {
+        type Item: Read;
+
+        fn root<'a>(&'a self) -> &'a Root<'a, Self::Item>;
+
+        fn buffers(&mut self) -> &mut Vec<Buffer>;
+
+        fn stream(&self) -> Result<impl Iterator<Item = Outcome<Self::Item>>, Error>;
+
+        fn count(&self) -> u64 {
+            self.root().buffers.iter().map(Buffer::count).sum()
+        }
+
+        fn retain<B, F, I>(&mut self, bounds: &[B], test: &F) -> Result<&mut Self, Error>
+        where
+            Self::Item: Evaluate<I>,
+            B: RangeBounds<I>,
+            F: Fn(&I) -> bool,
+            I: for<'de> Deserialize<'de, Ok = I> + PartialOrd;
+    }
+
+    /* ------------------------------------------------------------ Adapter Trait Implementation */
+
+    impl<'q, I> Adapter for Root<'q, I>
+    where
+        I: Read + Clone + 'q,
+        I::Src<'q>: Deserialize<'q, Ok = I::Src<'q>> + Reader<'q, I>,
+    {
+        type Item = I;
+
+        fn root(&self) -> &Self {
+            self
+        }
+
+        fn buffers(&mut self) -> &mut Vec<Buffer> {
+            &mut self.buffers
+        }
+
+        fn stream(&self) -> Result<impl Iterator<Item = Outcome<I>>, Error> {
+        }
+
+        fn retain<B, F, O>(&mut self, bounds: &[B], test: &F) -> Result<&mut Self, Error>
+        where
+            I: Evaluate<O>,
+            B: RangeBounds<O>,
+            F: Fn(&O) -> bool,
+            O: for<'de> Deserialize<'de, Ok = O> + PartialOrd,
+        {
+        }
+    }
+
+    impl<S, F> Adapter for Filter<S, F>
+    where
+        S: Adapter,
+        F: Fn(S::Item) -> Outcome<S::Item>,
+    {
+        type Item = S::Item;
+
+        fn root<'a>(&'a self) -> &'a Root<'a, S::Item> {
+            self.source.root()
+        }
+
+        fn buffers(&mut self) -> &mut Vec<Buffer> {
+            self.source.buffers()
+        }
+
+        fn stream(&self) -> Result<impl Iterator<Item = Outcome<S::Item>>, Error> {
+        }
+
+        fn retain<B, G, I>(&mut self, bounds: &[B], test: &G) -> Result<&mut Self, Error>
+        where
+            S::Item: Evaluate<I>,
+            B: RangeBounds<I>,
+            G: Fn(&I) -> bool,
+            I: for<'de> Deserialize<'de, Ok = I> + PartialOrd,
+        {
+            self.source.retain(bounds, test)?;
+            Ok(self)
+        }
+    }
+
+    impl<S> Adapter for Skip<S>
+    where
+        S: Adapter,
+    {
+        type Item = S::Item;
+
+        fn root<'a>(&'a self) -> &'a Root<'a, S::Item> {
+            self.inner.root()
+        }
+
+        fn buffers(&mut self) -> &mut Vec<Buffer> {
+            self.inner.buffers()
+        }
+
+        fn stream(&self) -> Result<impl Iterator<Item = Outcome<S::Item>>, Error> {
+        }
+
+        fn count(&self) -> u64 {
+            self.inner.count().saturating_sub(self.skip)
+        }
+
+        fn retain<B, G, I>(&mut self, bounds: &[B], test: &G) -> Result<&mut Self, Error>
+        where
+            S::Item: Evaluate<I>,
+            B: RangeBounds<I>,
+            G: Fn(&I) -> bool,
+            I: for<'de> Deserialize<'de, Ok = I> + PartialOrd,
+        {
+            self.inner.retain(bounds, test)?;
+            Ok(self)
+        }
+    }
+
+    impl<S> Adapter for Take<S>
+    where
+        S: Adapter,
+    {
+        type Item = S::Item;
+
+        fn root<'a>(&'a self) -> &'a Root<'a, S::Item> {
+            self.inner.root()
+        }
+
+        fn buffers(&mut self) -> &mut Vec<Buffer> {
+            self.inner.buffers()
+        }
+
+        fn stream(&self) -> Result<impl Iterator<Item = Outcome<S::Item>>, Error> {
+        }
+
+        fn count(&self) -> u64 {
+            self.inner.count().min(self.take)
+        }
+
+        fn retain<B, G, I>(&mut self, bounds: &[B], test: &G) -> Result<&mut Self, Error>
+        where
+            S::Item: Evaluate<I>,
+            B: RangeBounds<I>,
+            G: Fn(&I) -> bool,
+            I: for<'de> Deserialize<'de, Ok = I> + PartialOrd,
+        {
+        }
+    }
+
 }
 
 /* --------------------------------------------------------------------------- Stream Sub-Module */
