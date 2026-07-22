@@ -884,8 +884,23 @@ pub mod column {
         where
             O: Adapter,
         {
+    #[allow(
+        private_bounds,
+        reason = "sealed: Reconcile is unreachable outside the crate"
+    )]
+    pub trait Join: Reconcile + Sized {
+        fn and<O>(mut self, mut other: O) -> Result<super::Join<Self, O>, Error>
+        where
+            O: Column,
+        {
         }
     }
+
+    /* --------------------------------------------------------------- Join Trait Implementation */
+
+    impl<T> Join for T where T: Reconcile {}
+
+    /* ------------------------------------------------------------------- Walk Trait Definition */
 
 }
 
