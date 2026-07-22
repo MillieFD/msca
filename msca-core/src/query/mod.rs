@@ -807,6 +807,7 @@ pub mod column {
         }
 
         fn read(&self) -> Result<impl Iterator<Item = Result<Self::Item, io::Error>>, Error> {
+            self.stream().map(Resolve::resolve)
         }
 
         fn unique(&self) -> Result<HashSet<Self::Item, Xxh3Builder>, Error>
