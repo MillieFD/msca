@@ -52,7 +52,7 @@ use xxhash_rust::xxh3::Xxh3Builder;
 
 use crate::io::{self, Deserialize};
 use crate::manifest;
-use crate::read::{Composite, Outcome, Read, Reader};
+use crate::read::{Composite, Outcome, Read, Reader, Resolve};
 use crate::schema::{number, Schema, Type, Unfolder};
 
 /* --------------------------------------------------------------------------------------- Query */
@@ -168,6 +168,28 @@ impl Query {
         }
     }
 
+    /// Read a single [`Composite`] item at the specified `index` across all [segments][1] for this
+    /// query [`Schema`].
+    ///
+    /// ### Errors
+    ///
+    /// Returns [`Error::Io`] if an error occurs during file [`IO`](io) or item deserialization.
+    ///
+    /// [1]: crate::segment::Segment
+    pub fn item<I>(mut self, index: u64) -> Result<Option<I>, Error>
+    where
+        I: Read + 'static,
+        for<'a> I::Src<'a>: Composite<'a, Self> + Iterator<Item = Outcome<I>> + 'a,
+    {
+        let skip = self
+            .columns
+            .values_mut()
+            .map(|col| Buffer::skip(&mut col.buffers, index))
+            .last()
+            .unwrap_or_default() as usize;
+        self.read::<I>()?.nth(skip).transpose().map_err(Error::from)
+    }
+
     pub fn stream<'q, I>(&'q self, name: &str) -> Result<impl Iterator<Item = Outcome<I>>, Error>
     where
         I: Read + Clone + 'q,
@@ -184,6 +206,14 @@ impl Query {
         let src = stream::Root::new(buffers, &self.mmap);
         let items = src.stream()?.map(Outcome::from);
         Ok(items)
+    }
+
+    pub fn read<'q, I>(&'q self) -> Result<impl Iterator<Item = Result<I, io::Error>> + 'q, Error>
+    where
+        I: Read + 'q,
+        I::Src<'q>: Composite<'q, Self> + Iterator<Item = Outcome<I>> + 'q,
+    {
+        I::Src::new(self).map(Resolve::resolve)
     }
 
     /// Returns the total number of on-disk items for this [`Schema`] across all [segments][1]; the
