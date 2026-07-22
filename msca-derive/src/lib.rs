@@ -1,6 +1,6 @@
 /*
-Project: clem
-GitHub: https://github.com/MillieFD/clem
+Project: msca
+GitHub: https://github.com/MillieFD/msca
 
 BSD 3-Clause License, Copyright (c) 2026, Amelia Fraser-Dale
 
@@ -8,13 +8,13 @@ Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the conditions of the LICENSE are met.
 */
 
-//! Procedural macros for the `clem` storage engine.
+//! Procedural macros for the `msca` storage engine.
 //!
 //! ---
 //!
 //! Each macro expansion is implemented in the corresponding submodule; refer to the module-level
-//! documentation for more details. Generated code resolves all paths via the `clem` facade which
-//! re-exports this crate. Standalone use of `clem-derive` is not supported.
+//! documentation for more details. Generated code resolves all paths via the `msca` facade which
+//! re-exports this crate. Standalone use of `msca-derive` is not supported.
 
 #![doc = include_str!("../../doc/derive.md")]
 
@@ -47,7 +47,7 @@ pub fn read(input: TokenStream) -> TokenStream {
 /* ---------------------------------------------------------------------------- Field Extraction */
 
 /// A single field from the external struct; borrows from [`DeriveInput`].
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 struct Field<'a> {
     /// Field [identifier](Ident); used to generate the corresponding schema column name.
     ident: &'a Ident,
@@ -74,7 +74,7 @@ impl<'a> Field<'a> {
 }
 
 /// Extract [fields](Field) from an external type in **name-sorted** order to match the
-/// platform-invariant deterministic [`BTreeMap`][1] column order used throughout [clem](crate).
+/// platform-invariant deterministic [`BTreeMap`][1] column order used throughout [msca](crate).
 ///
 /// ### Errors
 ///
@@ -85,8 +85,8 @@ fn fields(input: &'_ DeriveInput) -> Result<Vec<Field<'_>>, syn::Error> {
     let error = |msg| Err(syn::Error::new_spanned(input, msg));
     let named = match &input.data {
         Data::Struct(DataStruct { fields: Fields::Named(named), .. }) => &named.named,
-        Data::Struct(_) => return error("clem requires named fields to generate a schema"),
-        other => return error("clem does not currently support this type"),
+        Data::Struct(..) => return error("msca requires named fields to generate a schema"),
+        other => return error("msca does not currently support this type"),
     };
     let mut fields: Vec<Field> = named
         .iter()
@@ -107,14 +107,24 @@ mod tests {
 
     use super::*;
 
+    /* ---------------------------------------------------------------------------- Shared State */
+
     /// Space-insensitive containment check; tolerant of generated token spacing.
     pub(crate) fn has(code: &str, needle: &str) -> bool {
         code.replace(' ', "").contains(&needle.replace(' ', ""))
     }
 
+    /// The two-field `struct Row` shared by the [`expand`](crate::data::expand) tests across the
+    /// crate; its fields are deliberately out of order so field sorting is exercised downstream.
+    pub(crate) fn row() -> DeriveInput {
+        parse_quote! { struct Row { a: u32, b: f64 } }
+    }
+
+    /* ------------------------------------------------------------------------------ Unit Tests */
+
     /// [`fields`] returns the named fields sorted by identifier.
     #[test]
-    fn fields_sorted() {
+    fn fields_sort_by_identifier() {
         let input: DeriveInput = parse_quote! { struct Row { b: u8, a: u16, c: u32 } };
         let fields = fields(&input).expect("Named struct was rejected");
         assert_eq!(Field::names(&fields), ["a", "b", "c"]);
@@ -122,13 +132,15 @@ mod tests {
 
     /// [`fields`] rejects enums, tuple structs, unit structs, and empty structs.
     #[test]
-    fn fields_rejects_unsupported() {
+    fn fields_reject_unsupported_shapes() {
         let inputs: [DeriveInput; 4] = [
             parse_quote! { enum Level { Low } },
             parse_quote! { struct Tuple(u8); },
             parse_quote! { struct Unit; },
             parse_quote! { struct Empty {} },
         ];
-        assert!(inputs.iter().all(|input| fields(input).is_err()));
+        inputs.iter().for_each(|input| {
+            fields(input).expect_err("Unsupported shape accepted");
+        });
     }
 }
