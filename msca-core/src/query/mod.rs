@@ -260,7 +260,26 @@ where
         (self.a, self.b)
     }
 
-/* --------------------------------------------------------------------------- Column Descriptor */
+    /// Returns an [`Iterator`] that yields [`deserialized`][1] composite [`items`](I) from the
+    /// [joined][2] columns.
+    ///
+    /// ### Errors
+    ///
+    /// - [`Error::Column`] if the composite [`I`] requests a column that is not in the [`Join`].
+    /// - [`Error::Type`] if the requested [`Type`] does not match the on-disk [`Column`] type.
+    ///
+    /// Refer to the [composite trait documentation](Composite) for more details.
+    ///
+    /// [1]: Deserialize::deserialize
+    /// [2]: column::Join
+    pub fn read<'a, I>(&'a self) -> Result<impl Iterator<Item = Result<I, io::Error>>, Error>
+    where
+        I: Read + 'a,
+        I::Src<'a>: Composite<'a, Self> + Iterator<Item = Outcome<I>> + 'a,
+    {
+        I::Src::new(self).map(Resolve::resolve)
+    }
+}
 
 /// A minimal column **descriptor** for [`Query`] planning and execution.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
