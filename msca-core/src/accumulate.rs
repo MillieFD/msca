@@ -892,7 +892,12 @@ impl<I> Describe<I> for Buffer<I>
 where
     I: BitMatch + Clone + Unfold + Send + Sync + 'static,
 {
-    fn buffers(&self, offset: u64, columns: &mut Columns) -> Result<u64, schema::Error> {
+    fn buffers(
+        &self,
+        offset: u64,
+        segment: u64,
+        columns: &mut Columns,
+    ) -> Result<u64, schema::Error> {
         if let Some(column) = columns.next() {
             let sector = Sector {
                 offset: offset.checked_add(SizedBuf::<I>::PREFIX).ok_or(Error::Zero)?,
@@ -2167,7 +2172,10 @@ where
     }
 }
 
-impl<I> Segment for Accumulator<I> {
+impl<I> Segment for Accumulator<I>
+where
+    I: Data,
+{
     const VARIANT: Variant = Variant::Data;
 
     fn wrap(&self, offset: u64) -> Result<Vec<u8>, Error> {
@@ -2190,9 +2198,12 @@ impl<I> Segment for Accumulator<I> {
     }
 }
 
-impl<I> Checksum for Accumulator<I> {}
+impl<I> Checksum for Accumulator<I> where I: Data {}
 
-impl<I> Register for Accumulator<I> {
+impl<I> Register for Accumulator<I>
+where
+    I: Data,
+{
     type Error = schema::Error;
     type Entry<'m> = &'m mut manifest::Schema;
 
