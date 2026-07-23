@@ -327,6 +327,7 @@ pub enum Buffer {
     },
     /// A buffer containing **more than one** distinct [`PartialOrd`] item.
     #[n(2)]
+    #[non_exhaustive] // rejects external struct literal construction
     Detailed {
         /// Location of the [`Buffer`] on disk.
         ///
