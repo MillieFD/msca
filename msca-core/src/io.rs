@@ -123,6 +123,7 @@ const ALIGN: usize = {
 /// data processing.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode, CborLen)]
+#[non_exhaustive] // rejects external struct literal construction; use Sector::new
 pub struct Sector {
     /// Byte offset to the start of the sector.
     #[n(0)]
