@@ -189,6 +189,7 @@ impl<'de> Deserialize<'de> for Manifest {
 /// on-disk data segments contain the columnar buffers.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode, CborLen)]
+#[non_exhaustive] // rejects external struct literal construction
 pub struct Schema {
     /// Location of the [`Schema`] segment.
     #[n(0)]
