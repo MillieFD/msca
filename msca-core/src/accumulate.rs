@@ -890,13 +890,8 @@ pub trait Describe<I>: Accumulate<I> + Serialize {
 
 impl<I> Describe<I> for Buffer<I>
 where
-    I: BitMatch + Clone + Unfold + 'static,
+    I: BitMatch + Clone + Unfold + Send + Sync + 'static,
 {
-    fn boxed(&self) -> BoxAcc<I> {
-        let buf = Self::default();
-        Box::new(buf)
-    }
-
     fn buffers(&self, offset: u64, columns: &mut Columns) -> Result<u64, schema::Error> {
         if let Some(column) = columns.next() {
             let sector = Sector {
