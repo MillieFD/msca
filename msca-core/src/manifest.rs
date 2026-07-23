@@ -114,7 +114,7 @@ impl Manifest {
     /// Returns the corresponding [entry](S::Entry) in [`self`](Self) for the provided [`Segment`].
     ///
     /// Refer to the [trait documentation](Register) for more details.
-    //noinspection RsNeedlessLifetimes → explicit 'm lifetime improves readability
+    // noinspection RsNeedlessLifetimes → explicit 'm lifetime improves readability
     pub fn entry<'m, S>(&'m mut self, seg: &S) -> Result<S::Entry<'m>, S::Error>
     where
         S: Register,
