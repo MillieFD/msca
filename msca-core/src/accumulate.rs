@@ -870,10 +870,6 @@ where
 ///
 /// [1]: crate::read::Composite
 pub trait Describe<I>: Accumulate<I> + Serialize {
-    /// Returns a new empty instance of [`Self`] boxed as a [`BoxAcc`] trait object.
-    // NOTE: Buffer must be a growable Vec; compiler cannot predict the number of accumulated items
-    fn boxed(&self) -> BoxAcc<I>;
-
     /// Generates one [`Buffer`](manifest::Buffer) descriptor per [`Column`] describing the
     /// [accumulated](Accumulate) data. Each descriptor is appended to the corresponding
     /// [`Manifest`] column entry.
