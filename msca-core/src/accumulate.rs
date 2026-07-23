@@ -32,17 +32,12 @@ use bitvec::field::BitField;
 use bitvec::vec::BitVec;
 use minicbor::{CborLen, Decode, Encode};
 
-use crate::io::{Checksum, Register, SizedBuf, HEADER};
+use crate::io::{Checksum, HEADER, Register, SizedBuf};
 use crate::manifest::{self, Column, Manifest};
 use crate::number::Error;
-use crate::schema::{self, size_of_opt, BitMatch, Unfold};
+use crate::schema::{self, BitMatch, Unfold, size_of_opt};
 use crate::segment::{Align, Header, Segment, Variant};
-use crate::{io, Sector};
-
-/// Shorthand type-erased stack-allocated [pointer](Box) to a [`Describe`] trait object backed by a
-/// heap-allocated growable [`Buffer`](Serialize::Buffer).
-// NOTE: Buffer must be a growable Vec; compiler cannot predict the number of accumulated items
-pub type BoxAcc<I> = Box<dyn Describe<I, Buffer = Vec<u8>>>;
+use crate::{Data, Sector, io};
 
 /// Shorthand type-erased [`Iterator`] over mutable [`Column`] descriptors.
 // NOTE: Deterministic runtime order via BTreeMap; #[derive] ensures identical compile time order.
