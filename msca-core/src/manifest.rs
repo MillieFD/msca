@@ -293,6 +293,7 @@ impl From<Type> for Column {
 pub enum Buffer {
     /// A compact buffer containing exactly **one** item repeated `count` times.
     #[n(0)]
+    #[non_exhaustive] // rejects external struct literal construction
     Compact {
         /// Location of the [`Buffer`] on disk.
         ///
