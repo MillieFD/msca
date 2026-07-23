@@ -235,18 +235,15 @@ impl<T> Default for OptInSitu<T> {
 ///
 /// [`None`] entries append no data; the validity mask alone records their position. This design
 /// improves storage density at the expense of index-based random access. Users are encouraged to
-/// [`Stream`][1] data via the [`Query`](crate::Query) interface.
+/// stream data via the [`Query`](crate::Query) interface.
 ///
 /// ### Guidance
 ///
 /// The sibling [`OptInSitu`] type encodes [`Some`] and [`None`] values directly in a single data
 /// buffer for supported niche types; no validity mask required. Implementors are advised to use
 /// niche-optimised types when possible to improve storage efficiency and random read performance.
-///
-/// [1]: crate::read::Stream
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
-#[doc(hidden)]
 pub struct OptBitVec<I>
 where
     I: Unfold,
@@ -345,7 +342,6 @@ where
 /// [1]: https://doc.rust-lang.org/reference/dynamically-sized-types.html
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
-#[doc(hidden)]
 pub struct Seq<I>
 where
     I: Unfold,
@@ -402,7 +398,7 @@ where
 /// ### Data Layout
 ///
 /// It is not possible to predetermine the disk space required by each instance of an unsized type;
-/// there is no guarantee that two [`Vec<T>`] contain the same number of elements. The [msca](crate)
+/// there is no guarantee that two [`Vec<I>`] contain the same number of elements. The [msca](crate)
 /// engine therefore unfolds unsized types into:
 ///
 /// 1. Columnar `ends` region describing boundaries.
@@ -416,10 +412,9 @@ where
 /// [1]: https://doc.rust-lang.org/reference/dynamically-sized-types.html
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
-#[doc(hidden)]
-pub struct OptSeq<T>
+pub struct OptSeq<I>
 where
-    T: Unfold,
+    I: Unfold,
 {
     /// Cumulative end offsets.
     ///
@@ -435,7 +430,7 @@ where
         feature = "serde",
         serde(default, skip_serializing_if = "Accumulate::is_empty")
     )]
-    pub data: T::RawAcc,
+    pub data: I::RawAcc,
 }
 
 impl<I> Default for OptSeq<I>
@@ -471,7 +466,6 @@ where
 /// storage lives in the inner accumulator.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug, Default, Eq, PartialEq, Ord, PartialOrd, Hash, Encode, Decode, CborLen)]
-#[doc(hidden)]
 pub struct Flatten<I>(#[n(0)] pub I);
 
 /// A **state machine** used to build [data buffers](manifest::Buffer) for the specified [`Column`].
@@ -509,12 +503,11 @@ pub struct Flatten<I>(#[n(0)] pub I);
 ///
 /// ### Guidance
 ///
-/// Implementers are encouraged to use a [`bin`] segment for genuinely constant data that never
-/// changes across the entire file lifetime. This improves storage efficiency by eliminating an
+/// Implementers are encouraged to use a [`Bin`](crate::Bin) segment for genuinely constant data
+/// that never changes across the file lifetime. This improves storage efficiency by eliminating an
 /// unnecessary column from the schema.
-// TODO → add doc link to binary segment
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub(crate) enum Buffer<I>
+pub enum Buffer<I>
 where
     I: Unfold,
 {
