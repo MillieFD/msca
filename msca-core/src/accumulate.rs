@@ -106,9 +106,13 @@ pub type Columns<'a> = dyn Iterator<Item = &'a mut Column> + 'a;
 /// [3]: schema::Type
 /// [4]: crate::Dataset::schema
 /// [5]: crate::Dataset::write
-pub struct Accumulator<I> {
-    /// Type-erased [`Describe`] trait object.
-    pub data: BoxAcc<I>,
+pub struct Accumulator<I>
+where
+    I: Data,
+{
+    /// The monomorphized composite accumulator for [`I`], named through [`Data::Acc`] so no trait
+    /// object erases it: the whole accumulator tree stays inlineable.
+    pub data: I::Acc,
     /// [Name](String) of the corresponding [`Schema`][1] registered in the [`Manifest`].
     ///
     /// [1]: crate::Schema
@@ -118,7 +122,10 @@ pub struct Accumulator<I> {
     pub schema: Sector,
 }
 
-impl<I> Accumulator<I> {
+impl<I> Accumulator<I>
+where
+    I: Data,
+{
     /// Size of the data segment [`Header`] and metadata in bytes.
     ///
     /// Refer to the [`Accumulator`] documentation for more details regarding segment layout.
@@ -151,22 +158,26 @@ impl<I> Accumulator<I> {
 /// verification compared to [`Dataset::schema`][3].
 ///
 /// [1]: manifest::Schema
-/// [2]: crate::schema::Type
+/// [2]: schema::Type
 /// [3]: crate::Dataset::schema
 impl<I> Clone for Accumulator<I>
 where
-    I: 'static,
+    I: Data,
 {
     fn clone(&self) -> Self {
+        // NOTE: each clone starts empty due to I::Acc::default
         Self {
-            data: self.data.boxed(),
+            data: I::Acc::default(),
             name: self.name.clone(),
             schema: self.schema,
         }
     }
 }
 
-impl<I> Debug for Accumulator<I> {
+impl<I> Debug for Accumulator<I>
+where
+    I: Data,
+{
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Accumulator")
             .field("item", &std::any::type_name::<I>())
@@ -579,7 +590,10 @@ pub trait Accumulate<I> {
 
 /* ------------------------------------------------------------- Accumulate Trait Implementation */
 
-impl<I> Accumulate<I> for Accumulator<I> {
+impl<I> Accumulate<I> for Accumulator<I>
+where
+    I: Data,
+{
     fn push(&mut self, item: I) {
         self.data.push(item);
     }
