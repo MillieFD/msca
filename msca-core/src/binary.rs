@@ -67,7 +67,7 @@ use std::collections::btree_map::{Entry, VacantEntry};
 
 use minicbor::{CborLen, Decode, Encode};
 
-use crate::io::{self, Buffer, Checksum, Register, HEADER};
+use crate::io::{self, Buffer, Checksum, HEADER, Register};
 use crate::manifest::{self, Manifest};
 use crate::schema::number::Error;
 use crate::segment::{Align, Header, Segment, Variant};
@@ -240,8 +240,14 @@ impl Register for Bin {
 mod tests {
     use std::path::PathBuf;
 
+    use macro_rules_attribute::apply;
+    use smol_macros::test;
+
     use super::*;
     use crate::io::File;
+    use crate::manifest::Error::Collision;
+
+    /* ---------------------------------------------------------------------------- Shared State */
 
     /// Unique scratch path for a layout test, cleared before use.
     fn scratch(name: &str) -> PathBuf {
@@ -250,9 +256,11 @@ mod tests {
         path
     }
 
+    /* ------------------------------------------------------------------------------ Unit Tests */
+
     /// [`Bin::with_capacity`] reserves payload space without accumulating any bytes.
     #[test]
-    fn with_capacity_reserves() {
+    fn with_capacity_reserves_without_accumulating() {
         let bin = Bin::with_capacity("b", 64);
         assert!(bin.is_empty());
         assert_eq!(bin.count(), 0);
@@ -261,45 +269,41 @@ mod tests {
 
     /// A duplicate name is rejected while reserving the manifest entry – before any file IO – so
     /// the on-disk file remains intact and reopens cleanly afterwards.
-    #[test]
-    fn duplicate_rejected_before_io() {
-        smol::block_on(async {
-            let path = scratch("bin-entry");
-            let mut file = File::create(&path).await.expect("Create failed");
-            let mut bin = Bin::new("cal");
-            bin.push([9u8; 4].as_slice());
-            file.write(bin).await.expect("Write failed");
-            let mut twin = Bin::new("cal");
-            twin.push([7u8; 2].as_slice());
-            let err = file.write(twin).await.expect_err("Duplicate accepted");
-            assert!(matches!(
-                err,
-                io::Error::Manifest(manifest::Error::Collision { .. })
-            ));
-            drop(file);
-            File::open(&path).await.expect("Reopen failed"); // Manifest intact
-            std::fs::remove_file(&path).ok();
-        });
+    #[apply(test!)]
+    async fn duplicate_name_is_rejected_before_io() {
+        // 1. Write the original payload under `cal`.
+        let path = scratch("bin-entry");
+        let mut file = File::create(&path).await.expect("Create failed");
+        let mut bin = Bin::new("cal");
+        bin.push([9u8; 4].as_slice());
+        file.write(bin).await.expect("Write failed");
+        // 2. A second payload under the same name is rejected before any file IO.
+        let mut twin = Bin::new("cal");
+        twin.push([7u8; 2].as_slice());
+        let clash = file.write(twin).await.expect_err("Duplicate accepted");
+        // 3. The manifest survived the rejected write, so the file reopens cleanly.
+        drop(file);
+        File::open(&path).await.expect("Reopen failed");
+        std::fs::remove_file(&path).ok();
+        assert!(matches!(clash, io::Error::Manifest(Collision { .. })));
     }
 
     /// The registered `bins` sector spans exactly the payload at an absolute 64-bit boundary,
     /// relative to the immutable segment region.
-    #[test]
-    fn sector_spans_payload() {
-        smol::block_on(async {
-            let path = scratch("bin-sector");
-            let mut file = File::create(&path).await.expect("Create failed");
-            let mut bin = Bin::new("cal");
-            bin.push([1u8, 2, 3, 4, 5].as_slice());
-            file.write(bin).await.expect("Write failed");
-            let sect = *file.manifest.bins.get("cal").expect("Bin missing");
-            let bytes = std::fs::read(&path).expect("Read failed");
-            std::fs::remove_file(&path).ok();
-            assert_eq!(sect.size.get(), 5); // Payload bytes only
-            assert_eq!(sect.offset % 8, 0); // Absolute 64-bit alignment
-            let abs = sect.offset as usize + HEADER;
-            assert_eq!(&bytes[abs..abs + 5], &[1, 2, 3, 4, 5]);
-        });
+    #[apply(test!)]
+    async fn sector_spans_payload_at_aligned_offset() {
+        let path = scratch("bin-sector");
+        let mut file = File::create(&path).await.expect("Create failed");
+        let mut bin = Bin::new("cal");
+        bin.push([1u8, 2, 3, 4, 5].as_slice());
+        file.write(bin).await.expect("Write failed");
+        let sect = *file.manifest.bins.get("cal").expect("Bin missing");
+        let bytes = std::fs::read(&path).expect("Read failed");
+        std::fs::remove_file(&path).ok();
+        let abs = sect.offset as usize + HEADER;
+        assert_eq!(sect.size.get(), 5); // payload bytes only
+        assert_eq!(sect.offset % 8, 0); // absolute 64-bit alignment
+        assert_eq!(&bytes[abs..abs + 5], &[1, 2, 3, 4, 5]);
     }
 
     /// [`Segment::wrap`] frames a binary segment as `[variant][size][pad][payload][checksum]`: the
@@ -307,49 +311,49 @@ mod tests {
     /// payload to the next absolute 64-bit boundary, and the trailing [checksum](Checksum::verify)
     /// covers every preceding byte.
     #[test]
-    fn frame_layout() {
+    fn frame_layout_pads_payload_to_boundary() {
         let mut bin = Bin::new("cal");
         bin.push([1u8, 2, 3, 4, 5].as_slice());
         let bytes = bin.wrap(0).expect("Frame failed");
-        assert_eq!(bytes[0], Variant::Binary as u8);
         let size = u64::from_le_bytes(bytes[1..Header::SIZE].try_into().expect("Size is 8 bytes"));
-        assert_eq!(size, bin.data.len() as u64); // Size spans the payload alone
-        let start = Header::SIZE.next_multiple_of(8); // Payload begins at the next 64-bit boundary
+        let start = Header::SIZE.next_multiple_of(8); // payload begins at the next 64-bit boundary
+        let body = Bin::verify(&bytes).expect("Checksum failed"); // trailing checksum verifies
+        assert_eq!(bytes[0], Variant::Binary as u8);
+        assert_eq!(size, bin.data.len() as u64); // size spans the payload alone
         assert_eq!(&bytes[start..start + 5], &[1, 2, 3, 4, 5]);
         assert_eq!(bytes.len(), start + 5 + size_of::<u64>()); // header + pad + payload + checksum
-        let body = Bin::verify(&bytes).expect("Checksum failed"); // Trailing checksum verifies
         assert_eq!(body, &bytes[..bytes.len() - size_of::<u64>()]);
     }
 
     /// [`Extend`] moves bytes into the accumulator from any [`IntoIterator`] that yields [`u8`],
     /// covering both a bare iterator and an owned collection.
     #[test]
-    fn extend_moves_bytes() {
+    fn extend_moves_bytes_from_any_iterator() {
         let mut bin = Bin::new("b");
-        bin.extend(1u8..=3); // Bare iterator
-        bin.extend([4u8, 5, 6]); // Owned IntoIterator
+        bin.extend(1u8..=3); // bare iterator
+        bin.extend([4u8, 5, 6]); // owned IntoIterator
         assert_eq!(bin.data, [1, 2, 3, 4, 5, 6]);
         assert_eq!(bin.count(), 6);
     }
 
     /// Every binary segment body begins on an absolute 64-bit boundary, even when a preceding
     /// segment leaves an odd byte count that must be padded before the next header.
-    #[test]
-    fn body_starts_aligned() {
-        smol::block_on(async {
-            let path = scratch("bin-align");
-            let mut file = File::create(&path).await.expect("Create failed");
-            for (name, size) in [("a", 1usize), ("b", 3), ("c", 7), ("d", 8)] {
-                let mut bin = Bin::new(name);
-                bin.push(vec![u8::MAX; size].as_slice());
-                file.write(bin).await.expect("Write failed");
-            }
-            for name in ["a", "b", "c", "d"] {
-                let sect = file.manifest.bins.get(name).expect("Bin missing");
-                assert_eq!(sect.offset % 8, 0, "{name} body misaligned");
-            }
-            drop(file);
-            std::fs::remove_file(&path).ok();
-        });
+    #[apply(test!)]
+    async fn every_body_starts_aligned() {
+        // 1. Write four payloads whose odd sizes force padding before each following header.
+        let path = scratch("bin-align");
+        let mut file = File::create(&path).await.expect("Create failed");
+        for (name, size) in [("a", 1usize), ("b", 3), ("c", 7), ("d", 8)] {
+            let mut bin = Bin::new(name);
+            bin.push(vec![u8::MAX; size].as_slice());
+            file.write(bin).await.expect("Write failed");
+        }
+        // 2. Every registered body still lands on an absolute 64-bit boundary.
+        for name in ["a", "b", "c", "d"] {
+            let sect = file.manifest.bins.get(name).expect("Bin missing");
+            assert_eq!(sect.offset % 8, 0, "{name} body misaligned");
+        }
+        drop(file);
+        std::fs::remove_file(&path).ok();
     }
 }
