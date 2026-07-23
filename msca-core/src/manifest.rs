@@ -310,6 +310,7 @@ pub enum Buffer {
     },
     /// A buffer containing **more than one** distinct item with no orderable statistics.
     #[n(1)]
+    #[non_exhaustive] // rejects external struct literal construction
     Basic {
         /// Location of the [`Buffer`] on disk.
         ///
