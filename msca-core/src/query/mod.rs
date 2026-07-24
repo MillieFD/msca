@@ -53,7 +53,7 @@ use xxhash_rust::xxh3::Xxh3Builder;
 use crate::io::{self, Deserialize};
 use crate::manifest::{self, Buffer};
 use crate::read::{Composite, Outcome, Read, Reader, Resolve};
-use crate::schema::{number, Schema, Type, Unfolder};
+use crate::schema::{Schema, Type, Unfolder, number};
 
 /* ------------------------------------------------------------------------------ Public Exports */
 
@@ -502,22 +502,31 @@ pub mod column {
     use funty::Unsigned;
     use xxhash_rust::xxh3::Xxh3Builder;
 
-    use super::{stream, Buffer, Error, Query};
+    use super::{Error, Query, stream};
     use crate::io::{self, Deserialize};
-    use crate::manifest;
-    use crate::read::{Evaluate, IsOption, Keep, Outcome, Read, Reader};
+    use crate::manifest::Buffer;
+    use crate::read::{Evaluate, IsOption, Outcome, Read, Reader, Resolve};
     use crate::schema::BitMatch;
 
     /* -------------------------------------------------------------------------- Public Exports */
 
-    pub(crate) struct Root<'q, I> {
-        query: &'q Query,
-        name: &'q str,
-        buffers: Vec<Buffer>,
+    /// An [iteration](Iterator) **state machine** over [deserialized][1] [items](I) from one
+    /// [`Column`] in the [`Query`] result set.
+    ///
+    /// [1]: Deserialize::deserialize
+    #[doc(hidden)] // returned by Adapter::root; not intended as a stable API
+    pub struct Src<'q, I> {
+        /// An immutable reference to the parent [`Query`].
+        pub query: &'q Query,
+        /// The name of the [`Column`] over which this [`Src`] iterates.
+        pub name: &'q str,
+        /// Candidate [`Buffer`] collection used for targeted [`IO`](io).
+        pub buffers: Vec<Buffer>,
+        /// Type-state carrier for the requested [`item`](I) type.
         item: PhantomData<I>,
     }
 
-    impl<'q, I> Root<'q, I> {
+    impl<'q, I> Src<'q, I> {
         pub(crate) const fn new(query: &'q Query, name: &'q str, buffers: Vec<Buffer>) -> Self {
             Self { query, name, buffers, item: PhantomData }
         }
